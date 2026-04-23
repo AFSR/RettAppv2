@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AFSR
+@testable import RettApp
 
 final class SeizureViewModelTests: XCTestCase {
 
