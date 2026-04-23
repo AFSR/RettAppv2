@@ -37,6 +37,19 @@ extension Color {
     }
 }
 
+// MARK: - ShapeStyle shortcuts (for `.foregroundStyle(.afsrPurple)` syntax)
+
+extension ShapeStyle where Self == Color {
+    static var afsrPurple: Color       { .afsrPurple }
+    static var afsrPurpleLight: Color  { .afsrPurpleLight }
+    static var afsrPurpleDark: Color   { .afsrPurpleDark }
+    static var afsrBackground: Color   { .afsrBackground }
+    static var afsrAccent: Color       { .afsrAccent }
+    static var afsrEmergency: Color    { .afsrEmergency }
+    static var afsrSuccess: Color      { .afsrSuccess }
+    static var afsrWarning: Color      { .afsrWarning }
+}
+
 // MARK: - Typography
 
 enum AFSRFont {
