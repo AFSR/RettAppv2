@@ -1,0 +1,96 @@
+import SwiftUI
+
+// MARK: - Colors
+
+extension Color {
+    static let afsrPurple      = Color(hex: "#6B3FA0")
+    static let afsrPurpleLight = Color(hex: "#9B6FC8")
+    static let afsrPurpleDark  = Color(hex: "#4A2070")
+    static let afsrWhite       = Color.white
+    static let afsrBackground  = Color(hex: "#F8F5FC")
+    static let afsrAccent      = Color(hex: "#E8D5F7")
+    static let afsrEmergency   = Color(hex: "#E53935")
+    static let afsrSuccess     = Color(hex: "#43A047")
+    static let afsrWarning     = Color(hex: "#FB8C00")
+
+    init(hex: String) {
+        let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "#", with: "")
+        var rgb: UInt64 = 0
+        Scanner(string: trimmed).scanHexInt64(&rgb)
+        let r, g, b, a: Double
+        switch trimmed.count {
+        case 6:
+            r = Double((rgb >> 16) & 0xFF) / 255.0
+            g = Double((rgb >> 8) & 0xFF) / 255.0
+            b = Double(rgb & 0xFF) / 255.0
+            a = 1.0
+        case 8:
+            r = Double((rgb >> 24) & 0xFF) / 255.0
+            g = Double((rgb >> 16) & 0xFF) / 255.0
+            b = Double((rgb >> 8) & 0xFF) / 255.0
+            a = Double(rgb & 0xFF) / 255.0
+        default:
+            r = 0; g = 0; b = 0; a = 1
+        }
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
+    }
+}
+
+// MARK: - Typography
+
+enum AFSRFont {
+    static func title(_ size: CGFloat = 28) -> Font {
+        .system(size: size, weight: .bold, design: .rounded)
+    }
+
+    static func headline(_ size: CGFloat = 20) -> Font {
+        .system(size: size, weight: .semibold, design: .rounded)
+    }
+
+    static func body(_ size: CGFloat = 17) -> Font {
+        .system(size: size, weight: .regular, design: .default)
+    }
+
+    static func caption(_ size: CGFloat = 13) -> Font {
+        .system(size: size, weight: .regular, design: .default)
+    }
+
+    static func timer(_ size: CGFloat = 72) -> Font {
+        .system(size: size, weight: .bold, design: .rounded).monospacedDigit()
+    }
+}
+
+// MARK: - Layout tokens
+
+enum AFSRTokens {
+    static let cornerRadius: CGFloat = 20
+    static let cornerRadiusLarge: CGFloat = 24
+    static let cornerRadiusSmall: CGFloat = 12
+    static let shadowRadius: CGFloat = 8
+    static let shadowOpacity: Double = 0.12
+    static let spacing: CGFloat = 16
+    static let spacingLarge: CGFloat = 24
+    static let spacingSmall: CGFloat = 8
+    static let minTapTarget: CGFloat = 60
+}
+
+// MARK: - View modifiers
+
+struct AFSRCardStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(AFSRTokens.spacing)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius, style: .continuous))
+            .shadow(
+                color: .black.opacity(AFSRTokens.shadowOpacity),
+                radius: AFSRTokens.shadowRadius,
+                x: 0, y: 2
+            )
+    }
+}
+
+extension View {
+    func afsrCard() -> some View { modifier(AFSRCardStyle()) }
+}
