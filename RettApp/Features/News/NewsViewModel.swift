@@ -39,8 +39,9 @@ final class NewsViewModel {
     }
 
     private func fetchArticles() async throws -> [NewsArticle] {
+        let path = "collections/\(APIConfig.newsCollection)/entries"
         var components = URLComponents(
-            url: APIConfig.baseURL.appendingPathComponent("collections/articles/entries"),
+            url: APIConfig.baseURL.appendingPathComponent(path),
             resolvingAgainstBaseURL: false
         )
         components?.queryItems = [
