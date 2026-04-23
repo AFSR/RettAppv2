@@ -2,6 +2,13 @@
 <Scheme
    LastUpgradeVersion = "1600"
    version = "1.3">
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES">
@@ -14,7 +21,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "05DA4C2D3B22722AC2AD494A"
+               BlueprintIdentifier = "FBCD3F875FDF8840E59DDA99"
                BuildableName = "RettApp.app"
                BlueprintName = "RettApp"
                ReferencedContainer = "container:RettApp.xcodeproj">
@@ -28,7 +35,7 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "20FE92D3D838711FDC60E98A"
+               BlueprintIdentifier = "1895BA5E1D864AC25A9C0FD8"
                BuildableName = "RettAppTests.xctest"
                BlueprintName = "RettAppTests"
                ReferencedContainer = "container:RettApp.xcodeproj">
@@ -36,34 +43,6 @@
          </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
-   <TestAction
-      buildConfiguration = "Debug"
-      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
-      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES">
-      <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "20FE92D3D838711FDC60E98A"
-               BuildableName = "RettAppTests.xctest"
-               BlueprintName = "RettAppTests"
-               ReferencedContainer = "container:RettApp.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "20FE92D3D838711FDC60E98A"
-               BuildableName = "RettAppTests.xctest"
-               BlueprintName = "RettAppTests"
-               ReferencedContainer = "container:RettApp.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-      </Testables>
-   </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
@@ -74,6 +53,16 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "FBCD3F875FDF8840E59DDA99"
+            BuildableName = "RettApp.app"
+            BlueprintName = "RettApp"
+            ReferencedContainer = "container:RettApp.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -81,12 +70,33 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "FBCD3F875FDF8840E59DDA99"
+            BuildableName = "RettApp.app"
+            BlueprintName = "RettApp"
+            ReferencedContainer = "container:RettApp.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
    </ProfileAction>
-   <AnalyzeAction
-      buildConfiguration = "Debug">
-   </AnalyzeAction>
-   <ArchiveAction
-      buildConfiguration = "Release"
-      revealArchiveInOrganizer = "YES">
-   </ArchiveAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1895BA5E1D864AC25A9C0FD8"
+               BuildableName = "RettAppTests.xctest"
+               BlueprintName = "RettAppTests"
+               ReferencedContainer = "container:RettApp.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
 </Scheme>

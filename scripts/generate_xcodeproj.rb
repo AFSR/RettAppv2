@@ -146,11 +146,43 @@ project.save
 # --- Shared scheme ----------------------------------------------------------
 
 scheme = Xcodeproj::XCScheme.new
-scheme.configure_with_targets(app_target, test_target)
-# Les tests doivent être exécutables
-test_action = scheme.test_action
-test_ref = Xcodeproj::XCScheme::TestAction::TestableReference.new(test_target)
-test_action.add_testable(test_ref)
+
+# Build action : construire l'app (+ les tests)
+build_action = Xcodeproj::XCScheme::BuildAction.new
+app_entry = Xcodeproj::XCScheme::BuildAction::Entry.new(app_target)
+app_entry.build_for_analyzing = true
+app_entry.build_for_archiving = true
+app_entry.build_for_profiling = true
+app_entry.build_for_running = true
+app_entry.build_for_testing = true
+build_action.add_entry(app_entry)
+
+test_build_entry = Xcodeproj::XCScheme::BuildAction::Entry.new(test_target)
+test_build_entry.build_for_analyzing = false
+test_build_entry.build_for_archiving = false
+test_build_entry.build_for_profiling = false
+test_build_entry.build_for_running = false
+test_build_entry.build_for_testing = true
+build_action.add_entry(test_build_entry)
+scheme.build_action = build_action
+
+# Launch (Run) : référence l'exécutable = l'app
+launch_action = Xcodeproj::XCScheme::LaunchAction.new
+launch_action.buildable_product_runnable =
+  Xcodeproj::XCScheme::BuildableProductRunnable.new(app_target, 0)
+scheme.launch_action = launch_action
+
+# Profile (Instruments)
+profile_action = Xcodeproj::XCScheme::ProfileAction.new
+profile_action.buildable_product_runnable =
+  Xcodeproj::XCScheme::BuildableProductRunnable.new(app_target, 0)
+scheme.profile_action = profile_action
+
+# Test
+test_action = Xcodeproj::XCScheme::TestAction.new
+test_action.add_testable(Xcodeproj::XCScheme::TestAction::TestableReference.new(test_target))
+scheme.test_action = test_action
+
 scheme.save_as(PROJECT_PATH, APP_NAME, true)
 
 puts "✅ #{PROJECT_PATH} généré"
