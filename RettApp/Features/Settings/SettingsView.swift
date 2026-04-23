@@ -12,7 +12,7 @@ struct SettingsView: View {
     @Query(sort: \MedicationLog.scheduledTime) private var logs: [MedicationLog]
 
     @State private var notificationsEnabled: Bool = false
-    @State private var healthKitStatus: HKAuthorizationStatus = .notDetermined
+    @State private var healthKitStatus: HealthKitManager.SimpleAuthStatus = .notDetermined
     @State private var showChildEditor = false
     @State private var showMedicationPlan = false
     @State private var showEraseConfirm = false
@@ -99,7 +99,7 @@ struct SettingsView: View {
         } header: {
             Text("Santé")
         } footer: {
-            Text("HealthKit enregistre les crises de votre enfant dans Apple Santé avec des métadonnées identifiant le prénom. Les médicaments sont stockés localement uniquement (limitation API HealthKit).")
+            Text("Toutes les données (crises, médicaments, prises) sont stockées localement sur l'appareil. L'API publique HealthKit n'expose pas encore de type pour les crises d'épilepsie — utilisez l'export CSV pour partager les données avec un professionnel de santé.")
         }
     }
 
@@ -193,9 +193,9 @@ struct SettingsView: View {
     private var healthKitStatusLabel: String {
         switch healthKitStatus {
         case .notDetermined: return "Non demandé"
-        case .sharingDenied: return "Refusé"
-        case .sharingAuthorized: return "Autorisé"
-        @unknown default: return "Inconnu"
+        case .denied: return "Refusé"
+        case .authorized: return "Autorisé"
+        case .unavailable: return "Indisponible"
         }
     }
 
