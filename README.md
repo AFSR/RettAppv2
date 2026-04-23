@@ -23,8 +23,8 @@ Application iOS native (SwiftUI) développée pour l'**Association Française du
 ## Structure
 
 ```
-AFSR/
-├── AFSRApp.swift                # Entry point @main
+RettApp/
+├── RettAppApp.swift             # Entry point @main
 ├── ContentView.swift            # TabView racine
 ├── Core/
 │   ├── Auth/                    # AuthManager + SignInView
@@ -41,11 +41,13 @@ AFSR/
 │   └── Theme/                   # AFSRTheme (couleurs, typo, tokens)
 └── Resources/
     ├── Info.plist
-    ├── AFSR.entitlements
+    ├── RettApp.entitlements
     ├── Assets.xcassets
     └── Localizable.strings
-AFSRTests/                       # Tests unitaires
+RettAppTests/                    # Tests unitaires
 ```
+
+> Les composants partagés gardent le préfixe `AFSR*` (`AFSRButton`, `AFSRTheme`, `AFSRPurple`…) car ils incarnent la charte graphique de l'**Association Française du Syndrome de Rett**.
 
 ## Générer le projet Xcode
 
@@ -56,25 +58,25 @@ Le dépôt ne contient pas de `.xcodeproj` — le projet est décrit dans `proje
 ```bash
 brew install xcodegen
 xcodegen generate
-open AFSR.xcodeproj
+open RettApp.xcodeproj
 ```
 
 ### Sans XcodeGen
 
 1. Dans Xcode : **File → New → Project → iOS → App**
 2. Product name : `RettApp`, Bundle ID : `fr.afsr.RettApp`, Interface : SwiftUI, Language : Swift
-3. Glisser le dossier `AFSR/` dans le navigator (ne pas cocher "Copy items")
+3. Glisser le dossier `RettApp/` dans le navigator (ne pas cocher "Copy items")
 4. Dans **Signing & Capabilities**, ajouter :
    - Sign in with Apple
    - HealthKit (avec Clinical Health Records désactivé)
    - Push Notifications
    - Background Modes → Background fetch
-5. Remplacer l'`Info.plist` par celui de `AFSR/Resources/Info.plist`
-6. Associer `AFSR/Resources/AFSR.entitlements` au target
+5. Remplacer l'`Info.plist` par celui de `RettApp/Resources/Info.plist`
+6. Associer `RettApp/Resources/RettApp.entitlements` au target
 
 ## Configuration API
 
-Éditer `AFSR/Features/News/Models/NewsArticle.swift` :
+Éditer `RettApp/Features/News/Models/NewsArticle.swift` :
 
 ```swift
 enum APIConfig {
@@ -92,7 +94,7 @@ enum APIConfig {
 
 ```bash
 xcodegen generate
-xcodebuild test -scheme AFSR -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild test -scheme RettApp -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
 Tests inclus :

@@ -1,5 +1,5 @@
 import XCTest
-@testable import AFSR
+@testable import RettApp
 
 final class GazeProcessorTests: XCTestCase {
 

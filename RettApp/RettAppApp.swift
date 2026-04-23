@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct AFSRApp: App {
+struct RettAppApp: App {
     @State private var authManager = AuthManager()
 
     var sharedModelContainer: ModelContainer = {
