@@ -39,7 +39,7 @@ final class ARFaceViewController: UIViewController, ARSCNViewDelegate, ARSession
         // On le transforme en espace monde puis on projette sur l'écran.
         let lookLocal = faceAnchor.lookAtPoint
         let worldTransform = faceAnchor.transform
-        let lookWorld = worldTransform * simd_float4(lookLocal.x, lookLocal.y, lookLocal.z, 1)
+        let lookWorld = simd_mul(worldTransform, simd_float4(lookLocal.x, lookLocal.y, lookLocal.z, 1))
         let worldVector = SCNVector3(lookWorld.x, lookWorld.y, lookWorld.z)
 
         let projected = arView.projectPoint(worldVector)
@@ -66,9 +66,3 @@ struct ARFaceView: UIViewControllerRepresentable {
     }
 }
 
-// MARK: - simd_float4x4 * simd_float4 helper
-
-@inline(__always)
-private func *(lhs: simd_float4x4, rhs: simd_float4) -> simd_float4 {
-    simd_mul(lhs, rhs)
-}
