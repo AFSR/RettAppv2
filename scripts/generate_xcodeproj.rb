@@ -71,6 +71,10 @@ app_target.add_resources([assets_ref])
 strings_ref = resources_group.new_reference('Localizable.strings')
 strings_ref.last_known_file_type = 'text.plist.strings'
 app_target.add_resources([strings_ref])
+# LaunchScreen.storyboard
+launch_ref = resources_group.new_reference('LaunchScreen.storyboard')
+launch_ref.last_known_file_type = 'file.storyboard'
+app_target.add_resources([launch_ref])
 
 # --- Tests sources ----------------------------------------------------------
 
@@ -96,7 +100,6 @@ common_app_settings = {
   'DEVELOPMENT_ASSET_PATHS'              => '',
   'ASSETCATALOG_COMPILER_APPICON_NAME'   => 'AppIcon',
   'ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME' => 'AccentColor',
-  'INFOPLIST_KEY_UILaunchScreen_Generation' => 'YES',
   'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad' =>
     'UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight',
   'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone' =>
