@@ -13,7 +13,7 @@ import CoreGraphics
 final class GazeCalibrator {
     private struct Sample { let raw: CGPoint; let actual: CGPoint }
 
-    private(set) var samples: [Sample] = []
+    private var samples: [Sample] = []
     private let maxSamples: Int
 
     /// Transformation affine 1D par axe : apply(p) = (scaleX*p.x + offsetX, scaleY*p.y + offsetY).
