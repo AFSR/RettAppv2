@@ -8,11 +8,21 @@ extension Color {
     static let afsrPurpleLight = Color(hex: "#9B6FC8")
     static let afsrPurpleDark  = Color(hex: "#4A2070")
     static let afsrWhite       = Color.white
-    static let afsrBackground  = Color(hex: "#F8F5FC")
     static let afsrAccent      = Color(hex: "#E8D5F7")
     static let afsrEmergency   = Color(hex: "#E53935")
     static let afsrSuccess     = Color(hex: "#43A047")
     static let afsrWarning     = Color(hex: "#FB8C00")
+
+    /// Fond principal des écrans : lavande très pâle en mode clair (identité AFSR),
+    /// fond sombre système en mode sombre (cohérent avec Forms/Lists système).
+    static let afsrBackground = Color(UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor.systemGroupedBackground
+        default:
+            return UIColor(red: 0.973, green: 0.961, blue: 0.988, alpha: 1) // #F8F5FC
+        }
+    })
 
     init(hex: String) {
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
