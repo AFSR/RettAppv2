@@ -116,30 +116,40 @@ private struct PlayingView: View {
                     viewModel.handleGaze(point, in: canvasSize)
                 }
                 .allowsHitTesting(false)
-                .opacity(0.001) // rendu mais invisible
+                .opacity(0.001)
 
-                // Cible + progress ring
-                if let target = viewModel.currentTarget {
-                    TargetView(target: target, progress: viewModel.processor.dwellProgress)
-                        .position(target.position)
-                        .animation(.easeInOut(duration: 0.35), value: target.position)
-                }
+                // Zone tactile pleine surface : un tap du parent = "l'enfant regarde ici".
+                // Placée sous les visuels (qui sont non-interactifs) → reçoit tous les taps
+                // hors des contrôles en haut.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        SpatialTapGesture(coordinateSpace: .local)
+                            .onEnded { event in
+                                viewModel.recordCalibrationTap(at: event.location, canvasSize: canvasSize)
+                            }
+                    )
 
-                // Splash animation
-                if let splash = viewModel.splashAt {
-                    SplashView()
-                        .position(splash)
-                        .transition(.scale.combined(with: .opacity))
+                // Visuels non-interactifs (les taps les traversent)
+                Group {
+                    if let target = viewModel.currentTarget {
+                        TargetView(target: target, progress: viewModel.processor.dwellProgress)
+                            .position(target.position)
+                            .animation(.easeInOut(duration: 0.35), value: target.position)
+                    }
+                    if let splash = viewModel.splashAt {
+                        SplashView()
+                            .position(splash)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                    if viewModel.showGazeIndicator {
+                        Circle()
+                            .fill(Color.afsrPurple.opacity(0.4))
+                            .frame(width: 20, height: 20)
+                            .position(viewModel.lastGazePoint)
+                    }
                 }
-
-                // Indicateur de regard
-                if viewModel.showGazeIndicator {
-                    Circle()
-                        .fill(Color.afsrPurple.opacity(0.4))
-                        .frame(width: 20, height: 20)
-                        .position(viewModel.lastGazePoint)
-                        .allowsHitTesting(false)
-                }
+                .allowsHitTesting(false)
 
                 VStack {
                     HStack {
@@ -147,11 +157,21 @@ private struct PlayingView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(.afsrPurple)
                         Spacer()
+                        CalibrationBadge(count: viewModel.calibrator.samplesCount) {
+                            viewModel.resetCalibration()
+                        }
                         ScoreBadge(score: viewModel.score)
                     }
                     .padding()
                     Spacer()
+                    Text("Touchez le personnage quand votre enfant le regarde — cela calibre le suivi du regard.")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 16)
                 }
+                .allowsHitTesting(true)
             }
             .onAppear {
                 canvasSize = geo.size
@@ -223,6 +243,33 @@ private struct ScoreBadge: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
+    }
+}
+
+/// Badge indiquant le nombre de points de calibration enregistrés.
+/// Long-press pour réinitialiser.
+private struct CalibrationBadge: View {
+    let count: Int
+    let onReset: () -> Void
+
+    private var status: (icon: String, color: Color, label: String) {
+        switch count {
+        case 0:    return ("scope", .orange, "Non calibré")
+        case 1:    return ("scope", .orange, "1 pt")
+        case 2...4: return ("scope", .yellow, "\(count) pts")
+        default:   return ("scope", .afsrSuccess, "\(count) pts")
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: status.icon).foregroundStyle(status.color)
+            Text(status.label).font(AFSRFont.caption())
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .onLongPressGesture(minimumDuration: 0.8) { onReset() }
+        .accessibilityLabel("Calibration : \(status.label). Appuyer longuement pour réinitialiser.")
     }
 }
 

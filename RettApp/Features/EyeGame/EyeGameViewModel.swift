@@ -23,10 +23,14 @@ final class EyeGameViewModel {
     var state: GameState = .configuration
     var currentTarget: GameTarget?
     var score: Int = 0
+    /// Dernier point brut reçu d'ARKit (avant calibration).
+    var rawGazePoint: CGPoint = .zero
+    /// Point après application de la calibration — utilisé pour l'affichage et le dwell.
     var lastGazePoint: CGPoint = .zero
     var splashAt: CGPoint? = nil
 
     let processor = GazeProcessor()
+    let calibrator = GazeCalibrator()
     private var spawnedCount = 0
     private var audioPlayer: AVAudioPlayer?
     private var moveTask: Task<Void, Never>?
@@ -62,27 +66,57 @@ final class EyeGameViewModel {
         state = .configuration
     }
 
-    func handleGaze(_ point: CGPoint, in canvasSize: CGSize) {
-        lastGazePoint = point
+    /// Reçoit un point brut depuis ARKit. Stocke raw, applique la calibration,
+    /// puis met à jour la logique de dwell avec le point calibré.
+    func handleGaze(_ rawPoint: CGPoint, in canvasSize: CGSize) {
+        rawGazePoint = rawPoint
+        let calibrated = calibrator.apply(rawPoint)
+        lastGazePoint = calibrated
         guard state == .playing, let target = currentTarget else { return }
-        if let _ = processor.update(gazePoint: point, targets: [target]) {
-            triggerSplash(at: target.position)
-            score += 1
-            spawnedCount += 1
-            if spawnedCount >= targetCount {
-                state = .finished(score: score, total: targetCount)
-                currentTarget = nil
-                moveTask?.cancel()
-                return
-            }
-            // Délai avant la prochaine cible
-            Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                guard let self else { return }
-                await MainActor.run {
-                    self.splashAt = nil
-                    self.spawnTarget(in: canvasSize)
-                }
+        if processor.update(gazePoint: calibrated, targets: [target]) != nil {
+            completeTarget(canvasSize: canvasSize)
+        }
+    }
+
+    /// Appelée quand le parent tape à l'écran pour signaler "l'enfant regarde ICI".
+    /// - enregistre la paire `(raw_actuel, tap)` dans le calibrateur
+    /// - si le tap est proche de la cible courante, valide la cible (même effet qu'un dwell)
+    func recordCalibrationTap(at location: CGPoint, canvasSize: CGSize) {
+        calibrator.addSample(raw: rawGazePoint, actual: location)
+        // Met à jour le point affiché immédiatement avec la nouvelle calibration.
+        lastGazePoint = calibrator.apply(rawGazePoint)
+
+        guard state == .playing, let target = currentTarget else { return }
+        let dx = location.x - target.position.x
+        let dy = location.y - target.position.y
+        let dist = (dx * dx + dy * dy).squareRoot()
+        if dist < target.diameter / 2 + 40 {
+            completeTarget(canvasSize: canvasSize)
+        }
+    }
+
+    func resetCalibration() {
+        calibrator.reset()
+        lastGazePoint = rawGazePoint
+    }
+
+    private func completeTarget(canvasSize: CGSize) {
+        guard let target = currentTarget else { return }
+        triggerSplash(at: target.position)
+        score += 1
+        spawnedCount += 1
+        if spawnedCount >= targetCount {
+            state = .finished(score: score, total: targetCount)
+            currentTarget = nil
+            moveTask?.cancel()
+            return
+        }
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let self else { return }
+            await MainActor.run {
+                self.splashAt = nil
+                self.spawnTarget(in: canvasSize)
             }
         }
     }
