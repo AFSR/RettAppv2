@@ -4,51 +4,60 @@ import QuartzCore
 
 /// Filtre de Kalman 2D pour lisser la position du regard.
 ///
-/// Modèle : position + vitesse, accélération supposée gaussienne (constant-acceleration model).
-/// - État : `[x, y, vx, vy]`
-/// - Mesure : `[x, y]`
-/// - Transition : `x_{k+1} = x_k + vx·dt`, pareil pour y
+/// Modèle à accélération gaussienne : état `[x, y, vx, vy]`, mesure `[x, y]`.
 ///
-/// Adaptation à la calibration :
-/// - Le bruit de mesure `R` diminue quand le nombre d'échantillons de calibration augmente.
-/// - Au début (aucune calibration), `R` est grand → le filtre lisse fort et suit peu la mesure.
-/// - Avec > 10 échantillons, `R` est petit → le filtre réagit vite et fait confiance à la mesure.
+/// Deux paramètres règlent le comportement :
 ///
-/// Cela permet de compenser la mauvaise calibration initiale par un lissage agressif, puis de
-/// redonner de la réactivité quand on sait mieux où l'utilisateur regarde.
+/// 1. **`smoothingStrength` ∈ [0, 1]** — contrôlé par l'utilisateur dans les
+///    Réglages. 0 = réactif (très peu de lissage), 1 = très lisse.
+/// 2. **Nombre d'échantillons de calibration** — le bruit de mesure R diminue
+///    quand on a plus de points, donc le filtre fait plus confiance à la mesure
+///    quand la calibration est stable.
+///
+/// Les deux effets se multiplient : à strength=0, R est déjà très faible, le
+/// filtre est quasi transparent. À strength=1, R est multiplié par ~10 et le
+/// filtre lisse fortement.
 final class GazeKalmanFilter {
 
-    // MARK: - Tuning
+    // MARK: - Tuning baseline (avant application de smoothingStrength)
 
-    /// Écart-type de la mesure quand la calibration est inexistante (pixels).
-    private let sigmaMeasureHigh: Double = 200.0
-    /// Écart-type de la mesure quand la calibration est stable.
-    private let sigmaMeasureLow: Double = 20.0
-    /// Nombre d'échantillons après lequel on considère la calibration stable.
+    /// σ de mesure avec aucune calibration (pixels).
+    private let sigmaMeasureHighBase: Double = 60.0
+    /// σ de mesure quand la calibration est stable (≥ samplesForFullConfidence).
+    private let sigmaMeasureLowBase: Double = 8.0
+    /// Nombre d'échantillons pour atteindre la confiance maximale.
     private let samplesForFullConfidence: Double = 10.0
-    /// Écart-type de l'accélération aléatoire (pixels/s²) — gouverne la "raideur".
-    private let sigmaAcceleration: Double = 800.0
+    /// σ d'accélération aléatoire (pixels/s²) — plus élevé = filtre plus réactif aux changements.
+    private let sigmaAcceleration: Double = 4000.0
+
+    // MARK: - Config runtime
+
+    /// 0 = aucun lissage (filtre bypassé), 1 = lissage maximal.
+    var smoothingStrength: Double = 0.4 {
+        didSet {
+            smoothingStrength = max(0, min(1, smoothingStrength))
+            recomputeR()
+        }
+    }
+
+    /// Si faux, le filtre est complètement bypassé (retourne la mesure brute).
+    var enabled: Bool = true
 
     // MARK: - State
 
-    // Vecteur d'état 4×1 : [x, y, vx, vy]
     private var state: [Double] = [0, 0, 0, 0]
-    // Matrice de covariance 4×4
     private var P: [[Double]] = GazeKalmanFilter.diag([1000, 1000, 1000, 1000])
-    // Matrice de bruit de mesure 2×2 (adaptée dynamiquement)
-    private var R: [[Double]]
-    // Timestamp de la dernière mise à jour
+    private var R: [[Double]] = [[1, 0], [0, 1]]
     private var lastTimestamp: CFTimeInterval?
     private var initialized = false
+    private var lastSampleCount: Int = 0
 
     init() {
-        let r = sigmaMeasureHigh * sigmaMeasureHigh
-        self.R = [[r, 0], [0, r]]
+        recomputeR()
     }
 
     // MARK: - Public API
 
-    /// Remet le filtre à zéro (appelé sur nouvelle calibration ou fin de partie).
     func reset() {
         state = [0, 0, 0, 0]
         P = GazeKalmanFilter.diag([1000, 1000, 1000, 1000])
@@ -56,17 +65,30 @@ final class GazeKalmanFilter {
         initialized = false
     }
 
-    /// Met à jour la confiance du filtre dans la mesure à partir du nombre d'échantillons
-    /// de calibration disponibles. Plus il y en a, plus R est petit.
+    /// Met à jour la confiance du filtre en fonction du nombre d'échantillons de calibration.
     func setCalibrationConfidence(sampleCount: Int) {
-        let factor = min(Double(sampleCount) / samplesForFullConfidence, 1.0)
-        let sigma = sigmaMeasureHigh - (sigmaMeasureHigh - sigmaMeasureLow) * factor
+        lastSampleCount = sampleCount
+        recomputeR()
+    }
+
+    private func recomputeR() {
+        let factor = min(Double(lastSampleCount) / samplesForFullConfidence, 1.0)
+        // Échelle entre High (peu de calibration) et Low (calibration stable)
+        let baseSigma = sigmaMeasureHighBase - (sigmaMeasureHighBase - sigmaMeasureLowBase) * factor
+        // Amplification par smoothingStrength : σ_final = baseSigma · (1 + 3·strength).
+        // À strength=0 : σ = baseSigma. À strength=1 : σ = 4·baseSigma → variance ×16.
+        let sigma = baseSigma * (1.0 + 3.0 * smoothingStrength)
         let r = sigma * sigma
         R = [[r, 0], [0, r]]
     }
 
-    /// Applique une étape prédiction + mise à jour au filtre et retourne la position lissée.
+    /// Applique une étape prédiction + mise à jour et retourne la position lissée.
+    /// Si `enabled == false`, retourne directement la mesure.
     func filter(measurement: CGPoint) -> CGPoint {
+        guard enabled else {
+            initialized = false
+            return measurement
+        }
         let now = CACurrentMediaTime()
         let dt: Double
         if let last = lastTimestamp {
@@ -77,7 +99,6 @@ final class GazeKalmanFilter {
         lastTimestamp = now
 
         if !initialized {
-            // Initialisation directe avec la première mesure
             state = [Double(measurement.x), Double(measurement.y), 0, 0]
             initialized = true
             return measurement
@@ -90,20 +111,13 @@ final class GazeKalmanFilter {
 
     // MARK: - Kalman steps
 
-    /// Prédiction : state = F · state, P = F · P · Fᵀ + Q
     private func predict(dt: Double) {
-        // F = [[1, 0, dt, 0],
-        //      [0, 1, 0, dt],
-        //      [0, 0, 1, 0],
-        //      [0, 0, 0, 1]]
         state = [
             state[0] + dt * state[2],
             state[1] + dt * state[3],
             state[2],
             state[3]
         ]
-
-        // P = F · P · Fᵀ + Q
         let F: [[Double]] = [
             [1, 0, dt, 0],
             [0, 1, 0, dt],
@@ -116,12 +130,6 @@ final class GazeKalmanFilter {
         P = Self.add(FPFt, Q)
     }
 
-    /// Q pour un modèle à accélération constante :
-    ///
-    ///   Q = σ_a² · [[dt⁴/4, 0, dt³/2, 0],
-    ///              [0, dt⁴/4, 0, dt³/2],
-    ///              [dt³/2, 0, dt²,  0],
-    ///              [0, dt³/2, 0,    dt²]]
     private func processNoise(dt: Double) -> [[Double]] {
         let sa2 = sigmaAcceleration * sigmaAcceleration
         let dt2 = dt * dt
@@ -135,48 +143,34 @@ final class GazeKalmanFilter {
         ]
     }
 
-    /// Mise à jour avec une mesure de position 2D.
     private func update(measurement: CGPoint) {
-        // Innovation : y = z - H · state, avec H = [[1,0,0,0],[0,1,0,0]]
         let innovation: [Double] = [
             Double(measurement.x) - state[0],
             Double(measurement.y) - state[1]
         ]
-
-        // S = H · P · Hᵀ + R = P[0..1, 0..1] + R (puisque H sélectionne position)
         let S: [[Double]] = [
             [P[0][0] + R[0][0], P[0][1] + R[0][1]],
             [P[1][0] + R[1][0], P[1][1] + R[1][1]]
         ]
-
-        // S⁻¹ (2×2 inversion directe)
         let det = S[0][0] * S[1][1] - S[0][1] * S[1][0]
-        guard abs(det) > 1e-9 else { return } // skip mise à jour instable
+        guard abs(det) > 1e-9 else { return }
         let Sinv: [[Double]] = [
             [ S[1][1] / det, -S[0][1] / det],
             [-S[1][0] / det,  S[0][0] / det]
         ]
-
-        // K = P · Hᵀ · S⁻¹ — où P·Hᵀ prend les 2 premières colonnes de P (4×2)
         var K = [[Double]](repeating: [0, 0], count: 4)
         for i in 0..<4 {
             for j in 0..<2 {
                 K[i][j] = P[i][0] * Sinv[0][j] + P[i][1] * Sinv[1][j]
             }
         }
-
-        // state = state + K · innovation
         for i in 0..<4 {
             state[i] += K[i][0] * innovation[0] + K[i][1] * innovation[1]
         }
-
-        // P = (I - K·H) · P
-        // K·H est 4×4 : (K·H)[i][j] = K[i][j] si j<2, sinon 0
         var newP = [[Double]](repeating: [Double](repeating: 0, count: 4), count: 4)
         for i in 0..<4 {
             for j in 0..<4 {
                 var sum = P[i][j]
-                // soustraire (K·H·P)[i][j] = Σ_k (K·H)[i][k] · P[k][j]
                 sum -= K[i][0] * P[0][j] + K[i][1] * P[1][j]
                 newP[i][j] = sum
             }

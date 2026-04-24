@@ -38,6 +38,24 @@ final class EyeGameViewModel {
     private var audioPlayer: AVAudioPlayer?
     private var moveTask: Task<Void, Never>?
 
+    init() {
+        // Charge les réglages du filtre persistés par l'utilisateur
+        applyStoredFilterSettings()
+        // Initialise le Kalman avec la confiance correspondant aux échantillons déjà sauvegardés
+        kalman.setCalibrationConfidence(sampleCount: calibrator.samplesCount)
+    }
+
+    /// Recharge depuis UserDefaults les réglages utilisateur du filtre de Kalman.
+    /// À appeler quand les réglages ont pu être modifiés (e.g. retour sur l'onglet Jeu).
+    func applyStoredFilterSettings() {
+        let defaults = UserDefaults.standard
+        let enabled = defaults.object(forKey: EyeGameSettings.smoothingEnabledKey) as? Bool ?? true
+        let strength = defaults.object(forKey: EyeGameSettings.smoothingStrengthKey) as? Double
+            ?? EyeGameSettings.defaultSmoothingStrength
+        kalman.enabled = enabled
+        kalman.smoothingStrength = strength
+    }
+
     // MARK: - Compat
 
     func isEyeTrackingAvailable() -> Bool {

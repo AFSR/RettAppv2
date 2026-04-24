@@ -10,11 +10,15 @@ import CoreGraphics
 /// À partir des échantillons, on fait deux régressions linéaires indépendantes :
 /// `actual_x = scaleX * raw_x + offsetX` et pareil pour y. C'est une approximation
 /// simple mais robuste : ça corrige offset, échelle et inversion d'axe en même temps.
+///
+/// Les échantillons sont persistés dans `UserDefaults` pour survivre entre les
+/// lancements de l'app.
 final class GazeCalibrator {
-    private struct Sample { let raw: CGPoint; let actual: CGPoint }
+    private struct Sample: Codable { let rx: Double; let ry: Double; let ax: Double; let ay: Double }
 
     private var samples: [Sample] = []
     private let maxSamples: Int
+    private let persistenceKey = "afsr.eyegame.calibration.samples"
 
     /// Transformation affine 1D par axe : apply(p) = (scaleX*p.x + offsetX, scaleY*p.y + offsetY).
     private(set) var scaleX: CGFloat = 1
@@ -24,24 +28,33 @@ final class GazeCalibrator {
 
     init(maxSamples: Int = 30) {
         self.maxSamples = maxSamples
+        load()
+        recompute()
     }
 
-    /// Ajoute un échantillon et recalcule la transformation.
+    // MARK: - Public API
+
+    var samplesCount: Int { samples.count }
+
+    /// Ajoute un échantillon, recalcule la transformation et persiste.
     func addSample(raw: CGPoint, actual: CGPoint) {
-        samples.append(Sample(raw: raw, actual: actual))
+        samples.append(Sample(
+            rx: Double(raw.x), ry: Double(raw.y),
+            ax: Double(actual.x), ay: Double(actual.y)
+        ))
         if samples.count > maxSamples {
             samples.removeFirst(samples.count - maxSamples)
         }
         recompute()
+        save()
     }
 
     func reset() {
         samples.removeAll()
         scaleX = 1; offsetX = 0
         scaleY = 1; offsetY = 0
+        save()
     }
-
-    var samplesCount: Int { samples.count }
 
     /// Applique la transformation au point brut. Si moins de 2 échantillons, retourne `raw`.
     func apply(_ raw: CGPoint) -> CGPoint {
@@ -52,16 +65,39 @@ final class GazeCalibrator {
         )
     }
 
+    // MARK: - Persistence
+
+    private func save() {
+        do {
+            let data = try JSONEncoder().encode(samples)
+            UserDefaults.standard.set(data, forKey: persistenceKey)
+        } catch {
+            // échec silencieux — la calibration en mémoire reste utilisable
+        }
+    }
+
+    private func load() {
+        guard let data = UserDefaults.standard.data(forKey: persistenceKey),
+              let decoded = try? JSONDecoder().decode([Sample].self, from: data)
+        else { return }
+        samples = decoded
+        if samples.count > maxSamples {
+            samples = Array(samples.suffix(maxSamples))
+        }
+    }
+
+    // MARK: - Regression
+
     private func recompute() {
         guard samples.count >= 2 else {
             scaleX = 1; offsetX = 0
             scaleY = 1; offsetY = 0
             return
         }
-        let rawsX = samples.map { Double($0.raw.x) }
-        let actsX = samples.map { Double($0.actual.x) }
-        let rawsY = samples.map { Double($0.raw.y) }
-        let actsY = samples.map { Double($0.actual.y) }
+        let rawsX = samples.map { $0.rx }
+        let actsX = samples.map { $0.ax }
+        let rawsY = samples.map { $0.ry }
+        let actsY = samples.map { $0.ay }
 
         let (sx, ox) = linearFit(xs: rawsX, ys: actsX)
         let (sy, oy) = linearFit(xs: rawsY, ys: actsY)

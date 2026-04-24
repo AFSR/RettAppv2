@@ -23,6 +23,7 @@ struct SettingsView: View {
         List {
             childSection
             medicationsSection
+            eyeGameSection
             healthSection
             notificationsSection
             dataSection
@@ -79,6 +80,10 @@ struct SettingsView: View {
                 Label("Plan médicamenteux", systemImage: "pills.fill")
             }
         }
+    }
+
+    private var eyeGameSection: some View {
+        EyeGameSettingsSection()
     }
 
     private var healthSection: some View {

@@ -175,6 +175,7 @@ private struct PlayingView: View {
             }
             .onAppear {
                 canvasSize = geo.size
+                viewModel.applyStoredFilterSettings()
                 viewModel.start(in: geo.size)
                 #if targetEnvironment(simulator)
                 viewModel.startMockGaze(canvasSize: geo.size)
