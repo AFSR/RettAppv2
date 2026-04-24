@@ -25,12 +25,15 @@ final class EyeGameViewModel {
     var score: Int = 0
     /// Dernier point brut reçu d'ARKit (avant calibration).
     var rawGazePoint: CGPoint = .zero
-    /// Point après application de la calibration — utilisé pour l'affichage et le dwell.
+    /// Point après calibration (linéaire) mais avant Kalman.
+    var calibratedGazePoint: CGPoint = .zero
+    /// Point final, après calibration puis lissage Kalman — utilisé pour l'affichage et le dwell.
     var lastGazePoint: CGPoint = .zero
     var splashAt: CGPoint? = nil
 
     let processor = GazeProcessor()
     let calibrator = GazeCalibrator()
+    let kalman = GazeKalmanFilter()
     private var spawnedCount = 0
     private var audioPlayer: AVAudioPlayer?
     private var moveTask: Task<Void, Never>?
@@ -54,6 +57,8 @@ final class EyeGameViewModel {
         score = 0
         spawnedCount = 0
         processor.reset()
+        kalman.reset()
+        kalman.setCalibrationConfidence(sampleCount: calibrator.samplesCount)
         state = .playing
         processor.dwellDuration = speed.dwellDuration
         spawnTarget(in: canvasSize)
@@ -66,25 +71,32 @@ final class EyeGameViewModel {
         state = .configuration
     }
 
-    /// Reçoit un point brut depuis ARKit. Stocke raw, applique la calibration,
-    /// puis met à jour la logique de dwell avec le point calibré.
+    /// Pipeline : raw (ARKit) → calibration linéaire → filtre de Kalman → affichage + dwell.
     func handleGaze(_ rawPoint: CGPoint, in canvasSize: CGSize) {
         rawGazePoint = rawPoint
         let calibrated = calibrator.apply(rawPoint)
-        lastGazePoint = calibrated
+        calibratedGazePoint = calibrated
+        let smoothed = kalman.filter(measurement: calibrated)
+        lastGazePoint = smoothed
+
         guard state == .playing, let target = currentTarget else { return }
-        if processor.update(gazePoint: calibrated, targets: [target]) != nil {
+        if processor.update(gazePoint: smoothed, targets: [target]) != nil {
             completeTarget(canvasSize: canvasSize)
         }
     }
 
     /// Appelée quand le parent tape à l'écran pour signaler "l'enfant regarde ICI".
     /// - enregistre la paire `(raw_actuel, tap)` dans le calibrateur
-    /// - si le tap est proche de la cible courante, valide la cible (même effet qu'un dwell)
+    /// - ajuste la confiance du Kalman (R diminue avec plus d'échantillons)
+    /// - si le tap est proche de la cible courante, valide la cible
     func recordCalibrationTap(at location: CGPoint, canvasSize: CGSize) {
         calibrator.addSample(raw: rawGazePoint, actual: location)
-        // Met à jour le point affiché immédiatement avec la nouvelle calibration.
-        lastGazePoint = calibrator.apply(rawGazePoint)
+        kalman.setCalibrationConfidence(sampleCount: calibrator.samplesCount)
+
+        // Rafraîchit immédiatement la position affichée avec la nouvelle transformation.
+        let newCalibrated = calibrator.apply(rawGazePoint)
+        calibratedGazePoint = newCalibrated
+        lastGazePoint = kalman.filter(measurement: newCalibrated)
 
         guard state == .playing, let target = currentTarget else { return }
         let dx = location.x - target.position.x
@@ -97,6 +109,9 @@ final class EyeGameViewModel {
 
     func resetCalibration() {
         calibrator.reset()
+        kalman.reset()
+        kalman.setCalibrationConfidence(sampleCount: 0)
+        calibratedGazePoint = rawGazePoint
         lastGazePoint = rawGazePoint
     }
 
