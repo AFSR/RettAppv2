@@ -1,7 +1,12 @@
 import Foundation
 import SwiftData
 
-#if DEBUG
+/// Données de prévisualisation. N'est pas entouré de `#if DEBUG` : les macros
+/// `#Preview { }` SwiftUI sont compilées en Release aussi — si PreviewData
+/// n'est pas visible, l'Archive échoue. Coût zéro en production : les `let`
+/// statiques sont lazy, donc les stores en mémoire ne sont créés que si
+/// quelqu'un référence `PreviewData.container` (ce qui n'arrive jamais hors
+/// canvas Xcode).
 enum PreviewData {
     static let container: ModelContainer = {
         let schema = Schema([
@@ -60,4 +65,4 @@ enum PreviewData {
         return try! ModelContainer(for: schema, configurations: [config])
     }()
 }
-#endif
+
