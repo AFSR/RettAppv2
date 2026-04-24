@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import QuartzCore
 
 /// Filtre de Kalman 2D pour lisser la position du regard.
 ///
