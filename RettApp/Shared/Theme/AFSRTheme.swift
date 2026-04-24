@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Colors
 
@@ -37,17 +38,34 @@ extension Color {
     }
 }
 
+// MARK: - Adaptive colors (automatically adjust to dark/light mode)
+
+extension Color {
+    /// Violet AFSR adaptatif : foncé en mode clair (bon contraste sur blanc),
+    /// clair en mode sombre (bon contraste sur noir). Utilisée pour les
+    /// éléments d'accentuation comme la teinte des onglets (`.tint`).
+    static let afsrPurpleAdaptive = Color(UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor(Color.afsrPurpleLight)
+        default:
+            return UIColor(Color.afsrPurple)
+        }
+    })
+}
+
 // MARK: - ShapeStyle shortcuts (for `.foregroundStyle(.afsrPurple)` syntax)
 
 extension ShapeStyle where Self == Color {
-    static var afsrPurple: Color       { .afsrPurple }
-    static var afsrPurpleLight: Color  { .afsrPurpleLight }
-    static var afsrPurpleDark: Color   { .afsrPurpleDark }
-    static var afsrBackground: Color   { .afsrBackground }
-    static var afsrAccent: Color       { .afsrAccent }
-    static var afsrEmergency: Color    { .afsrEmergency }
-    static var afsrSuccess: Color      { .afsrSuccess }
-    static var afsrWarning: Color      { .afsrWarning }
+    static var afsrPurple: Color         { .afsrPurple }
+    static var afsrPurpleLight: Color    { .afsrPurpleLight }
+    static var afsrPurpleDark: Color     { .afsrPurpleDark }
+    static var afsrPurpleAdaptive: Color { .afsrPurpleAdaptive }
+    static var afsrBackground: Color     { .afsrBackground }
+    static var afsrAccent: Color         { .afsrAccent }
+    static var afsrEmergency: Color      { .afsrEmergency }
+    static var afsrSuccess: Color        { .afsrSuccess }
+    static var afsrWarning: Color        { .afsrWarning }
 }
 
 // MARK: - Typography

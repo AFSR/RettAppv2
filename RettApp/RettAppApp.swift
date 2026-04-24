@@ -24,7 +24,7 @@ struct RettAppApp: App {
         WindowGroup {
             RootView()
                 .environment(authManager)
-                .tint(.afsrPurple)
+                .tint(.afsrPurpleAdaptive)
         }
         .modelContainer(sharedModelContainer)
     }
