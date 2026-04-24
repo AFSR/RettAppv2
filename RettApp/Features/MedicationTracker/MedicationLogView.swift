@@ -10,6 +10,7 @@ struct MedicationPlanView: View {
 
     @State private var showEditor = false
     @State private var editing: Medication?
+    @State private var importSummary: MedicationImporter.ImportResult?
 
     private var profile: ChildProfile? { profiles.first }
 
@@ -59,6 +60,28 @@ struct MedicationPlanView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Fermer") { dismiss() }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                CSVImportMenu(
+                    buildTemplate: { try MedicationImporter.writeTemplate() },
+                    onImportedContent: { content in
+                        let result = MedicationImporter.importCSV(
+                            contents: content,
+                            childProfile: profile,
+                            context: modelContext
+                        )
+                        importSummary = result
+                        // Replanifie les notifications après l'import
+                        Task {
+                            let vm = MedicationViewModel()
+                            await vm.requestNotificationPermissionIfNeeded()
+                            await vm.rescheduleAllNotifications(
+                                medications: medications,
+                                childFirstName: profile?.firstName ?? ""
+                            )
+                        }
+                    }
+                )
+            }
         }
         .sheet(isPresented: $showEditor) {
             NavigationStack {
@@ -66,6 +89,21 @@ struct MedicationPlanView: View {
                     Task { await save(name: name, dose: dose, unit: unit, hours: hours, active: active) }
                 }
             }
+        }
+        .alert("Import terminé", isPresented: Binding(
+            get: { importSummary != nil },
+            set: { if !$0 { importSummary = nil } }
+        ), presenting: importSummary) { _ in
+            Button("OK") { importSummary = nil }
+        } message: { result in
+            var msg = "Importés : \(result.imported)\nIgnorés : \(result.skipped)"
+            if !result.errors.isEmpty {
+                msg += "\n\n" + result.errors.prefix(5).joined(separator: "\n")
+                if result.errors.count > 5 {
+                    msg += "\n… et \(result.errors.count - 5) autres"
+                }
+            }
+            return Text(msg)
         }
     }
 

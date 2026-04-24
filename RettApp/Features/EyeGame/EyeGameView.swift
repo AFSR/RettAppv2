@@ -56,36 +56,44 @@ private struct ConfigurationView: View {
     @Bindable var viewModel: EyeGameViewModel
 
     var body: some View {
-        Form {
-            Section("Nombre de parties") {
-                Picker("Cibles", selection: $viewModel.targetCount) {
-                    Text("3").tag(3)
-                    Text("5").tag(5)
-                    Text("10").tag(10)
+        VStack(spacing: 0) {
+            Form {
+                Section("Nombre de parties") {
+                    Picker("Cibles", selection: $viewModel.targetCount) {
+                        Text("3").tag(3)
+                        Text("5").tag(5)
+                        Text("10").tag(10)
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
-            }
-            Section("Vitesse") {
-                Picker("Vitesse", selection: $viewModel.speed) {
-                    ForEach(GameSpeed.allCases) { s in Text(s.label).tag(s) }
+                Section("Vitesse") {
+                    Picker("Vitesse", selection: $viewModel.speed) {
+                        ForEach(GameSpeed.allCases) { s in Text(s.label).tag(s) }
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
-            }
-            Section("Taille des cibles") {
-                Picker("Taille", selection: $viewModel.targetSize) {
-                    ForEach(TargetSize.allCases) { s in Text(s.label).tag(s) }
+                Section("Taille des cibles") {
+                    Picker("Taille", selection: $viewModel.targetSize) {
+                        ForEach(TargetSize.allCases) { s in Text(s.label).tag(s) }
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
+                Section("Options") {
+                    Toggle("Indicateur de regard", isOn: $viewModel.showGazeIndicator)
+                    Toggle("Musique de fond", isOn: $viewModel.musicEnabled)
+                }
+                Section {
+                    Text("Tenez l'appareil face à l'enfant, à 30-60 cm. L'enfant regarde le personnage pour lui envoyer une tarte à la crème 🥧.")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                }
             }
-            Section("Options") {
-                Toggle("Indicateur de regard", isOn: $viewModel.showGazeIndicator)
-                Toggle("Musique de fond", isOn: $viewModel.musicEnabled)
+
+            AFSRPrimaryButton(title: "Lancer la partie", icon: "play.fill") {
+                viewModel.launchPlaying()
             }
-            Section {
-                Text("Tenez l'appareil face à l'enfant, à 30-60 cm. L'enfant regarde le personnage pour lui envoyer une tarte à la crème 🥧.")
-                    .font(AFSRFont.caption())
-                    .foregroundStyle(.secondary)
-            }
+            .padding()
+            .background(Color(.systemBackground))
         }
     }
 }

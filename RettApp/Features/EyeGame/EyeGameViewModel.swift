@@ -39,6 +39,13 @@ final class EyeGameViewModel {
 
     // MARK: - Game lifecycle
 
+    /// Déclenchée par le bouton "Lancer" depuis la configuration. Fait juste passer
+    /// l'état à `.playing` — le vrai démarrage (spawn de la cible) est fait par
+    /// `start(in:)` depuis `PlayingView.onAppear` qui a la taille du canvas.
+    func launchPlaying() {
+        state = .playing
+    }
+
     func start(in canvasSize: CGSize) {
         score = 0
         spawnedCount = 0

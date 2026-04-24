@@ -19,8 +19,10 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            NavigationStack { NewsListView() }
-                .tabItem { Label("Actualités", systemImage: "newspaper.fill") }
+            if FeatureFlags.newsEnabled {
+                NavigationStack { NewsListView() }
+                    .tabItem { Label("Actualités", systemImage: "newspaper.fill") }
+            }
 
             if epilepsyEnabled {
                 NavigationStack { SeizureTrackerView() }
