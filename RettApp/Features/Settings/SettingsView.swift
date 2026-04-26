@@ -27,6 +27,7 @@ struct SettingsView: View {
             healthSection
             notificationsSection
             dataSection
+            medicalDisclaimerSection
             aboutSection
             accountSection
         }
@@ -153,6 +154,27 @@ struct SettingsView: View {
             } label: {
                 Label("Effacer les données de l'application", systemImage: "trash")
             }
+        }
+    }
+
+    private var medicalDisclaimerSection: some View {
+        Section {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.afsrWarning)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("RettApp n'est pas un dispositif médical")
+                        .font(AFSRFont.headline(15))
+                    Text("Cette application est un outil de suivi destiné aux parents et aidants. Elle ne constitue pas un dispositif médical au sens du règlement européen 2017/745 (MDR) et ne remplace en aucun cas un avis, un diagnostic ou un traitement médical délivré par un professionnel de santé. En cas d'urgence, contactez le 15 ou le 112.")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Avertissement médical")
         }
     }
 
