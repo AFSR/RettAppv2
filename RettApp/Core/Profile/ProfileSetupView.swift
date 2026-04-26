@@ -11,6 +11,7 @@ struct ProfileSetupView: View {
     @State private var hasEpilepsy: Bool = false
     @State private var initialMedications: [DraftMedication] = []
     @State private var step: Step = .intro
+    @State private var disclaimerAcknowledged: Bool = false
 
     enum Step { case intro, child, epilepsy, medications, done }
 
@@ -53,24 +54,59 @@ struct ProfileSetupView: View {
     // MARK: - Steps
 
     private var introStep: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "person.2.circle.fill")
-                .resizable().scaledToFit()
-                .frame(width: 120, height: 120)
-                .foregroundStyle(.afsrPurple)
-            Text("Bienvenue")
-                .font(AFSRFont.title())
-            Text("Nous allons configurer le profil de votre enfant.\nCes informations restent sur votre appareil.")
-                .font(AFSRFont.body())
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 20) {
+                Image(systemName: "person.2.circle.fill")
+                    .resizable().scaledToFit()
+                    .frame(width: 100, height: 100)
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                    .padding(.top, 24)
+                Text("Bienvenue")
+                    .font(AFSRFont.title())
+                Text("Nous allons configurer le profil de votre enfant.\nCes informations restent sur votre appareil.")
+                    .font(AFSRFont.body())
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+
+                disclaimerCard
+
+                Toggle(isOn: $disclaimerAcknowledged) {
+                    Text("J'ai lu et compris cet avertissement.")
+                        .font(AFSRFont.body(15))
+                }
                 .padding(.horizontal)
-            Spacer()
-            AFSRPrimaryButton(title: "Commencer") { step = .child }
-                .padding(.horizontal)
+                .tint(.afsrPurpleAdaptive)
+
+                AFSRPrimaryButton(title: "Commencer") { step = .child }
+                    .padding(.horizontal)
+                    .disabled(!disclaimerAcknowledged)
+                    .opacity(disclaimerAcknowledged ? 1 : 0.5)
+                    .padding(.bottom, 24)
+            }
         }
-        .padding()
+    }
+
+    private var disclaimerCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .foregroundStyle(.afsrWarning)
+                Text("Avertissement médical")
+                    .font(AFSRFont.headline(16))
+            }
+            Text("RettApp est un outil de suivi destiné aux parents et aidants. **Ce n'est pas un dispositif médical** au sens du règlement UE 2017/745 (MDR). L'application ne diagnostique pas, ne traite pas et ne remplace pas l'avis d'un professionnel de santé.\n\nEn cas d'urgence, appelez le **15** (Samu) ou le **112**.")
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(Color.afsrWarning.opacity(0.12), in: RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius)
+                .stroke(Color.afsrWarning.opacity(0.4), lineWidth: 1)
+        )
+        .padding(.horizontal)
     }
 
     private var childStep: some View {

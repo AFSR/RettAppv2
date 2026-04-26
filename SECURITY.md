@@ -13,6 +13,7 @@ Version : `1.0` — date : 2026-04-24 — périmètre : app iOS (SwiftUI, iOS 17
 7. [Conformité App Store](#7-conformité-app-store)
 8. [Menaces & mitigations](#8-menaces--mitigations)
 9. [Findings & recommandations priorisées](#9-findings--recommandations-priorisées)
+10. [Statut "dispositif médical" (MDR EU)](#10-statut-dispositif-médical-mdr-eu)
 
 ---
 
@@ -329,3 +330,47 @@ Modèle : **STRIDE simplifié appliqué à une app mobile sans backend**.
 ---
 
 *Audit à refaire à chaque ajout de dépendance tierce, activation du module News, ou ajout d'une synchronisation cloud.*
+
+---
+
+## 10. Statut "dispositif médical" (MDR EU)
+
+### Position retenue : **non-dispositif médical**
+
+RettApp **n'est pas un dispositif médical** au sens du Règlement européen 2017/745 (MDR), du UK Medical Device Regulations, ni des règles FDA. Aucune certification CE médicale, marquage UKCA, ou clearance FDA n'est requise dans le périmètre actuel.
+
+### Justification
+
+D'après le **MDCG 2019-11** (guide officiel européen de classification des logiciels santé) et l'art. 2 du MDR, un logiciel est qualifié de dispositif médical s'il est destiné au "diagnostic, traitement, prédiction, pronostic, atténuation" d'une maladie. Pour chaque fonctionnalité actuelle de RettApp :
+
+| Fonctionnalité | Qualification |
+|---|---|
+| Journal des crises (date, durée, type, notes) | Patient diary / logbook → **non-MD** |
+| Plan médicamenteux + rappels horaires | Aide à l'observance, dose saisie par l'utilisateur → **non-MD** |
+| Export CSV vers le neurologue | Outil de communication patient/médecin → **non-MD** |
+| Jeu eye-tracking « tarte à la crème » | Loisir / éveil, pas de revendication thérapeutique → **non-MD** |
+
+### Lignes rouges à ne pas franchir
+
+L'app basculerait en **dispositif médical classe IIa minimum** (et donc obligation CE) si elle implémentait :
+
+- Recommandation automatique de dose
+- Détection automatique de crise (caméra, accéléromètre, IA)
+- Alertes prédictives (pré-crise)
+- Analyse statistique avec interprétation clinique ("votre épilepsie s'aggrave")
+- Tout texte marketing du type "diagnostique l'épilepsie", "réduit les crises", "améliore le traitement"
+
+### Mesures concrètes en place
+
+1. **Onboarding** : avertissement médical encadré + case "J'ai lu et compris" obligatoire avant de pouvoir continuer (`ProfileSetupView.disclaimerCard`).
+2. **Réglages** : section "Avertissement médical" toujours visible, mention de l'urgence (15/112).
+3. **App Store Connect** : déclaratif "Regulated medical device" → réponse `No`, justifiée par l'absence de certification CE/FDA/UKCA.
+4. **Politique de confidentialité** (à publier) : doit reprendre la mention "RettApp n'est pas un dispositif médical au sens du règlement UE 2017/745. Elle ne remplace pas le suivi par un professionnel de santé."
+
+### Recommandation
+
+Avant déploiement national à grande échelle, faire valider cette analyse par un avocat spécialisé en santé numérique (ou consulter directement l'**ANSM**). Coût estimé : 1-2 h de conseil.
+
+### Référence App Store Connect
+
+Pour le déclaratif Apple : https://developer.apple.com/help/app-store-connect/manage-app-information/declare-regulated-medical-device-status — sélectionner **No** par pays/région.
