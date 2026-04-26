@@ -75,6 +75,12 @@ app_target.add_resources([strings_ref])
 launch_ref = resources_group.new_reference('LaunchScreen.storyboard')
 launch_ref.last_known_file_type = 'file.storyboard'
 app_target.add_resources([launch_ref])
+# Info.plist (référencée seulement, PAS un resource — utilisée via INFOPLIST_FILE)
+info_ref = resources_group.new_reference('Info.plist')
+info_ref.last_known_file_type = 'text.plist.xml'
+# RettApp.entitlements (référencée seulement, PAS un resource — utilisée via CODE_SIGN_ENTITLEMENTS)
+ent_ref = resources_group.new_reference("#{APP_NAME}.entitlements")
+ent_ref.last_known_file_type = 'text.plist.entitlements'
 
 # --- Tests sources ----------------------------------------------------------
 
