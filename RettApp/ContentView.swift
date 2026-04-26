@@ -28,6 +28,9 @@ struct ContentView: View {
                 NavigationStack { SeizureTrackerView() }
                     .tabItem { Label("Épilepsie", systemImage: "waveform.path.ecg") }
                     .badge(currentMonthSeizureCount)
+
+                NavigationStack { DashboardView() }
+                    .tabItem { Label("Tableau de bord", systemImage: "chart.bar.xaxis") }
             }
 
             NavigationStack { MedicationListView() }
