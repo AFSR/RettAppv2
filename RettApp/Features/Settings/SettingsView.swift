@@ -175,6 +175,11 @@ struct SettingsView: View {
 
     private var dataSection: some View {
         Section {
+            NavigationLink {
+                MedicalReportView()
+            } label: {
+                Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
+            }
             Button {
                 exportAllCSV()
             } label: {
@@ -198,7 +203,7 @@ struct SettingsView: View {
         } header: {
             Text("Données")
         } footer: {
-            Text("Les données de démonstration sont identifiées par le suffixe « (démo) » et la note « Données de démonstration ». Elles sont supprimables séparément.")
+            Text("Le rapport médecin produit un PDF imprimable structuré (identité, traitement, statistiques, calendrier des crises, observance, observations).")
         }
     }
 
