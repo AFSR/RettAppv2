@@ -26,7 +26,7 @@ struct SeizureTrackerView: View {
             }
             .padding(AFSRTokens.spacingLarge)
         }
-        .navigationTitle("Épilepsie")
+        .navigationTitle("Suivi épilepsie")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

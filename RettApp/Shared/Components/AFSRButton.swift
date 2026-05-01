@@ -5,7 +5,7 @@ import SwiftUI
 struct AFSRPrimaryButton: View {
     let title: String
     var icon: String? = nil
-    var color: Color = .afsrPurple
+    var color: Color = .afsrPurpleAdaptive
     let action: () -> Void
 
     var body: some View {
@@ -40,10 +40,10 @@ struct AFSRSecondaryButton: View {
             }
             .frame(maxWidth: .infinity)
             .frame(minHeight: AFSRTokens.minTapTarget)
-            .foregroundStyle(.afsrPurple)
+            .foregroundStyle(.afsrPurpleAdaptive)
             .overlay(
                 RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius, style: .continuous)
-                    .stroke(Color.afsrPurple, lineWidth: 2)
+                    .stroke(Color.afsrPurpleAdaptive, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)

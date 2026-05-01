@@ -91,7 +91,7 @@ struct SettingsView: View {
                 Button { showChildEditor = true } label: {
                     HStack {
                         Image(systemName: "person.circle.fill")
-                            .foregroundStyle(.afsrPurple)
+                            .foregroundStyle(.afsrPurpleAdaptive)
                         VStack(alignment: .leading) {
                             Text(profile.firstName).font(AFSRFont.headline(17)).foregroundStyle(.primary)
                             if let age = profile.ageYears {

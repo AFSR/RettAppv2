@@ -155,7 +155,7 @@ private struct PlayingView: View {
                     HStack {
                         Button("Quitter") { viewModel.reset() }
                             .buttonStyle(.borderedProminent)
-                            .tint(.afsrPurple)
+                            .tint(.afsrPurpleAdaptive)
                         Spacer()
                         CalibrationBadge(count: viewModel.calibrator.samplesCount) {
                             viewModel.resetCalibration()

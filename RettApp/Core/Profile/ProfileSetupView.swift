@@ -179,7 +179,7 @@ struct ProfileSetupView: View {
                         }
                     } label: {
                         Label("Ajouter un médicament", systemImage: "plus.circle.fill")
-                            .foregroundStyle(.afsrPurple)
+                            .foregroundStyle(.afsrPurpleAdaptive)
                     }
                 } header: {
                     Text("Médicaments en cours")
