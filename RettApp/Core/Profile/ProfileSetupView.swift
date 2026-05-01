@@ -6,6 +6,7 @@ struct ProfileSetupView: View {
     @Environment(AuthManager.self) private var authManager
 
     @State private var firstName: String = ""
+    @State private var lastName: String = ""
     @State private var hasBirthDate: Bool = false
     @State private var birthDate: Date = Date()
     @State private var hasEpilepsy: Bool = false
@@ -111,10 +112,17 @@ struct ProfileSetupView: View {
 
     private var childStep: some View {
         Form {
-            Section("Prénom de l'enfant") {
+            Section {
                 TextField("Prénom", text: $firstName)
                     .textContentType(.givenName)
                     .autocorrectionDisabled()
+                TextField("Nom de famille (optionnel)", text: $lastName)
+                    .textContentType(.familyName)
+                    .autocorrectionDisabled()
+            } header: {
+                Text("Identité de l'enfant")
+            } footer: {
+                Text("Le nom de famille n'apparaît que dans les documents imprimés (rapport médecin, cahier de suivi). Il reste sur votre appareil.")
             }
             Section {
                 Toggle("Renseigner la date de naissance", isOn: $hasBirthDate)
@@ -216,6 +224,7 @@ struct ProfileSetupView: View {
 
         let profile = ChildProfile(
             firstName: firstName.trimmingCharacters(in: .whitespaces),
+            lastName: lastName.trimmingCharacters(in: .whitespaces),
             birthDate: hasBirthDate ? birthDate : nil,
             hasEpilepsy: hasEpilepsy,
             appleUserID: appleID
