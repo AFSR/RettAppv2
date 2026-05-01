@@ -201,30 +201,33 @@ enum FollowUpBookletGenerator {
 
     private static func drawSeizureGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, pageWidth: CGFloat) {
         drawSectionTitle("Crises d'épilepsie observées", y: &y)
-        drawSectionHelp("Indiquer le nombre de crises et leur durée approximative dans la case correspondante. Détail à reporter à l'oral aux parents.", y: &y)
+        drawSectionHelp("Indiquer le nombre de crises observées par type, et la durée totale en bas. Pour chaque crise, noter heure + durée approximative.", y: &y)
 
-        let rows = ["Matin (avant midi)", "Midi (12h–14h)", "Après-midi", "Goûter / fin journée", "Total durée (min)"]
-        drawWriteGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 200, rowHeight: 30)
+        // Lignes = tous les types de crise + ligne durée totale
+        let rows = SeizureType.allCases.map { "\($0.label)" } + ["Durée totale (min)"]
+        drawWriteGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 180, rowHeight: 26)
     }
 
     private static func drawMoodGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, pageWidth: CGFloat) {
         drawSectionTitle("État général / humeur", y: &y)
         drawSectionHelp("Cocher la case correspondant à l'état dominant observé sur la journée.", y: &y)
 
-        let rows = ["😀 Bien / serein", "😐 Calme / neutre", "😟 Agité / pleure", "😴 Très fatigué"]
-        drawCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 180)
+        let rows = ["😀 Très bien", "🙂 Bien", "😐 Neutre", "😟 Inquiétant / agité", "😢 Très difficile"]
+        drawCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 200)
     }
 
     private static func drawMealsGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, pageWidth: CGFloat) {
         drawSectionTitle("Repas et hydratation", y: &y)
-        let rows = ["Petit-déj.", "Midi", "Goûter", "Hydratation suffisante"]
-        drawCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 180)
+        drawSectionHelp("Décrire qualitativement chaque repas (qualité, quantité, refus, aliments particuliers).", y: &y)
+        let rows = ["Petit-déjeuner", "Déjeuner", "Goûter", "Dîner", "Hydratation (~ ml)"]
+        drawWriteGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 160, rowHeight: 30)
     }
 
     private static func drawSleepGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, pageWidth: CGFloat) {
-        drawSectionTitle("Sommeil / siestes", y: &y)
-        let rows = ["Sieste matin", "Sieste après-midi", "Sommeil agité"]
-        drawCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 180)
+        drawSectionTitle("Sommeil et siestes", y: &y)
+        drawSectionHelp("Indiquer durée + qualité (calme, agité, réveils…). Pour les siestes : durée approximative.", y: &y)
+        let rows = ["Sommeil de nuit (durée)", "Qualité du sommeil", "Sieste matin", "Sieste après-midi", "Réveils nocturnes"]
+        drawWriteGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y, pageWidth: pageWidth, leftColumnWidth: 180, rowHeight: 28)
     }
 
     private static func drawFreeNotes(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, pageWidth: CGFloat) {
