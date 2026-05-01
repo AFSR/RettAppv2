@@ -125,6 +125,12 @@ enum MedicalReportGenerator {
         let layout: Layout
         var y: CGFloat = 0     // curseur vertical depuis le haut de la page
         var pageNumber: Int = 0
+
+        mutating func beginPage(context: UIGraphicsPDFRendererContext) {
+            context.beginPage()
+            pageNumber += 1
+            y = layout.margin
+        }
     }
 
     private static func beginPageIfNeeded(neededHeight: CGFloat, ctx: inout DrawContext, context: UIGraphicsPDFRendererContext) {
@@ -421,13 +427,5 @@ enum MedicalReportGenerator {
         if m == 0 { return "\(s) s" }
         if s == 0 { return "\(m) min" }
         return "\(m) min \(s) s"
-    }
-}
-
-private extension MedicalReportGenerator.DrawContext {
-    mutating func beginPage(context: UIGraphicsPDFRendererContext) {
-        context.beginPage()
-        pageNumber += 1
-        y = layout.margin
     }
 }
