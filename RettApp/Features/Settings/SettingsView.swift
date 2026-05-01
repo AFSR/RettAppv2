@@ -180,6 +180,11 @@ struct SettingsView: View {
             } label: {
                 Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
             }
+            NavigationLink {
+                FollowUpBookletView()
+            } label: {
+                Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
+            }
             Button {
                 exportAllCSV()
             } label: {
