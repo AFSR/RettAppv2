@@ -26,7 +26,7 @@ struct ContentView: View {
 
             if epilepsyEnabled {
                 NavigationStack { SeizureTrackerView() }
-                    .tabItem { Label("Épilepsie", systemImage: "waveform.path.ecg") }
+                    .tabItem { Label("Suivi épilepsie", systemImage: "waveform.path.ecg") }
                     .badge(currentMonthSeizureCount)
 
                 NavigationStack { DashboardView() }
