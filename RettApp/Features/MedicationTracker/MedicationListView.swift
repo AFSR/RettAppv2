@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 
+/// Journal chronologique des médicaments du jour : prises planifiées (récurrentes)
+/// et prises ponctuelles (ad-hoc) mélangées et triées par heure.
 struct MedicationListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [ChildProfile]
@@ -8,6 +10,7 @@ struct MedicationListView: View {
 
     @State private var viewModel = MedicationViewModel()
     @State private var showPlan = false
+    @State private var showAdHoc = false
     @State private var showDatePicker = false
 
     private var profile: ChildProfile? { profiles.first }
@@ -16,21 +19,12 @@ struct MedicationListView: View {
         ZStack {
             Color.afsrBackground.ignoresSafeArea()
 
-            if medications.isEmpty {
-                EmptyStateView(
-                    title: "Aucun médicament",
-                    message: "Configurez le plan médicamenteux pour voir les prises du jour.",
-                    systemImage: "pill",
-                    actionTitle: "Configurer le plan"
-                ) { showPlan = true }
-            } else {
-                MedicationDayListContent(
-                    selectedDate: viewModel.selectedDate,
-                    medications: medications,
-                    profile: profile,
-                    viewModel: viewModel
-                )
-            }
+            JournalContent(
+                selectedDate: viewModel.selectedDate,
+                medications: medications,
+                profile: profile,
+                viewModel: viewModel
+            )
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
@@ -47,10 +41,19 @@ struct MedicationListView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack {
+                HStack(spacing: 12) {
                     Button { shift(1) } label: { Image(systemName: "chevron.right") }
+                    Button {
+                        showAdHoc = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.afsrPurpleAdaptive)
+                    }
+                    .accessibilityLabel("Ajouter une prise ponctuelle")
                     Menu {
-                        Button { showPlan = true } label: { Label("Plan médicamenteux", systemImage: "list.bullet.rectangle") }
+                        Button { showPlan = true } label: {
+                            Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -58,6 +61,7 @@ struct MedicationListView: View {
             }
         }
         .sheet(isPresented: $showPlan) { NavigationStack { MedicationPlanView() } }
+        .sheet(isPresented: $showAdHoc) { AdHocLogSheet() }
         .sheet(isPresented: $showDatePicker) {
             NavigationStack {
                 DatePicker("Date", selection: $viewModel.selectedDate, displayedComponents: .date)
@@ -83,10 +87,10 @@ struct MedicationListView: View {
     }
 
     private var title: String {
-        if let name = profile?.firstName, !name.isEmpty {
-            return "Médicaments — \(name)"
+        if let n = profile?.firstName, !n.isEmpty {
+            return "Journal — \(n)"
         }
-        return "Médicaments"
+        return "Journal médicaments"
     }
 
     private func shift(_ days: Int) {
@@ -97,7 +101,9 @@ struct MedicationListView: View {
     }
 }
 
-private struct MedicationDayListContent: View {
+// MARK: - Contenu du journal
+
+private struct JournalContent: View {
     let selectedDate: Date
     let medications: [Medication]
     let profile: ChildProfile?
@@ -120,83 +126,182 @@ private struct MedicationDayListContent: View {
         )
     }
 
-    private var grouped: [(HourMinute.DayPeriod, [MedicationLog])] {
-        let dict = Dictionary(grouping: logs) { log -> HourMinute.DayPeriod in
-            HourMinute(date: log.scheduledTime).period
-        }
-        let order: [HourMinute.DayPeriod] = [.morning, .noon, .evening, .other]
-        return order.compactMap { period in
-            guard let items = dict[period], !items.isEmpty else { return nil }
-            return (period, items)
-        }
+    private var sortedLogs: [MedicationLog] {
+        logs.sorted { $0.effectiveTime < $1.effectiveTime }
+    }
+
+    private var stats: (planned: Int, taken: Int, adHoc: Int) {
+        let planned = logs.filter { !$0.isAdHoc }.count
+        let taken = logs.filter { !$0.isAdHoc && $0.taken }.count
+        let adHoc = logs.filter { $0.isAdHoc }.count
+        return (planned, taken, adHoc)
     }
 
     var body: some View {
-        if logs.isEmpty {
-            EmptyStateView(
-                title: "Aucune prise prévue",
-                message: "Aucun médicament planifié pour cette journée.",
-                systemImage: "calendar"
-            )
-        } else {
-            List {
-                ForEach(grouped, id: \.0) { period, items in
-                    Section(period.label) {
-                        ForEach(items) { log in
-                            MedicationLogRow(log: log) {
-                                viewModel.togglePrise(log, in: modelContext)
+        ScrollView {
+            VStack(spacing: 16) {
+                summaryHeader
+                if logs.isEmpty {
+                    emptyState
+                } else {
+                    LazyVStack(spacing: 8) {
+                        ForEach(sortedLogs) { log in
+                            JournalEntryRow(log: log) {
+                                toggle(log)
+                            } onDelete: {
+                                modelContext.delete(log)
+                                try? modelContext.save()
                             }
                         }
                     }
+                    .padding(.horizontal)
                 }
+                Spacer(minLength: 24)
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color.afsrBackground)
+            .padding(.top, 8)
         }
+    }
+
+    private var summaryHeader: some View {
+        let s = stats
+        let lateLogs = logs.filter { $0.isLate }.count
+        return HStack(spacing: 10) {
+            StatPill(value: "\(s.taken)/\(s.planned)", label: "Pris", color: .afsrSuccess)
+            StatPill(value: "\(s.adHoc)", label: "Ponctuels", color: .afsrPurpleAdaptive)
+            if lateLogs > 0 {
+                StatPill(value: "\(lateLogs)", label: "En retard", color: .afsrWarning)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "pills")
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(.secondary)
+            Text("Aucune prise pour cette journée")
+                .font(AFSRFont.headline(15))
+            Text("Ajoutez une prise ponctuelle avec le bouton ➕ ou configurez le plan médicamenteux.")
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .padding(.top, 40)
+    }
+
+    private func toggle(_ log: MedicationLog) {
+        log.taken.toggle()
+        log.takenTime = log.taken ? Date() : nil
+        try? modelContext.save()
     }
 }
 
-private struct MedicationLogRow: View {
+// MARK: - Row du journal
+
+private struct JournalEntryRow: View {
     @Bindable var log: MedicationLog
-    let toggle: () -> Void
+    let onToggle: () -> Void
+    let onDelete: () -> Void
+
+    private var statusColor: Color {
+        if log.isAdHoc { return .afsrPurpleAdaptive }
+        if log.taken { return .afsrSuccess }
+        if log.isLate { return .afsrWarning }
+        return Color(.systemGray3)
+    }
+
+    private var statusIcon: String {
+        if log.isAdHoc { return "pin.fill" }
+        if log.taken { return "checkmark.circle.fill" }
+        if log.isLate { return "clock.badge.exclamationmark.fill" }
+        return "circle"
+    }
 
     var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(log.medicationName)
-                    .font(AFSRFont.headline(17))
+        HStack(spacing: 12) {
+            Image(systemName: statusIcon)
+                .font(.system(size: 24))
+                .foregroundStyle(statusColor)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(log.medicationName)
+                        .font(AFSRFont.headline(16))
+                        .lineLimit(1)
+                    if log.isAdHoc {
+                        Text("Ponctuel")
+                            .font(AFSRFont.caption())
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                            .foregroundStyle(.afsrPurpleAdaptive)
+                    }
+                }
                 HStack(spacing: 8) {
-                    Text(log.scheduledTime, format: .dateTime.hour().minute())
+                    Text(log.effectiveTime, format: .dateTime.hour().minute())
                         .font(AFSRFont.caption())
                         .foregroundStyle(.secondary)
                     Text("· \(log.dose.shortString) \(log.doseUnit.label)")
                         .font(AFSRFont.caption())
                         .foregroundStyle(.secondary)
-                    if log.isLate {
-                        Text("En retard")
+                    if !log.isAdHoc, log.taken, let t = log.takenTime,
+                       Calendar.current.compare(t, to: log.scheduledTime, toGranularity: .minute) != .orderedSame {
+                        Text("(prévu \(log.scheduledTime, format: .dateTime.hour().minute()))")
                             .font(AFSRFont.caption())
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Color.afsrWarning.opacity(0.25), in: Capsule())
-                            .foregroundStyle(.afsrWarning)
+                            .foregroundStyle(.secondary)
                     }
-                    if log.taken, let takenTime = log.takenTime {
-                        Text("✓ \(takenTime.formatted(.dateTime.hour().minute()))")
-                            .font(AFSRFont.caption())
-                            .foregroundStyle(.afsrSuccess)
-                    }
+                }
+                if log.isAdHoc, !log.adhocReason.isEmpty {
+                    Text(log.adhocReason)
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                        .italic()
+                        .lineLimit(2)
                 }
             }
             Spacer()
-            Toggle("", isOn: Binding(
-                get: { log.taken },
-                set: { _ in toggle() }
-            ))
-            .labelsHidden()
-            .tint(.afsrSuccess)
-            .accessibilityLabel(log.taken ? "Pris" : "Non pris")
+
+            if !log.isAdHoc {
+                Toggle("", isOn: Binding(
+                    get: { log.taken },
+                    set: { _ in onToggle() }
+                ))
+                .labelsHidden()
+                .tint(.afsrSuccess)
+                .accessibilityLabel(log.taken ? "Pris" : "Non pris")
+            } else {
+                Button(role: .destructive) { onDelete() } label: {
+                    Image(systemName: "minus.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+    }
+}
+
+private struct StatPill: View {
+    let value: String
+    let label: String
+    let color: Color
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(AFSRFont.headline(18))
+                .foregroundStyle(color)
+            Text(label)
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
     }
 }
 

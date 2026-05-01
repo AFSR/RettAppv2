@@ -15,13 +15,13 @@ enum MedicationImporter {
     /// - `active` : `1`/`0` (optionnel, 1 par défaut)
     static var templateContent: String {
         let header = CSVParser.joinLine([
-            "name", "dose_amount", "dose_unit", "scheduled_hours", "active"
+            "name", "dose_amount", "dose_unit", "scheduled_hours", "kind", "active"
         ])
         let rows = [
-            CSVParser.joinLine(["Keppra", "500", "mg", "08:00|20:00", "1"]),
-            CSVParser.joinLine(["Dépakine", "250", "mg", "08:00|12:00|20:00", "1"]),
-            CSVParser.joinLine(["Rivotril", "0.5", "ml", "22:00", "1"]),
-            CSVParser.joinLine(["", "", "", "", ""])
+            CSVParser.joinLine(["Keppra", "500", "mg", "08:00|20:00", "regular", "1"]),
+            CSVParser.joinLine(["Dépakine", "250", "mg", "08:00|12:00|20:00", "regular", "1"]),
+            CSVParser.joinLine(["Doliprane (à la demande)", "150", "mg", "", "adhoc", "1"]),
+            CSVParser.joinLine(["", "", "", "", "", ""])
         ]
         return ([header] + rows).joined(separator: "\n") + "\n"
     }
@@ -66,10 +66,13 @@ enum MedicationImporter {
             let unitRaw = (row["dose_unit"] ?? "mg").lowercased()
             let unit = DoseUnit(rawValue: unitRaw) ?? .mg
 
+            let kindRaw = (row["kind"] ?? "regular").lowercased()
+            let kind: MedicationKind = MedicationKind(rawValue: kindRaw) ?? .regular
+
             let hours = parseHours(row["scheduled_hours"] ?? "")
-            guard !hours.isEmpty else {
+            if kind == .regular && hours.isEmpty {
                 skipped += 1
-                errors.append("Ligne \(lineNumber) : aucune heure de prise valide (scheduled_hours)")
+                errors.append("Ligne \(lineNumber) : un médicament récurrent doit avoir au moins une heure de prise (scheduled_hours)")
                 continue
             }
 
@@ -81,6 +84,7 @@ enum MedicationImporter {
                 doseAmount: dose,
                 doseUnit: unit,
                 scheduledHours: hours,
+                kind: kind,
                 isActive: isActive
             )
             med.childProfile = childProfile

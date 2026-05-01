@@ -16,6 +16,10 @@ struct SettingsView: View {
     @State private var showChildEditor = false
     @State private var showMedicationPlan = false
     @State private var showEraseConfirm = false
+    @State private var showDemoConfirm = false
+    @State private var showPurgeDemoConfirm = false
+    @State private var demoSummary: String?
+    @State private var showSharingSoon = false
     @State private var exportURL: URL?
     @State private var showShareSheet = false
 
@@ -27,6 +31,8 @@ struct SettingsView: View {
             healthSection
             notificationsSection
             dataSection
+            sharingSection
+            supportSection
             medicalDisclaimerSection
             aboutSection
             accountSection
@@ -49,6 +55,31 @@ struct SettingsView: View {
             Button("Annuler", role: .cancel) { }
         } message: {
             Text("Cette action supprimera le profil, les crises, les médicaments et les prises. Irréversible.")
+        }
+        .confirmationDialog("Générer des données de démonstration ?", isPresented: $showDemoConfirm) {
+            Button("Générer") { runGenerateDemo() }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Crée 3 mois de crises synthétiques + 2 médicaments de démo + 14 jours de prises. Vos données réelles ne sont pas modifiées.")
+        }
+        .confirmationDialog("Supprimer les données de démonstration ?", isPresented: $showPurgeDemoConfirm) {
+            Button("Supprimer", role: .destructive) { runPurgeDemo() }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Seules les entrées identifiées comme démo seront retirées. Vos données réelles sont conservées.")
+        }
+        .alert("Données de démonstration", isPresented: Binding(
+            get: { demoSummary != nil },
+            set: { if !$0 { demoSummary = nil } }
+        ), presenting: demoSummary) { _ in
+            Button("OK") { demoSummary = nil }
+        } message: { msg in
+            Text(msg)
+        }
+        .alert("Partage entre parents", isPresented: $showSharingSoon) {
+            Button("OK") { }
+        } message: {
+            Text("La synchronisation iCloud entre parents arrive dans une prochaine version. En attendant, vous pouvez exporter vos données en CSV (Réglages → Données → Exporter) et les transmettre par AirDrop, Messages ou e-mail.")
         }
     }
 
@@ -143,17 +174,70 @@ struct SettingsView: View {
     }
 
     private var dataSection: some View {
-        Section("Données") {
+        Section {
+            NavigationLink {
+                MedicalReportView()
+            } label: {
+                Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
+            }
+            NavigationLink {
+                FollowUpBookletView()
+            } label: {
+                Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
+            }
             Button {
                 exportAllCSV()
             } label: {
                 Label("Exporter toutes les données (CSV)", systemImage: "square.and.arrow.up")
             }
+            Button {
+                showDemoConfirm = true
+            } label: {
+                Label("Générer des données de démonstration", systemImage: "wand.and.stars")
+            }
+            Button(role: .destructive) {
+                showPurgeDemoConfirm = true
+            } label: {
+                Label("Supprimer les données de démonstration", systemImage: "wand.and.stars.inverse")
+            }
             Button(role: .destructive) {
                 showEraseConfirm = true
             } label: {
-                Label("Effacer les données de l'application", systemImage: "trash")
+                Label("Effacer toutes les données", systemImage: "trash")
             }
+        } header: {
+            Text("Données")
+        } footer: {
+            Text("Le rapport médecin produit un PDF imprimable structuré (identité, traitement, statistiques, calendrier des crises, observance, observations).")
+        }
+    }
+
+    private var sharingSection: some View {
+        Section {
+            Button {
+                showSharingSoon = true
+            } label: {
+                Label("Inviter le second parent", systemImage: "person.2.badge.plus.fill")
+            }
+        } header: {
+            Text("Partage")
+        } footer: {
+            Text("Synchronisez le suivi avec un second parent via iCloud (CloudKit Sharing). Les données restent chiffrées de bout en bout.")
+        }
+    }
+
+    private var supportSection: some View {
+        Section {
+            Button {
+                openDonationPage()
+            } label: {
+                Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
+                    .foregroundStyle(.afsrEmergency)
+            }
+        } header: {
+            Text("Soutenir l'association")
+        } footer: {
+            Text("L'AFSR est une association loi 1901 reconnue d'intérêt général. Vos dons sont déductibles à 66 % de votre impôt sur le revenu (dans la limite de 20 % du revenu imposable).")
         }
     }
 
@@ -314,6 +398,27 @@ struct SettingsView: View {
         let needsQuotes = s.contains(",") || s.contains("\n") || s.contains("\"")
         let escaped = s.replacingOccurrences(of: "\"", with: "\"\"")
         return needsQuotes ? "\"\(escaped)\"" : escaped
+    }
+
+    private func runGenerateDemo() {
+        let result = DemoDataGenerator.generate(in: modelContext)
+        demoSummary = "\(result.seizuresCreated) crises · \(result.medicationsCreated) médicaments · \(result.logsCreated) prises générées."
+    }
+
+    private func runPurgeDemo() {
+        let count = DemoDataGenerator.purgeDemoData(in: modelContext)
+        demoSummary = "\(count) entrée(s) de démonstration supprimée(s)."
+    }
+
+    private func openDonationPage() {
+        // Apple App Store Review Guideline 3.2.1(vii) : les apps peuvent collecter des
+        // dons aux orgas reconnues via Apple Pay OU via Safari.
+        // V1 : on redirige vers la page de don de l'AFSR (Safari).
+        // V2 (futur) : intégrer Apple Pay directement (nécessite merchant ID configuré
+        //              côté AFSR + processeur de paiement type Stripe/Adyen).
+        if let url = URL(string: "https://afsr.fr/don") {
+            UIApplication.shared.open(url)
+        }
     }
 
     private func eraseAll() {
