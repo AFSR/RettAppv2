@@ -27,6 +27,13 @@ struct MedicationPlanView: View {
                                 Text(med.name)
                                     .font(AFSRFont.headline(17))
                                     .foregroundStyle(.primary)
+                                if med.kind == .adhoc {
+                                    Text("Ponctuel")
+                                        .font(AFSRFont.caption())
+                                        .padding(.horizontal, 6).padding(.vertical, 2)
+                                        .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                                        .foregroundStyle(.afsrPurpleAdaptive)
+                                }
                                 Spacer()
                                 if !med.isActive {
                                     Text("Inactif")
@@ -34,7 +41,7 @@ struct MedicationPlanView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            Text("\(med.doseLabel) — \(med.scheduledHours.map(\.formatted).joined(separator: ", "))")
+                            Text(rowSubtitle(for: med))
                                 .font(AFSRFont.caption())
                                 .foregroundStyle(.secondary)
                         }
@@ -85,8 +92,8 @@ struct MedicationPlanView: View {
         }
         .sheet(isPresented: $showEditor) {
             NavigationStack {
-                MedicationEditor(medication: editing) { name, dose, unit, hours, active in
-                    Task { await save(name: name, dose: dose, unit: unit, hours: hours, active: active) }
+                MedicationEditor(medication: editing) { name, dose, unit, hours, kind, active in
+                    Task { await save(name: name, dose: dose, unit: unit, hours: hours, kind: kind, active: active) }
                 }
             }
         }
@@ -107,6 +114,16 @@ struct MedicationPlanView: View {
         }
     }
 
+    private func rowSubtitle(for med: Medication) -> String {
+        switch med.kind {
+        case .adhoc:
+            return "\(med.doseLabel) · à la demande"
+        case .regular:
+            let hours = med.scheduledHours.map(\.formatted).joined(separator: ", ")
+            return hours.isEmpty ? med.doseLabel : "\(med.doseLabel) — \(hours)"
+        }
+    }
+
     private func delete(_ offsets: IndexSet) {
         for i in offsets {
             modelContext.delete(medications[i])
@@ -120,15 +137,16 @@ struct MedicationPlanView: View {
         }
     }
 
-    private func save(name: String, dose: Double, unit: DoseUnit, hours: [HourMinute], active: Bool) async {
+    private func save(name: String, dose: Double, unit: DoseUnit, hours: [HourMinute], kind: MedicationKind, active: Bool) async {
         if let editing {
             editing.name = name
             editing.doseAmount = dose
             editing.doseUnit = unit
             editing.scheduledHours = hours
+            editing.kind = kind
             editing.isActive = active
         } else {
-            let med = Medication(name: name, doseAmount: dose, doseUnit: unit, scheduledHours: hours, isActive: active)
+            let med = Medication(name: name, doseAmount: dose, doseUnit: unit, scheduledHours: hours, kind: kind, isActive: active)
             med.childProfile = profile
             modelContext.insert(med)
         }
@@ -144,12 +162,13 @@ struct MedicationPlanView: View {
 struct MedicationEditor: View {
     @Environment(\.dismiss) private var dismiss
     let medication: Medication?
-    let onSave: (String, Double, DoseUnit, [HourMinute], Bool) -> Void
+    let onSave: (String, Double, DoseUnit, [HourMinute], MedicationKind, Bool) -> Void
 
     @State private var name: String = ""
     @State private var dose: String = ""
     @State private var unit: DoseUnit = .mg
     @State private var times: [HourMinute] = [HourMinute(hour: 8, minute: 0)]
+    @State private var kind: MedicationKind = .regular
     @State private var active: Bool = true
 
     private static let commonNames = [
@@ -159,6 +178,17 @@ struct MedicationEditor: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("Type", selection: $kind) {
+                    ForEach(MedicationKind.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            } footer: {
+                Text(kind == .regular
+                     ? "Récurrent : pris à des horaires fixes, génère des rappels automatiques."
+                     : "À la demande : pris en cas de besoin (Rivotril en cas de crise, antipyrétique sur fièvre…). Aucune notification.")
+            }
+
             Section("Nom") {
                 TextField("Ex. Keppra", text: $name)
                     .autocorrectionDisabled()
@@ -171,7 +201,7 @@ struct MedicationEditor: View {
                 }
             }
 
-            Section("Dose") {
+            Section("Dose habituelle") {
                 HStack {
                     TextField("Quantité", text: $dose)
                         .keyboardType(.decimalPad)
@@ -184,18 +214,20 @@ struct MedicationEditor: View {
                 }
             }
 
-            Section("Heures de prise") {
-                ForEach($times) { $t in
-                    DatePicker("Heure", selection: Binding(
-                        get: { t.asDate },
-                        set: { t = HourMinute(date: $0) }
-                    ), displayedComponents: .hourAndMinute)
-                }
-                .onDelete { idx in times.remove(atOffsets: idx) }
-                Button {
-                    times.append(HourMinute(hour: 12, minute: 0))
-                } label: {
-                    Label("Ajouter une heure", systemImage: "plus")
+            if kind == .regular {
+                Section("Heures de prise") {
+                    ForEach($times) { $t in
+                        DatePicker("Heure", selection: Binding(
+                            get: { t.asDate },
+                            set: { t = HourMinute(date: $0) }
+                        ), displayedComponents: .hourAndMinute)
+                    }
+                    .onDelete { idx in times.remove(atOffsets: idx) }
+                    Button {
+                        times.append(HourMinute(hour: 12, minute: 0))
+                    } label: {
+                        Label("Ajouter une heure", systemImage: "plus")
+                    }
                 }
             }
 
@@ -212,12 +244,13 @@ struct MedicationEditor: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Enregistrer") {
                     let amount = Double(dose.replacingOccurrences(of: ",", with: ".")) ?? 0
-                    onSave(name.trimmingCharacters(in: .whitespaces), amount, unit, times, active)
+                    let finalTimes = kind == .regular ? times : []
+                    onSave(name.trimmingCharacters(in: .whitespaces), amount, unit, finalTimes, kind, active)
                     dismiss()
                 }
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty
                           || Double(dose.replacingOccurrences(of: ",", with: ".")) == nil
-                          || times.isEmpty)
+                          || (kind == .regular && times.isEmpty))
                 .bold()
             }
         }
@@ -229,6 +262,7 @@ struct MedicationEditor: View {
                     : String(medication.doseAmount)
                 unit = medication.doseUnit
                 times = medication.scheduledHours
+                kind = medication.kind
                 active = medication.isActive
             }
         }

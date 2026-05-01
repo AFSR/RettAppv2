@@ -20,7 +20,7 @@ final class MedicationViewModel {
         let existing = (try? context.fetch(descriptor)) ?? []
         let existingKeys = Set(existing.map { "\($0.medicationId)|\(Int($0.scheduledTime.timeIntervalSince1970))" })
 
-        for med in medications where med.isActive {
+        for med in medications where med.isActive && med.kind == .regular {
             for slot in med.scheduledHours {
                 let scheduled = slot.date(on: day)
                 let key = "\(med.id)|\(Int(scheduled.timeIntervalSince1970))"
@@ -69,7 +69,7 @@ final class MedicationViewModel {
         let ids = pending.filter { $0.identifier.hasPrefix("afsr.med.") }.map { $0.identifier }
         center.removePendingNotificationRequests(withIdentifiers: ids)
 
-        for med in medications where med.isActive {
+        for med in medications where med.isActive && med.kind == .regular {
             for slot in med.scheduledHours {
                 let identifier = "afsr.med.\(med.id.uuidString).\(slot.hour).\(slot.minute)"
                 let content = UNMutableNotificationContent()
