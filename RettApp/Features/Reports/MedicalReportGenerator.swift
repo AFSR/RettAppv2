@@ -21,6 +21,7 @@ import PDFKit
 /// 9. **Observations parent** — bloc libre saisi par l'utilisateur
 /// 10. **Annexe** — calendrier détaillé chronologique de toutes les crises
 /// 11. **Pied de page** sur chaque page — disclaimer + date génération
+@MainActor
 enum MedicalReportGenerator {
 
     static let reportsDirectoryName = "Reports"
