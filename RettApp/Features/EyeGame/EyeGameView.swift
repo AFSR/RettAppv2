@@ -265,31 +265,45 @@ private struct CalibrationBadge: View {
     }
 
     var body: some View {
-        Menu {
-            Section {
-                Label("Calibration : \(status.label)", systemImage: status.icon)
+        HStack(spacing: 6) {
+            // Badge cliquable → menu
+            Menu {
+                Section("Calibration") {
+                    Label(status.label, systemImage: status.icon)
+                }
+                Section {
+                    Text("Touchez le personnage quand votre enfant le regarde pour calibrer le suivi du regard. Les points sont conservés entre les parties.")
+                }
+                Button(role: .destructive) {
+                    showResetConfirm = true
+                } label: {
+                    Label("Réinitialiser la calibration", systemImage: "arrow.counterclockwise")
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: status.icon).foregroundStyle(status.color)
+                    Text(status.label).font(AFSRFont.caption())
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
             }
-            Section {
-                Text("Touchez le personnage quand votre enfant le regarde pour calibrer le suivi du regard. Les points sont conservés entre les parties.")
-            }
-            Button(role: .destructive) {
+            .accessibilityLabel("Calibration : \(status.label). Toucher pour les options.")
+
+            // Bouton reset visible directement (en complément du menu, au cas où)
+            Button {
                 showResetConfirm = true
             } label: {
-                Label("Réinitialiser la calibration", systemImage: "arrow.counterclockwise")
+                Image(systemName: "arrow.counterclockwise.circle.fill")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.afsrEmergency.opacity(0.85))
+                    .background(Circle().fill(Color.white.opacity(0.001))) // hit-area
             }
-            .disabled(count == 0)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: status.icon).foregroundStyle(status.color)
-                Text(status.label).font(AFSRFont.caption())
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
+            .buttonStyle(.plain)
+            .accessibilityLabel("Réinitialiser la calibration du regard")
         }
-        .accessibilityLabel("Calibration : \(status.label). Toucher pour les options.")
         .confirmationDialog(
             "Réinitialiser la calibration ?",
             isPresented: $showResetConfirm,
