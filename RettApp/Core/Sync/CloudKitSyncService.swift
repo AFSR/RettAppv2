@@ -153,7 +153,10 @@ final class CloudKitSyncService {
         let share = CKShare(recordZoneID: zone.zoneID)
         share[CKShare.SystemFieldKey.title] = "Suivi RettApp — \(childProfile?.fullName ?? "enfant")" as CKRecordValue
         share[CKShare.SystemFieldKey.shareType] = "fr.afsr.RettApp.familyShare" as CKRecordValue
-        share.publicPermission = .none
+        // L'URL grants accès à toute personne avec le lien — sécurité repose sur
+        // la transmission AirDrop en présentiel uniquement (cf. ProximityShareSheet
+        // côté UI, qui exclut tous les canaux à distance).
+        share.publicPermission = .readWrite
 
         _ = try await container.privateCloudDatabase.modifyRecords(
             saving: [share], deleting: [],

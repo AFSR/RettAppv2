@@ -3,15 +3,17 @@ import SwiftData
 import CloudKit
 
 /// Sous-page Réglages → Partage entre parents.
-/// Statut iCloud, création/gestion de l'invitation, sync manuelle bidirectionnelle.
+/// L'invitation se fait **en présentiel via AirDrop** uniquement, par sécurité —
+/// les deux iPhones doivent être à proximité au moment du partage.
 struct ParentSharingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
 
     @State private var sharingURL: URL?
-    @State private var presentNativeShareController = false
-    @State private var presentLinkShareSheet = false
+    @State private var presentAirDropSheet = false
+    @State private var presentInviteCard = false
+    @State private var presentStopConfirm = false
     @State private var workingError: String?
 
     var body: some View {
@@ -27,22 +29,31 @@ struct ParentSharingView: View {
             await sync.refreshAccountStatus()
             await sync.refreshShareStatus()
         }
-        .sheet(isPresented: $presentNativeShareController) {
-            if let share = sync.currentShare {
-                CloudSharingSheet(
-                    share: share,
-                    container: CKContainer(identifier: CloudKitSyncService.containerID),
-                    onSaveCompleted: {
-                        Task { await sync.refreshShareStatus() }
-                    },
-                    onStopSharing: {
-                        Task { await sync.refreshShareStatus() }
-                    }
+        .sheet(isPresented: $presentInviteCard) {
+            if let url = sharingURL {
+                InvitationCardView(
+                    url: url,
+                    childName: profiles.first?.fullName ?? "votre enfant",
+                    onAirDrop: { presentAirDropSheet = true }
                 )
+                .presentationDetents([.medium, .large])
             }
         }
-        .sheet(isPresented: $presentLinkShareSheet) {
-            if let url = sharingURL { ShareSheet(items: [url]) }
+        .sheet(isPresented: $presentAirDropSheet) {
+            if let url = sharingURL {
+                ProximityShareSheet(url: url, onComplete: {
+                    presentAirDropSheet = false
+                    Task { await sync.refreshShareStatus() }
+                })
+            }
+        }
+        .confirmationDialog("Arrêter le partage ?", isPresented: $presentStopConfirm) {
+            Button("Arrêter", role: .destructive) {
+                Task { await stopSharing() }
+            }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("L'autre parent ne pourra plus accéder ni modifier les données. Vous pourrez créer une nouvelle invitation à tout moment.")
         }
         .alert("Erreur de synchronisation", isPresented: Binding(
             get: { workingError != nil },
@@ -159,22 +170,19 @@ struct ParentSharingView: View {
                 Button {
                     Task { await createInvite() }
                 } label: {
-                    Label("Créer une invitation", systemImage: "person.crop.circle.badge.plus")
+                    Label("Créer une invitation (AirDrop)", systemImage: "dot.radiowaves.left.and.right")
                 }
                 .disabled(sync.accountStatus != .available || sync.syncState == .syncing)
             case .owner:
                 Button {
-                    presentNativeShareController = true
+                    Task { await regenerateInviteSheet() }
                 } label: {
-                    Label("Gérer les participants", systemImage: "person.2")
+                    Label("Réenvoyer l'invitation par AirDrop", systemImage: "dot.radiowaves.left.and.right")
                 }
-                if let share = sync.currentShare, let url = share.url {
-                    Button {
-                        sharingURL = url
-                        presentLinkShareSheet = true
-                    } label: {
-                        Label("Renvoyer le lien d'invitation", systemImage: "link")
-                    }
+                Button(role: .destructive) {
+                    presentStopConfirm = true
+                } label: {
+                    Label("Arrêter le partage", systemImage: "xmark.circle")
                 }
             case .participant:
                 EmptyView()
@@ -199,6 +207,11 @@ struct ParentSharingView: View {
     private var infoSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
+                Label {
+                    Text("**Présentiel obligatoire** : l'invitation se transmet uniquement via AirDrop, donc en présence physique des deux appareils.")
+                } icon: {
+                    Image(systemName: "person.2.wave.2.fill").foregroundStyle(.afsrPurpleAdaptive)
+                }
                 Label("Données chiffrées par iCloud (TLS + chiffrement au repos).", systemImage: "lock.shield.fill")
                 Label("Aucun serveur AFSR ou tiers n'est impliqué.", systemImage: "checkmark.shield.fill")
                 Label("L'invité peut révoquer son accès à tout moment depuis ses Réglages iCloud.", systemImage: "person.crop.circle.badge.xmark")
@@ -214,13 +227,30 @@ struct ParentSharingView: View {
 
     private func createInvite() async {
         do {
-            // 1. Pousse les données existantes pour que l'invité voie tout au moment d'accepter
+            // 1. Pousse l'existant pour que l'invité voie tout au moment d'accepter
             try await sync.replicateAll(from: modelContext)
-            // 2. Crée le CKShare et obtient l'URL d'invitation
+            // 2. Crée le CKShare et obtient l'URL
             let url = try await sync.setupSharing(childProfile: profiles.first)
             sharingURL = url
-            // 3. Présente le UICloudSharingController natif (gère destinataires, perms, etc.)
-            presentNativeShareController = true
+            presentInviteCard = true
+        } catch {
+            workingError = error.localizedDescription
+        }
+    }
+
+    private func regenerateInviteSheet() async {
+        if let url = sync.currentShare?.url {
+            sharingURL = url
+            presentInviteCard = true
+        } else {
+            // pas de share local → en récupérer un
+            await createInvite()
+        }
+    }
+
+    private func stopSharing() async {
+        do {
+            try await sync.stopSharing()
         } catch {
             workingError = error.localizedDescription
         }
@@ -232,6 +262,93 @@ struct ParentSharingView: View {
             try await sync.pullChanges(into: modelContext)
         } catch {
             workingError = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Carte d'invitation (rappel proximité)
+
+private struct InvitationCardView: View {
+    @Environment(\.dismiss) private var dismiss
+    let url: URL
+    let childName: String
+    let onAirDrop: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    Image(systemName: "person.2.wave.2.fill")
+                        .font(.system(size: 64, weight: .light))
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                        .padding(.top, 16)
+
+                    VStack(spacing: 8) {
+                        Text("Invitation prête")
+                            .font(AFSRFont.title(24))
+                        Text("Pour le suivi de \(childName)")
+                            .font(AFSRFont.body(15))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        StepRow(number: "1", text: "Approchez les deux iPhones (à moins de 10 m).")
+                        StepRow(number: "2", text: "Sur l'autre iPhone, AirDrop doit être activé (Centre de contrôle → AirDrop → Tout le monde 10 min ou Mes contacts).")
+                        StepRow(number: "3", text: "Touchez « Envoyer par AirDrop » ci-dessous.")
+                        StepRow(number: "4", text: "Sélectionnez l'autre iPhone dans la liste AirDrop qui s'affiche.")
+                        StepRow(number: "5", text: "L'autre parent accepte l'invitation, l'appli RettApp s'ouvre et synchronise.")
+                    }
+                    .padding()
+                    .background(Color.afsrPurpleAdaptive.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal)
+
+                    Button {
+                        onAirDrop()
+                    } label: {
+                        Label("Envoyer par AirDrop", systemImage: "dot.radiowaves.left.and.right")
+                            .font(AFSRFont.headline(17))
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: AFSRTokens.minTapTarget)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.afsrPurpleAdaptive)
+                    .padding(.horizontal)
+
+                    VStack(spacing: 4) {
+                        Text("Pour des raisons de sécurité, l'invitation ne peut pas être envoyée par Messages, Mail ou un autre canal à distance.")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                    Spacer(minLength: 16)
+                }
+            }
+            .navigationTitle("Invitation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Fermer") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private struct StepRow: View {
+    let number: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(number)
+                .font(AFSRFont.headline(13))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(Color.afsrPurpleAdaptive, in: Circle())
+            Text(text)
+                .font(AFSRFont.body(14))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
     }
 }
