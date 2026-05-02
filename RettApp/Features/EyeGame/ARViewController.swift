@@ -91,7 +91,7 @@ final class ARFaceViewController: UIViewController, ARSessionDelegate {
         if now - lastLogTime > 2.0 {
             lastLogTime = now
             Self.log.info(
-                "blend h=\(horizontal, format: .fixed(precision: 3)) v=\(vertical, format: .fixed(precision: 3)) → screen \(Int(screenPoint.x))/\(Int(screenPoint.y)) orient=\(orientationName(orientation))"
+                "blend h=\(horizontal, format: .fixed(precision: 3)) v=\(vertical, format: .fixed(precision: 3)) → screen \(Int(screenPoint.x))/\(Int(screenPoint.y)) orient=\(self.orientationName(orientation))"
             )
         }
 
