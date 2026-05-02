@@ -1,9 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// Journal chronologique des médicaments du jour : prises planifiées (récurrentes)
-/// et prises ponctuelles (ad-hoc) mélangées et triées par heure.
-struct MedicationListView: View {
+/// Onglet principal de l'app — Journal du jour.
+/// Combine : bouton urgence crise (si épilepsie), saisie rapide humeur/observations,
+/// prises de médicaments planifiées et ponctuelles, crises du jour. Tout est saisi ici.
+struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
@@ -14,8 +15,11 @@ struct MedicationListView: View {
     @State private var showDatePicker = false
     @State private var showMoodSheet = false
     @State private var showObservationSheet = false
+    @State private var showSeizureTracker = false
+    @State private var showSeizureHistory = false
 
     private var profile: ChildProfile? { profiles.first }
+    private var epilepsyEnabled: Bool { profile?.hasEpilepsy ?? false }
 
     var body: some View {
         ZStack {
@@ -25,7 +29,9 @@ struct MedicationListView: View {
                 selectedDate: viewModel.selectedDate,
                 medications: medications,
                 profile: profile,
-                viewModel: viewModel
+                viewModel: viewModel,
+                emergencyAction: epilepsyEnabled ? { showSeizureTracker = true } : nil,
+                showSeizureHistory: { showSeizureHistory = true }
             )
         }
         .navigationTitle(title)
@@ -59,6 +65,12 @@ struct MedicationListView: View {
                         Button { showObservationSheet = true } label: {
                             Label("Repas / sommeil du jour", systemImage: "fork.knife")
                         }
+                        if epilepsyEnabled {
+                            Divider()
+                            Button { showSeizureHistory = true } label: {
+                                Label("Historique des crises", systemImage: "list.bullet.rectangle.portrait")
+                            }
+                        }
                         Divider()
                         Button { showPlan = true } label: {
                             Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
@@ -71,6 +83,12 @@ struct MedicationListView: View {
         }
         .sheet(isPresented: $showPlan) { NavigationStack { MedicationPlanView() } }
         .sheet(isPresented: $showAdHoc) { AdHocLogSheet() }
+        .sheet(isPresented: $showSeizureHistory) {
+            NavigationStack { SeizureHistoryView() }
+        }
+        .fullScreenCover(isPresented: $showSeizureTracker) {
+            NavigationStack { SeizureTrackerView() }
+        }
         .sheet(isPresented: $showMoodSheet) { MoodSheet() }
         .sheet(isPresented: $showObservationSheet) {
             DailyObservationSheet(dayStart: viewModel.selectedDate)
@@ -121,20 +139,28 @@ private struct JournalContent: View {
     let medications: [Medication]
     let profile: ChildProfile?
     let viewModel: MedicationViewModel
+    /// Action déclenchée par le gros bouton urgence (nil = pas d'épilepsie, bouton caché).
+    let emergencyAction: (() -> Void)?
+    /// Ouvre l'historique complet des crises.
+    let showSeizureHistory: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Query private var logs: [MedicationLog]
     @Query private var moods: [MoodEntry]
     @Query private var observations: [DailyObservation]
+    @Query private var seizures: [SeizureEvent]
 
     @State private var showMood = false
     @State private var showObservation = false
 
-    init(selectedDate: Date, medications: [Medication], profile: ChildProfile?, viewModel: MedicationViewModel) {
+    init(selectedDate: Date, medications: [Medication], profile: ChildProfile?, viewModel: MedicationViewModel,
+         emergencyAction: (() -> Void)?, showSeizureHistory: @escaping () -> Void) {
         self.selectedDate = selectedDate
         self.medications = medications
         self.profile = profile
         self.viewModel = viewModel
+        self.emergencyAction = emergencyAction
+        self.showSeizureHistory = showSeizureHistory
 
         let day = Calendar.current.startOfDay(for: selectedDate)
         let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day
@@ -148,6 +174,10 @@ private struct JournalContent: View {
         )
         self._observations = Query(
             filter: #Predicate<DailyObservation> { $0.dayStart == day }
+        )
+        self._seizures = Query(
+            filter: #Predicate<SeizureEvent> { $0.startTime >= day && $0.startTime < nextDay },
+            sort: \SeizureEvent.startTime
         )
     }
 
@@ -165,19 +195,18 @@ private struct JournalContent: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                if let emergencyAction {
+                    AFSREmergencyButton(title: "Démarrer une crise", action: emergencyAction)
+                        .padding(.horizontal)
+                }
                 summaryHeader
                 moodObservationCard
-                if logs.isEmpty {
+                if logs.isEmpty && seizures.isEmpty && moods.isEmpty {
                     emptyState
                 } else {
                     LazyVStack(spacing: 8) {
-                        ForEach(sortedLogs) { log in
-                            JournalEntryRow(log: log) {
-                                toggle(log)
-                            } onDelete: {
-                                modelContext.delete(log)
-                                try? modelContext.save()
-                            }
+                        ForEach(combinedFeed) { item in
+                            JournalFeedRow(item: item, onToggle: { log in toggle(log) }, onDelete: { delete($0) }, onSeizureTap: { showSeizureHistory() })
                         }
                     }
                     .padding(.horizontal)
@@ -186,6 +215,20 @@ private struct JournalContent: View {
             }
             .padding(.top, 8)
         }
+    }
+
+    /// Combine logs médicament, crises et humeurs en un feed chronologique unique.
+    private var combinedFeed: [JournalFeedItem] {
+        var items: [JournalFeedItem] = []
+        items.append(contentsOf: logs.map { JournalFeedItem.medication($0) })
+        items.append(contentsOf: seizures.map { JournalFeedItem.seizure($0) })
+        items.append(contentsOf: moods.map { JournalFeedItem.mood($0) })
+        return items.sorted { $0.time < $1.time }
+    }
+
+    private func delete(_ log: MedicationLog) {
+        modelContext.delete(log)
+        try? modelContext.save()
     }
 
     private var summaryHeader: some View {
@@ -310,6 +353,123 @@ private struct JournalContent: View {
 
 // MARK: - Row du journal
 
+// MARK: - Feed item type
+
+private enum JournalFeedItem: Identifiable {
+    case medication(MedicationLog)
+    case seizure(SeizureEvent)
+    case mood(MoodEntry)
+
+    var id: String {
+        switch self {
+        case .medication(let l): return "med-\(l.id.uuidString)"
+        case .seizure(let s): return "seiz-\(s.id.uuidString)"
+        case .mood(let m): return "mood-\(m.id.uuidString)"
+        }
+    }
+    var time: Date {
+        switch self {
+        case .medication(let l): return l.effectiveTime
+        case .seizure(let s): return s.startTime
+        case .mood(let m): return m.timestamp
+        }
+    }
+}
+
+private struct JournalFeedRow: View {
+    let item: JournalFeedItem
+    let onToggle: (MedicationLog) -> Void
+    let onDelete: (MedicationLog) -> Void
+    let onSeizureTap: () -> Void
+
+    var body: some View {
+        switch item {
+        case .medication(let log):
+            JournalEntryRow(log: log,
+                            onToggle: { onToggle(log) },
+                            onDelete: { onDelete(log) })
+        case .seizure(let s):
+            SeizureRowCompact(event: s, onTap: onSeizureTap)
+        case .mood(let m):
+            MoodRowCompact(entry: m)
+        }
+    }
+}
+
+private struct SeizureRowCompact: View {
+    let event: SeizureEvent
+    let onTap: () -> Void
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: "waveform.path.ecg")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.afsrEmergency)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("Crise — \(event.seizureType.label)")
+                            .font(AFSRFont.headline(15))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    HStack(spacing: 6) {
+                        Text(event.startTime, format: .dateTime.hour().minute())
+                            .font(AFSRFont.caption())
+                        Text("· \(event.formattedDuration)")
+                            .font(AFSRFont.caption())
+                        if event.trigger != .none {
+                            Text("· \(event.trigger.label)")
+                                .font(AFSRFont.caption())
+                                .lineLimit(1)
+                        }
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MoodRowCompact: View {
+    let entry: MoodEntry
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(entry.level.emoji)
+                .font(.system(size: 26))
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.level.label)
+                    .font(AFSRFont.headline(15))
+                HStack(spacing: 6) {
+                    Text(entry.timestamp, format: .dateTime.hour().minute())
+                        .font(AFSRFont.caption())
+                    if !entry.notes.isEmpty {
+                        Text("·").font(AFSRFont.caption())
+                        Text(entry.notes)
+                            .font(AFSRFont.caption())
+                            .italic()
+                            .lineLimit(2)
+                    }
+                }
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+    }
+}
+
 private struct JournalEntryRow: View {
     @Bindable var log: MedicationLog
     let onToggle: () -> Void
@@ -422,6 +582,6 @@ private extension Double {
 }
 
 #Preview {
-    NavigationStack { MedicationListView() }
+    NavigationStack { JournalView() }
         .modelContainer(PreviewData.container)
 }

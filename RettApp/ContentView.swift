@@ -24,17 +24,14 @@ struct ContentView: View {
                     .tabItem { Label("Actualités", systemImage: "newspaper.fill") }
             }
 
+            NavigationStack { JournalView() }
+                .tabItem { Label("Journal", systemImage: "book.pages.fill") }
+                .badge(epilepsyEnabled ? currentMonthSeizureCount : 0)
+
             if epilepsyEnabled {
-                NavigationStack { SeizureTrackerView() }
-                    .tabItem { Label("Suivi épilepsie", systemImage: "waveform.path.ecg") }
-                    .badge(currentMonthSeizureCount)
-
                 NavigationStack { DashboardView() }
-                    .tabItem { Label("Tableau de bord", systemImage: "chart.bar.xaxis") }
+                    .tabItem { Label("Bilan", systemImage: "chart.bar.xaxis") }
             }
-
-            NavigationStack { MedicationListView() }
-                .tabItem { Label("Médicaments", systemImage: "pill.fill") }
 
             NavigationStack { EyeGameView() }
                 .tabItem { Label("Jeu Regard", systemImage: "eye.fill") }
