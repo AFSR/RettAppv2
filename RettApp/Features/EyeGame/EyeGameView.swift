@@ -253,6 +253,8 @@ private struct CalibrationBadge: View {
     let count: Int
     let onReset: () -> Void
 
+    @State private var showResetConfirm = false
+
     private var status: (icon: String, color: Color, label: String) {
         switch count {
         case 0:    return ("scope", .orange, "Non calibré")
@@ -263,14 +265,41 @@ private struct CalibrationBadge: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: status.icon).foregroundStyle(status.color)
-            Text(status.label).font(AFSRFont.caption())
+        Menu {
+            Section {
+                Label("Calibration : \(status.label)", systemImage: status.icon)
+            }
+            Section {
+                Text("Touchez le personnage quand votre enfant le regarde pour calibrer le suivi du regard. Les points sont conservés entre les parties.")
+            }
+            Button(role: .destructive) {
+                showResetConfirm = true
+            } label: {
+                Label("Réinitialiser la calibration", systemImage: "arrow.counterclockwise")
+            }
+            .disabled(count == 0)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: status.icon).foregroundStyle(status.color)
+                Text(status.label).font(AFSRFont.caption())
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: Capsule())
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
-        .onLongPressGesture(minimumDuration: 0.8) { onReset() }
-        .accessibilityLabel("Calibration : \(status.label). Appuyer longuement pour réinitialiser.")
+        .accessibilityLabel("Calibration : \(status.label). Toucher pour les options.")
+        .confirmationDialog(
+            "Réinitialiser la calibration ?",
+            isPresented: $showResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Réinitialiser", role: .destructive) { onReset() }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Tous les points de calibration enregistrés seront supprimés. Vous devrez retaper sur le personnage pour recalibrer le suivi du regard.")
+        }
     }
 }
 
