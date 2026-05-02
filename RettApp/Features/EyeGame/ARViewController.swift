@@ -4,36 +4,35 @@ import ARKit
 /// Wrapper UIKit pour exécuter une `ARFaceTrackingConfiguration` et émettre des points
 /// de regard projetés sur l'écran.
 ///
-/// Pourquoi pas `ARSCNView` ? Précédemment on utilisait `ARSCNView.projectPoint(faceAnchor.lookAtPoint)`,
-/// mais `lookAtPoint` est documenté comme un point sur un plan **3 m devant le visage**
-/// (Apple docs). La variation angulaire reste la même quelle que soit la distance, mais
-/// la projection à travers la caméra AR (caméra co-localisée avec l'écran) écrase la
-/// plage de variation autour du centre de l'écran → le point bouge à peine.
+/// **Pourquoi pas `ARSCNView.projectPoint(lookAtPoint)` ?** Apple documente lookAtPoint
+/// comme un point sur un plan **3 m devant le visage**. Projeté à travers la caméra AR
+/// (co-localisée avec l'écran), la variation angulaire est correcte mais la magnitude
+/// est écrasée près du centre → le point bouge à peine. La calibration ne peut pas
+/// rattraper si la plage d'entrée est aussi étroite.
 ///
-/// Approche correcte (utilisée ici) :
-/// 1. Récupérer les transforms `leftEyeTransform` / `rightEyeTransform` (face-anchor space)
-/// 2. Les passer en world space via `faceAnchor.transform`
-/// 3. Calculer la direction du regard (axe -Z des yeux moyennée)
-/// 4. Intersecter le rayon (origine = position moyenne des yeux, direction = regard)
-///    avec le plan z = 0 du référentiel monde (= plan de l'écran, l'origine de l'AR session
-///    étant la caméra frontale au démarrage, qui est sur la même surface que l'écran)
-/// 5. Convertir le point d'intersection (mètres) en points d'écran via les dimensions
-///    physiques approximatives du device (la calibration tap-based corrige le résiduel)
+/// **Approche retenue (toute la math en face-anchor LOCAL space)** :
+/// 1. Récupérer `leftEyeTransform` et `rightEyeTransform` (déjà en face-anchor local)
+/// 2. Position moyenne des yeux + direction de regard (axe -Z des yeux moyennée)
+/// 3. Intersecter le rayon (origine = yeux moyens, direction = regard) avec un plan
+///    virtuel z = 0,30 m en face-anchor local (≈ distance moyenne face↔écran)
+/// 4. Mapper hit.x / hit.y (mètres) vers les points d'écran avec une plage présumée
+///    ±0,05 m × ±0,10 m. Le calibrateur tap-based + le Kalman corrigent le résiduel.
+///
+/// Pas de conversion world space → on évite les ambiguïtés de signe d'axe Z entre les
+/// versions/orientations.
 final class ARFaceViewController: UIViewController, ARSessionDelegate {
 
     let arSession = ARSession()
     var onGazeUpdate: ((CGPoint) -> Void)?
 
-    /// Dimensions approximatives de l'écran en mètres, utilisées pour convertir
-    /// les coordonnées du plan d'intersection en points d'écran.
-    /// La calibration utilisateur (taps) corrige le résiduel ; ces valeurs servent
-    /// juste à produire une plage de variation plausible.
-    private var physicalScreenSize: SIMD2<Float> {
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            return SIMD2<Float>(0.197, 0.262)   // ≈ iPad de 11"
-        }
-        return SIMD2<Float>(0.071, 0.155)        // ≈ iPhone 15 / Pro
-    }
+    /// Distance virtuelle face ↔ plan d'intersection (m). Approximation de la
+    /// distance face-écran lors d'une utilisation normale.
+    private let assumedScreenDistance: Float = 0.30
+    /// Demi-plage attendue du regard sur le plan virtuel (m).
+    /// Le calibrateur (régression linéaire sur les taps) corrige le résiduel,
+    /// donc la précision absolue ne compte pas.
+    private let halfRangeX: Float = 0.05
+    private let halfRangeY: Float = 0.10
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -63,46 +62,46 @@ final class ARFaceViewController: UIViewController, ARSessionDelegate {
         guard let faceAnchor = anchors.compactMap({ $0 as? ARFaceAnchor }).first,
               faceAnchor.isTracked else { return }
 
-        let faceTransform = faceAnchor.transform
+        let leftEye = faceAnchor.leftEyeTransform
+        let rightEye = faceAnchor.rightEyeTransform
 
-        // Eye transforms en world space
-        let leftEyeWorld = simd_mul(faceTransform, faceAnchor.leftEyeTransform)
-        let rightEyeWorld = simd_mul(faceTransform, faceAnchor.rightEyeTransform)
+        // Position moyenne des yeux (face-anchor LOCAL space)
+        let leftPos = SIMD3<Float>(leftEye.columns.3.x, leftEye.columns.3.y, leftEye.columns.3.z)
+        let rightPos = SIMD3<Float>(rightEye.columns.3.x, rightEye.columns.3.y, rightEye.columns.3.z)
+        let avgEye = (leftPos + rightPos) / 2
 
-        // Position moyenne des yeux (world)
-        let leftPos = SIMD3<Float>(leftEyeWorld.columns.3.x, leftEyeWorld.columns.3.y, leftEyeWorld.columns.3.z)
-        let rightPos = SIMD3<Float>(rightEyeWorld.columns.3.x, rightEyeWorld.columns.3.y, rightEyeWorld.columns.3.z)
-        let eyePos = (leftPos + rightPos) / 2
+        // Direction du regard : axe -Z des yeux (face-anchor local), moyennée et normalisée
+        let leftFwd = -SIMD3<Float>(leftEye.columns.2.x, leftEye.columns.2.y, leftEye.columns.2.z)
+        let rightFwd = -SIMD3<Float>(rightEye.columns.2.x, rightEye.columns.2.y, rightEye.columns.2.z)
+        var gaze = leftFwd + rightFwd
+        let lenSq = simd_length_squared(gaze)
+        guard lenSq > 1e-6 else { return }
+        gaze /= lenSq.squareRoot()
 
-        // Direction du regard : axe -Z de chaque transform œil (en world), moyennée et normalisée
-        let leftFwd = -SIMD3<Float>(leftEyeWorld.columns.2.x, leftEyeWorld.columns.2.y, leftEyeWorld.columns.2.z)
-        let rightFwd = -SIMD3<Float>(rightEyeWorld.columns.2.x, rightEyeWorld.columns.2.y, rightEyeWorld.columns.2.z)
-        let gaze = simd_normalize(leftFwd + rightFwd)
+        // Plan virtuel à z = assumedScreenDistance (face-anchor local).
+        // Si gaze.z proche de 0, on ne peut pas projeter — on utilise un fallback grossier
+        // sur lookAtPoint pour ne pas bloquer le signal.
+        let xLocal: Float
+        let yLocal: Float
+        if abs(gaze.z) > 1e-3 {
+            let t = (assumedScreenDistance - avgEye.z) / gaze.z
+            let hit = avgEye + t * gaze
+            xLocal = hit.x
+            yLocal = hit.y
+        } else {
+            // Fallback : lookAtPoint × scale
+            let look = faceAnchor.lookAtPoint
+            xLocal = look.x
+            yLocal = look.y
+        }
 
-        // Le user regarde l'écran → la direction du regard a un -Z significatif
-        // (l'origine du monde est la caméra ; la face est à +Z, regarder l'écran = direction -Z)
-        guard gaze.z < -0.01 else { return }
-        // Intersection avec le plan z = 0 : t = -eyePos.z / gaze.z
-        let t = -eyePos.z / gaze.z
-        guard t > 0, t < 5 else { return } // sanity 0..5m
+        // Mapping → points d'écran. La calibration tap absorbera le scale exact.
+        let screen = UIScreen.main.bounds.size
+        let xNorm = CGFloat(xLocal) / CGFloat(halfRangeX)        // ≈ [-1, 1]
+        let yNorm = CGFloat(yLocal) / CGFloat(halfRangeY)        // ≈ [-1, 1], y up
 
-        let hit = eyePos + t * gaze
-        // hit.x / hit.y sont en world space sur le plan de l'écran (en mètres)
-        // - x positif : vers la droite de l'utilisateur en mode portrait
-        // - y positif : vers le haut → la caméra étant en haut du téléphone, l'écran s'étend
-        //   en y NÉGATIF (du haut au bas)
-
-        let physical = physicalScreenSize
-        let screenSize = UIScreen.main.bounds.size
-
-        // Mapping x : hit.x ∈ [-w/2, +w/2] → [0, screenWidth]
-        let xNorm = CGFloat(hit.x) / CGFloat(physical.x) + 0.5
-        let xPoint = xNorm * screenSize.width
-
-        // Mapping y : hit.y ∈ [-h, 0] (caméra en haut) → [screenHeight, 0]
-        // Donc yPoint = -hit.y / h * screenHeight
-        let yNorm = -CGFloat(hit.y) / CGFloat(physical.y)
-        let yPoint = yNorm * screenSize.height
+        let xPoint = (xNorm * 0.5 + 0.5) * screen.width
+        let yPoint = (1 - (yNorm * 0.5 + 0.5)) * screen.height   // flip y → écran y down
 
         let screenPoint = CGPoint(x: xPoint, y: yPoint)
 
