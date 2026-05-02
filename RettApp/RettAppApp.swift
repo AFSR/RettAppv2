@@ -17,36 +17,60 @@ struct RettAppApp: App {
             MoodEntry.self,
             DailyObservation.self
         ])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
-        // 1) Tentative normale (lightweight migration)
+        // On utilise un nom de fichier versionné — ça évite tout résidu d'un store
+        // antérieur dont le schéma serait incompatible (lightweight migration absente).
+        let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v4.store")
+        let config = ModelConfiguration(schema: schema, url: storeURL)
+
+        // 1) Tentative normale
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            print("⚠️ ModelContainer init failed (1): \(error)")
+            logSwiftDataError("init #1 (disque, store v4)", error)
         }
 
-        // 2) Tentative de récupération : efface le store sur disque (perte des données locales,
-        //    mais évite un crash en boucle si le schema a divergé de manière non rétro-compat).
-        let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
-        let storeWAL = storeURL.appendingPathExtension("wal")
-        let storeSHM = storeURL.appendingPathExtension("shm")
-        for url in [storeURL, storeWAL, storeSHM] {
+        // 2) Recovery : efface le store v4 et retente
+        let wal = storeURL.appendingPathExtension("wal")
+        let shm = storeURL.appendingPathExtension("shm")
+        for url in [storeURL, wal, shm] {
             try? FileManager.default.removeItem(at: url)
         }
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
-            print("⚠️ ModelContainer init failed (2 — after wipe): \(error)")
+            logSwiftDataError("init #2 (disque après wipe)", error)
         }
 
-        // 3) Dernier recours : in-memory seulement (l'app reste fonctionnelle pour la session)
+        // 3) In-memory — l'app reste fonctionnelle pour la session
         let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: schema, configurations: [memConfig])
         } catch {
-            fatalError("Impossible d'initialiser le ModelContainer même en mémoire : \(error)")
+            logSwiftDataError("init #3 (in-memory)", error)
         }
+
+        // 4) Diagnostic ultime : trouve le model qui pose problème en testant un par un
+        let models: [(String, any PersistentModel.Type)] = [
+            ("ChildProfile", ChildProfile.self),
+            ("SeizureEvent", SeizureEvent.self),
+            ("Medication", Medication.self),
+            ("MedicationLog", MedicationLog.self),
+            ("MoodEntry", MoodEntry.self),
+            ("DailyObservation", DailyObservation.self)
+        ]
+        for (name, model) in models {
+            let s = Schema([model])
+            let c = ModelConfiguration(schema: s, isStoredInMemoryOnly: true)
+            do {
+                _ = try ModelContainer(for: s, configurations: [c])
+                print("✅ Schema OK (in-memory) : \(name)")
+            } catch {
+                print("❌ Schema KO (in-memory) : \(name) — \(error)")
+            }
+        }
+
+        fatalError("Aucune init ModelContainer n'a réussi. Voir les logs ci-dessus.")
     }()
 
     var body: some Scene {
@@ -72,6 +96,20 @@ struct RettAppApp: App {
                 }
         }
         .modelContainer(sharedModelContainer)
+    }
+}
+
+private func logSwiftDataError(_ stage: String, _ error: Error) {
+    print("⚠️ ModelContainer \(stage) — \(type(of: error))")
+    print("   description : \(error)")
+    print("   localized   : \(error.localizedDescription)")
+    let ns = error as NSError
+    print("   domain      : \(ns.domain)")
+    print("   code        : \(ns.code)")
+    if !ns.userInfo.isEmpty {
+        for (key, value) in ns.userInfo {
+            print("   userInfo[\(key)] = \(value)")
+        }
     }
 }
 
