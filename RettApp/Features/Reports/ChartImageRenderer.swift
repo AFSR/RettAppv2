@@ -4,6 +4,10 @@ import UIKit
 
 /// Rend des graphiques SwiftUI Charts en `UIImage` pour insertion dans un PDF.
 /// Utilise `ImageRenderer` (iOS 16+).
+///
+/// `ImageRenderer` est `@MainActor`-isolé : ces fonctions doivent donc être appelées
+/// depuis le main thread.
+@MainActor
 enum ChartImageRenderer {
 
     /// Graphique fréquence (BarMark) — nb crises par bucket.

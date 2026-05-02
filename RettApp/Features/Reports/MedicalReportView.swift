@@ -108,6 +108,7 @@ struct MedicalReportView: View {
 
     // MARK: - Génération
 
+    @MainActor
     private func generate() async {
         generating = true
         defer { generating = false }

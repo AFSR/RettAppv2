@@ -37,6 +37,7 @@ enum MedicalReportGenerator {
         let parentNotes: String
     }
 
+    @MainActor
     static func generate(_ input: Input) throws -> URL {
         let pageWidth: CGFloat = 595.0
         let pageHeight: CGFloat = 842.0
