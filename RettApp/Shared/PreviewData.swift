@@ -17,7 +17,7 @@ enum PreviewData {
             MoodEntry.self,
             DailyObservation.self
         ])
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try! ModelContainer(for: schema, configurations: [config])
 
         // Utilise un ModelContext dédié (non main-actor) pour peupler depuis
@@ -65,7 +65,7 @@ enum PreviewData {
             MoodEntry.self,
             DailyObservation.self
         ])
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try! ModelContainer(for: schema, configurations: [config])
     }()
 }

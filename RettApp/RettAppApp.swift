@@ -21,7 +21,17 @@ struct RettAppApp: App {
         // On utilise un nom de fichier versionné — ça évite tout résidu d'un store
         // antérieur dont le schéma serait incompatible (lightweight migration absente).
         let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v4.store")
-        let config = ModelConfiguration(schema: schema, url: storeURL)
+        // IMPORTANT : `cloudKitDatabase: .none` désactive la sync auto SwiftData ↔ CloudKit.
+        // Sans cela, comme on a déclaré l'entitlement iCloud (pour le partage entre parents),
+        // SwiftData tenterait d'activer son intégration CloudKit native — qui exige que
+        // TOUS les attributs soient optionnels et que les @Attribute(.unique) disparaissent.
+        // Notre partage entre parents est géré manuellement via CloudKitSyncService, pas
+        // par SwiftData ; le store local doit donc rester strict.
+        let config = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
 
         // 1) Tentative normale
         do {
@@ -43,7 +53,11 @@ struct RettAppApp: App {
         }
 
         // 3) In-memory — l'app reste fonctionnelle pour la session
-        let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let memConfig = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
         do {
             return try ModelContainer(for: schema, configurations: [memConfig])
         } catch {
@@ -61,7 +75,11 @@ struct RettAppApp: App {
         ]
         for (name, model) in models {
             let s = Schema([model])
-            let c = ModelConfiguration(schema: s, isStoredInMemoryOnly: true)
+            let c = ModelConfiguration(
+                schema: s,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
             do {
                 _ = try ModelContainer(for: s, configurations: [c])
                 print("✅ Schema OK (in-memory) : \(name)")
