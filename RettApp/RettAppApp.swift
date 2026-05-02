@@ -1,9 +1,12 @@
 import SwiftUI
 import SwiftData
+import CloudKit
 
 @main
 struct RettAppApp: App {
+    @UIApplicationDelegateAdaptor(RettAppDelegate.self) private var appDelegate
     @State private var authManager = AuthManager()
+    @State private var syncService = CloudKitSyncService()
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -26,7 +29,23 @@ struct RettAppApp: App {
         WindowGroup {
             RootView()
                 .environment(authManager)
+                .environment(syncService)
                 .tint(.afsrPurpleAdaptive)
+                .task {
+                    await syncService.refreshAccountStatus()
+                    await syncService.refreshShareStatus()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.didReceiveShareMetadata)) { note in
+                    guard let metadata = note.object as? CKShare.Metadata else { return }
+                    Task { @MainActor in
+                        do {
+                            try await syncService.acceptShare(metadata)
+                            try await syncService.pullChanges(into: sharedModelContainer.mainContext)
+                        } catch {
+                            syncService.lastErrorMessage = error.localizedDescription
+                        }
+                    }
+                }
         }
         .modelContainer(sharedModelContainer)
     }
