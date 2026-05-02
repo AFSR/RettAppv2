@@ -10,7 +10,9 @@ struct RettAppApp: App {
             ChildProfile.self,
             SeizureEvent.self,
             Medication.self,
-            MedicationLog.self
+            MedicationLog.self,
+            MoodEntry.self,
+            DailyObservation.self
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {

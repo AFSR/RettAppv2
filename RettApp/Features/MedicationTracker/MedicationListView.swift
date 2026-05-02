@@ -12,6 +12,8 @@ struct MedicationListView: View {
     @State private var showPlan = false
     @State private var showAdHoc = false
     @State private var showDatePicker = false
+    @State private var showMoodSheet = false
+    @State private var showObservationSheet = false
 
     private var profile: ChildProfile? { profiles.first }
 
@@ -51,6 +53,13 @@ struct MedicationListView: View {
                     }
                     .accessibilityLabel("Ajouter une prise ponctuelle")
                     Menu {
+                        Button { showMoodSheet = true } label: {
+                            Label("Saisir une humeur", systemImage: "face.smiling")
+                        }
+                        Button { showObservationSheet = true } label: {
+                            Label("Repas / sommeil du jour", systemImage: "fork.knife")
+                        }
+                        Divider()
                         Button { showPlan = true } label: {
                             Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
                         }
@@ -62,6 +71,10 @@ struct MedicationListView: View {
         }
         .sheet(isPresented: $showPlan) { NavigationStack { MedicationPlanView() } }
         .sheet(isPresented: $showAdHoc) { AdHocLogSheet() }
+        .sheet(isPresented: $showMoodSheet) { MoodSheet() }
+        .sheet(isPresented: $showObservationSheet) {
+            DailyObservationSheet(dayStart: viewModel.selectedDate)
+        }
         .sheet(isPresented: $showDatePicker) {
             NavigationStack {
                 DatePicker("Date", selection: $viewModel.selectedDate, displayedComponents: .date)
@@ -111,6 +124,11 @@ private struct JournalContent: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query private var logs: [MedicationLog]
+    @Query private var moods: [MoodEntry]
+    @Query private var observations: [DailyObservation]
+
+    @State private var showMood = false
+    @State private var showObservation = false
 
     init(selectedDate: Date, medications: [Medication], profile: ChildProfile?, viewModel: MedicationViewModel) {
         self.selectedDate = selectedDate
@@ -123,6 +141,13 @@ private struct JournalContent: View {
         self._logs = Query(
             filter: #Predicate<MedicationLog> { $0.scheduledTime >= day && $0.scheduledTime < nextDay },
             sort: \MedicationLog.scheduledTime
+        )
+        self._moods = Query(
+            filter: #Predicate<MoodEntry> { $0.timestamp >= day && $0.timestamp < nextDay },
+            sort: \MoodEntry.timestamp
+        )
+        self._observations = Query(
+            filter: #Predicate<DailyObservation> { $0.dayStart == day }
         )
     }
 
@@ -141,6 +166,7 @@ private struct JournalContent: View {
         ScrollView {
             VStack(spacing: 16) {
                 summaryHeader
+                moodObservationCard
                 if logs.isEmpty {
                     emptyState
                 } else {
@@ -173,6 +199,90 @@ private struct JournalContent: View {
             }
         }
         .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private var moodObservationCard: some View {
+        let dayObs = observations.first
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "face.smiling")
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                Text("Humeur & observations")
+                    .font(AFSRFont.headline(15))
+                Spacer()
+            }
+
+            if moods.isEmpty && (dayObs == nil || dayObs?.isPopulated == false) {
+                Text("Aucune saisie aujourd'hui")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+            } else {
+                if !moods.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(moods) { m in
+                            Text(m.level.emoji).font(.system(size: 22))
+                        }
+                        Spacer()
+                        Text(moods.count == 1 ? "1 humeur" : "\(moods.count) humeurs")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let obs = dayObs, obs.isPopulated {
+                    HStack(spacing: 8) {
+                        if let r = obs.mealRating {
+                            Label(r.label, systemImage: "fork.knife")
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                        }
+                        if let r = obs.nightSleepRating {
+                            Label(r.label, systemImage: "bed.double.fill")
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                        }
+                        if obs.napDurationMinutes > 0 {
+                            Label("\(obs.napDurationMinutes) min", systemImage: "moon.zzz.fill")
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    showMood = true
+                } label: {
+                    Label("Humeur", systemImage: "plus")
+                        .font(AFSRFont.caption())
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    showObservation = true
+                } label: {
+                    Label(dayObs?.isPopulated == true ? "Modifier obs." : "Repas / sommeil",
+                          systemImage: "square.and.pencil")
+                        .font(AFSRFont.caption())
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .padding(.horizontal)
+        .sheet(isPresented: $showMood) { MoodSheet() }
+        .sheet(isPresented: $showObservation) {
+            DailyObservationSheet(dayStart: selectedDate)
+        }
     }
 
     private var emptyState: some View {

@@ -91,7 +91,7 @@ struct SettingsView: View {
                 Button { showChildEditor = true } label: {
                     HStack {
                         Image(systemName: "person.circle.fill")
-                            .foregroundStyle(.afsrPurple)
+                            .foregroundStyle(.afsrPurpleAdaptive)
                         VStack(alignment: .leading) {
                             Text(profile.firstName).font(AFSRFont.headline(17)).foregroundStyle(.primary)
                             if let age = profile.ageYears {
@@ -442,8 +442,15 @@ struct ChildProfileEditor: View {
 
     var body: some View {
         Form {
-            Section("Prénom") {
+            Section {
                 TextField("Prénom", text: $profile.firstName)
+                    .textContentType(.givenName)
+                TextField("Nom de famille (optionnel)", text: $profile.lastName)
+                    .textContentType(.familyName)
+            } header: {
+                Text("Identité")
+            } footer: {
+                Text("Le nom de famille n'est utilisé que dans les documents imprimés (rapport médecin, cahier de suivi).")
             }
             Section {
                 Toggle("Date de naissance", isOn: $hasBirthDate)

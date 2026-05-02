@@ -113,7 +113,7 @@ struct FollowUpBookletView: View {
         generating = true
         defer { generating = false }
         let opts = FollowUpBookletGenerator.Options(
-            coverChildName: profiles.first?.firstName ?? "Enfant",
+            coverChildName: profiles.first?.fullName ?? "Enfant",
             coverPeriodLabel: periodLabel.isEmpty ? defaultPeriodLabel() : periodLabel,
             includeMedicationGrid: includeMedicationGrid,
             includeSeizureGrid: includeSeizureGrid,
