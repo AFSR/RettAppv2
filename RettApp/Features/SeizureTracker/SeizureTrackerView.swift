@@ -10,6 +10,7 @@ struct SeizureTrackerView: View {
     @State private var pulse = false
     @State private var showHistory = false
     @State private var showQualification = false
+    @State private var showManualEntry = false
 
     private var profile: ChildProfile? { profiles.first }
     private var lastSeizure: SeizureEvent? { seizures.first }
@@ -40,6 +41,9 @@ struct SeizureTrackerView: View {
         }
         .sheet(isPresented: $showHistory) {
             NavigationStack { SeizureHistoryView() }
+        }
+        .sheet(isPresented: $showManualEntry) {
+            ManualSeizureEntrySheet()
         }
         .sheet(isPresented: $showQualification, onDismiss: {
             if case .qualifying = viewModel.phase {
@@ -97,6 +101,15 @@ struct SeizureTrackerView: View {
                 viewModel.start()
             }
             .accessibilityHint("Démarre un chronomètre pour enregistrer la durée d'une crise.")
+
+            Button {
+                showManualEntry = true
+            } label: {
+                Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
+                    .font(AFSRFont.body(15))
+            }
+            .buttonStyle(.bordered)
+            .tint(.afsrPurpleAdaptive)
 
             if let last = lastSeizure {
                 SectionCard(title: "Dernière crise", systemImage: "clock.arrow.circlepath") {
