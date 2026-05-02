@@ -277,15 +277,15 @@ struct SettingsView: View {
 
     private var sharingSection: some View {
         Section {
-            Button {
-                showSharingSoon = true
+            NavigationLink {
+                ParentSharingView()
             } label: {
-                Label("Inviter le second parent", systemImage: "person.2.badge.plus.fill")
+                Label("Partage entre parents", systemImage: "person.2.badge.plus.fill")
             }
         } header: {
             Text("Partage")
         } footer: {
-            Text("Synchronisez le suivi avec un second parent via iCloud (CloudKit Sharing). Les données restent chiffrées de bout en bout.")
+            Text("Synchronisez le suivi avec un second parent via iCloud (CloudKit Sharing).")
         }
     }
 
