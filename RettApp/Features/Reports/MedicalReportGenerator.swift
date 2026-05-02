@@ -157,6 +157,7 @@ enum MedicalReportGenerator {
         var bottomLimit: CGFloat { pageRect.height - margin - 40 } // garde la place pour footer
     }
 
+    @MainActor
     private struct DrawContext {
         let layout: Layout
         var y: CGFloat = 0
