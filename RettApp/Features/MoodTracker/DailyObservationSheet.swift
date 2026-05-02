@@ -1,7 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// Saisie qualitative + quantitative quotidienne : repas, hydratation, sommeil de nuit, sieste.
+/// Saisie qualitative + quantitative quotidienne : 4 repas distincts, hydratation,
+/// sommeil de nuit (qualité + durée), sieste.
 struct DailyObservationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -11,46 +12,77 @@ struct DailyObservationSheet: View {
 
     @State private var existing: DailyObservation?
 
-    @State private var mealRating: QualityRating?
-    @State private var mealNotes: String = ""
+    @State private var mealRatings: [MealSlot: QualityRating?] = [:]
+    @State private var mealNotes: [MealSlot: String] = [:]
+
     @State private var hydrationRating: QualityRating?
     @State private var hydrationNotes: String = ""
+
     @State private var nightSleepRating: QualityRating?
+    @State private var nightSleepDurationMinutes: Int = 0
     @State private var nightSleepNotes: String = ""
+
     @State private var napDurationMinutes: Int = 0
     @State private var napNotes: String = ""
+
     @State private var generalNotes: String = ""
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Repas") {
-                    QualityPicker(rating: $mealRating, label: "Appétit / qualité du repas")
-                    TextField("Détails (refus de manger, repas particuliers…)", text: $mealNotes, axis: .vertical)
-                        .lineLimit(1...4)
+                Section {
+                    ForEach(MealSlot.allCases) { slot in
+                        MealRow(
+                            slot: slot,
+                            rating: Binding(
+                                get: { mealRatings[slot] ?? nil },
+                                set: { mealRatings[slot] = $0 }
+                            ),
+                            notes: Binding(
+                                get: { mealNotes[slot] ?? "" },
+                                set: { mealNotes[slot] = $0 }
+                            )
+                        )
+                    }
+                } header: {
+                    Text("Repas")
+                } footer: {
+                    Text("Notez l'appétit / la qualité de chaque repas. Laissez vide ce qui n'a pas eu lieu.")
                 }
+
                 Section("Hydratation") {
-                    QualityPicker(rating: $hydrationRating, label: "Quantité bue")
+                    QualityPicker(rating: $hydrationRating, label: "Quantité bue sur la journée")
                     TextField("Détails (boissons, refus, déshydratation…)", text: $hydrationNotes, axis: .vertical)
                         .lineLimit(1...3)
                 }
+
                 Section("Sommeil de nuit") {
+                    HStack {
+                        Text("Durée").foregroundStyle(.secondary)
+                        Spacer()
+                        Stepper(value: $nightSleepDurationMinutes, in: 0...900, step: 15) {
+                            Text(formatNightDuration(nightSleepDurationMinutes))
+                                .monospacedDigit()
+                        }
+                    }
                     QualityPicker(rating: $nightSleepRating, label: "Qualité")
-                    TextField("Détails (réveils, agitation, durée approx.…)", text: $nightSleepNotes, axis: .vertical)
+                    TextField("Détails (réveils, agitation, heure de coucher…)", text: $nightSleepNotes, axis: .vertical)
                         .lineLimit(1...4)
                 }
+
                 Section("Sieste") {
                     HStack {
-                        Text("Durée")
+                        Text("Durée").foregroundStyle(.secondary)
                         Spacer()
                         Stepper(value: $napDurationMinutes, in: 0...300, step: 15) {
                             Text(napDurationMinutes == 0 ? "Pas de sieste" : "\(napDurationMinutes) min")
-                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
                         }
                     }
                     TextField("Détails", text: $napNotes, axis: .vertical)
                         .lineLimit(1...3)
                 }
+
                 Section("Notes générales (optionnel)") {
                     TextField("Tout autre élément du jour", text: $generalNotes, axis: .vertical)
                         .lineLimit(2...6)
@@ -75,6 +107,15 @@ struct DailyObservationSheet: View {
         return f.string(from: dayStart).capitalized
     }
 
+    private func formatNightDuration(_ minutes: Int) -> String {
+        if minutes == 0 { return "Non renseignée" }
+        let h = minutes / 60
+        let m = minutes % 60
+        if h == 0 { return "\(m) min" }
+        if m == 0 { return "\(h) h" }
+        return "\(h) h \(m) min"
+    }
+
     private func loadExisting() {
         let normalized = Calendar.current.startOfDay(for: dayStart)
         let descriptor = FetchDescriptor<DailyObservation>(
@@ -82,11 +123,14 @@ struct DailyObservationSheet: View {
         )
         if let found = try? modelContext.fetch(descriptor).first {
             existing = found
-            mealRating = found.mealRating
-            mealNotes = found.mealNotes
+            for slot in MealSlot.allCases {
+                mealRatings[slot] = found.mealRating(for: slot)
+                mealNotes[slot] = found.mealNotes(for: slot)
+            }
             hydrationRating = found.hydrationRating
             hydrationNotes = found.hydrationNotes
             nightSleepRating = found.nightSleepRating
+            nightSleepDurationMinutes = found.nightSleepDurationMinutes
             nightSleepNotes = found.nightSleepNotes
             napDurationMinutes = found.napDurationMinutes
             napNotes = found.napNotes
@@ -97,11 +141,14 @@ struct DailyObservationSheet: View {
     private func save() {
         let normalized = Calendar.current.startOfDay(for: dayStart)
         if let existing {
-            existing.mealRating = mealRating
-            existing.mealNotes = mealNotes
+            for slot in MealSlot.allCases {
+                existing.setMealRating(mealRatings[slot] ?? nil, for: slot)
+                existing.setMealNotes(mealNotes[slot] ?? "", for: slot)
+            }
             existing.hydrationRating = hydrationRating
             existing.hydrationNotes = hydrationNotes
             existing.nightSleepRating = nightSleepRating
+            existing.nightSleepDurationMinutes = nightSleepDurationMinutes
             existing.nightSleepNotes = nightSleepNotes
             existing.napDurationMinutes = napDurationMinutes
             existing.napNotes = napNotes
@@ -109,10 +156,21 @@ struct DailyObservationSheet: View {
         } else {
             let obs = DailyObservation(
                 dayStart: normalized,
-                mealRating: mealRating, mealNotes: mealNotes,
-                hydrationRating: hydrationRating, hydrationNotes: hydrationNotes,
-                nightSleepRating: nightSleepRating, nightSleepNotes: nightSleepNotes,
-                napDurationMinutes: napDurationMinutes, napNotes: napNotes,
+                breakfastRating: mealRatings[.breakfast] ?? nil,
+                breakfastNotes: mealNotes[.breakfast] ?? "",
+                lunchRating: mealRatings[.lunch] ?? nil,
+                lunchNotes: mealNotes[.lunch] ?? "",
+                snackRating: mealRatings[.snack] ?? nil,
+                snackNotes: mealNotes[.snack] ?? "",
+                dinnerRating: mealRatings[.dinner] ?? nil,
+                dinnerNotes: mealNotes[.dinner] ?? "",
+                hydrationRating: hydrationRating,
+                hydrationNotes: hydrationNotes,
+                nightSleepRating: nightSleepRating,
+                nightSleepDurationMinutes: nightSleepDurationMinutes,
+                nightSleepNotes: nightSleepNotes,
+                napDurationMinutes: napDurationMinutes,
+                napNotes: napNotes,
                 generalNotes: generalNotes,
                 childProfileId: profiles.first?.id
             )
@@ -120,6 +178,29 @@ struct DailyObservationSheet: View {
         }
         try? modelContext.save()
         dismiss()
+    }
+}
+
+// MARK: - Per-meal row
+
+private struct MealRow: View {
+    let slot: MealSlot
+    @Binding var rating: QualityRating?
+    @Binding var notes: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: slot.icon)
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                Text(slot.label)
+                    .font(AFSRFont.headline(15))
+            }
+            QualityPicker(rating: $rating, label: "Qualité / appétit")
+            TextField("Notes (refus, repas particulier…)", text: $notes, axis: .vertical)
+                .lineLimit(1...3)
+        }
+        .padding(.vertical, 4)
     }
 }
 
