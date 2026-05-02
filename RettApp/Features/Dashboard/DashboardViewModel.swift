@@ -135,6 +135,68 @@ final class DashboardViewModel {
         }
     }
 
+    /// Bucket pour humeur/observance/etc — valeur facultative.
+    struct ValueBucket: Identifiable {
+        let id = UUID()
+        let date: Date
+        let value: Double?
+    }
+
+    /// Construit une série de buckets « humeur moyenne » à partir des entrées humeur.
+    func moodBuckets(for moods: [MoodEntry], calendar: Calendar = .current) -> [ValueBucket] {
+        let starts = bucketStarts(calendar: calendar)
+        return starts.map { start in
+            let next = endForBucket(start: start, calendar: calendar)
+            let inBucket = moods.filter { $0.timestamp >= start && $0.timestamp < next }
+            let avg: Double? = inBucket.isEmpty ? nil
+                : inBucket.map { Double($0.levelRaw) }.reduce(0, +) / Double(inBucket.count)
+            return ValueBucket(date: start, value: avg)
+        }
+    }
+
+    /// Série « observance médicamenteuse » : % de prises planifiées effectivement prises par bucket.
+    func adherenceBuckets(for logs: [MedicationLog], calendar: Calendar = .current) -> [ValueBucket] {
+        let starts = bucketStarts(calendar: calendar)
+        return starts.map { start in
+            let next = endForBucket(start: start, calendar: calendar)
+            let inBucket = logs.filter { !$0.isAdHoc && $0.scheduledTime >= start && $0.scheduledTime < next }
+            guard !inBucket.isEmpty else { return ValueBucket(date: start, value: nil) }
+            let taken = inBucket.filter { $0.taken }.count
+            return ValueBucket(date: start, value: Double(taken) / Double(inBucket.count) * 100.0)
+        }
+    }
+
+    /// Buckets « observation repas/sommeil » : moyenne de la note 1-5 par bucket.
+    func observationBuckets(for observations: [DailyObservation],
+                            keyPath: KeyPath<DailyObservation, Int>,
+                            calendar: Calendar = .current) -> [ValueBucket] {
+        let starts = bucketStarts(calendar: calendar)
+        return starts.map { start in
+            let next = endForBucket(start: start, calendar: calendar)
+            let inBucket = observations.filter {
+                $0.dayStart >= start && $0.dayStart < next && $0[keyPath: keyPath] > 0
+            }
+            guard !inBucket.isEmpty else { return ValueBucket(date: start, value: nil) }
+            let avg = inBucket.map { Double($0[keyPath: keyPath]) }.reduce(0, +) / Double(inBucket.count)
+            return ValueBucket(date: start, value: avg)
+        }
+    }
+
+    private func bucketStarts(calendar: Calendar) -> [Date] {
+        let (windowStart, windowEnd) = windowBounds(calendar: calendar)
+        var result: [Date] = []
+        var cursor = windowStart
+        while cursor < windowEnd {
+            result.append(cursor)
+            cursor = calendar.date(byAdding: scale.calendarComponent, value: 1, to: cursor) ?? windowEnd
+        }
+        return result
+    }
+
+    private func endForBucket(start: Date, calendar: Calendar) -> Date {
+        calendar.date(byAdding: scale.calendarComponent, value: 1, to: start) ?? start
+    }
+
     /// Libellé compact de la fenêtre courante (ex. "Avril 2026", "Sem. 17", "26 avr.").
     func windowLabel() -> String {
         let f = DateFormatter()

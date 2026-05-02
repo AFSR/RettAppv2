@@ -25,14 +25,24 @@ struct SettingsView: View {
 
     var body: some View {
         List {
+            // ENFANT
             childSection
+
+            // CONFIGURATION DU SUIVI
             medicationsSection
             eyeGameSection
-            healthSection
             notificationsSection
+            healthSection
+
+            // EXPORTS / DOCUMENTS À DESTINATION DES PROFESSIONNELS
+            documentsSection
             dataSection
+
+            // ASSOCIATION
             sharingSection
             supportSection
+
+            // LÉGAL ET COMPTE
             medicalDisclaimerSection
             aboutSection
             accountSection
@@ -173,7 +183,7 @@ struct SettingsView: View {
         }
     }
 
-    private var dataSection: some View {
+    private var documentsSection: some View {
         Section {
             NavigationLink {
                 MedicalReportView()
@@ -185,6 +195,15 @@ struct SettingsView: View {
             } label: {
                 Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
             }
+        } header: {
+            Text("Documents médicaux")
+        } footer: {
+            Text("Le rapport médecin produit un PDF structuré (statistiques, corrélations, plan médicamenteux, calendrier en annexe). Le cahier de suivi est un PDF imprimable à confier à l'équipe encadrante.")
+        }
+    }
+
+    private var dataSection: some View {
+        Section {
             Button {
                 exportAllCSV()
             } label: {
@@ -208,7 +227,7 @@ struct SettingsView: View {
         } header: {
             Text("Données")
         } footer: {
-            Text("Le rapport médecin produit un PDF imprimable structuré (identité, traitement, statistiques, calendrier des crises, observance, observations).")
+            Text("Vos données restent sur cet appareil. L'export CSV sert à les transmettre vous-même à un professionnel de santé.")
         }
     }
 
