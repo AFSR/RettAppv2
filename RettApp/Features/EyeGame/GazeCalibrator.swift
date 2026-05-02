@@ -18,7 +18,11 @@ final class GazeCalibrator {
 
     private var samples: [Sample] = []
     private let maxSamples: Int
-    private let persistenceKey = "afsr.eyegame.calibration.samples"
+    /// Versionnée : v2 = nouvelle projection ray-plane (commit du fix EyeGame).
+    /// Bumper la clé efface implicitement la calibration apprise sur l'ancien signal
+    /// (l'ancienne v1 utilisait `lookAtPoint` + ARSCNView.projectPoint, signal très
+    /// différent en magnitude → calibration v1 inutilisable sur v2).
+    private let persistenceKey = "afsr.eyegame.calibration.samples.v2"
 
     /// Transformation affine 1D par axe : apply(p) = (scaleX*p.x + offsetX, scaleY*p.y + offsetY).
     private(set) var scaleX: CGFloat = 1
