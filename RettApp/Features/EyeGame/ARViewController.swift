@@ -2,23 +2,25 @@ import SwiftUI
 import ARKit
 import os.log
 
-/// Wrapper UIKit pour exécuter une `ARFaceTrackingConfiguration` et émettre des points
-/// de regard projetés sur l'écran.
+/// Wrapper UIKit pour le suivi du regard.
 ///
-/// Voir le commit history pour les itérations précédentes (lookAtPoint via
-/// ARSCNView.projectPoint, ray-plane intersection en world space). La version actuelle :
+/// **Stratégie actuelle (V3) — basée sur les blendShapes oculaires** :
 ///
-/// 1. Reste en **face-anchor LOCAL space** (pas de conversion world)
-/// 2. Calcule la position moyenne et la direction de regard à partir des transforms
-///    des deux yeux. Eye Z+ pointe vers l'arrière du globe oculaire (convention Apple),
-///    donc la direction du regard est `-columns.2`.
-/// 3. Intersecte le rayon avec un plan virtuel à 30 cm (≈ distance face-écran)
-/// 4. Mappe le hit (mètres) vers les points d'écran avec des half-ranges agressives
-///    (le calibrateur tap absorbe le résiduel).
-/// 5. Adapte les half-ranges à l'orientation : en paysage, on permute X et Y pour que
-///    le mapping suive la nouvelle géométrie écran.
-/// 6. **N'applique aucun guard** sur le signe / la magnitude → on émet à chaque frame,
-///    quitte à ce que le point sorte temporairement de l'écran (le calibrateur corrige).
+/// Apple expose dans `faceAnchor.blendShapes` 8 valeurs angulaires normalisées [0, 1]
+/// décrivant la direction du regard de chaque œil indépendamment :
+/// `eyeLookIn{Right,Left}` (vers le nez), `eyeLookOut{Right,Left}` (vers l'extérieur),
+/// `eyeLookUp{Right,Left}` (vers le haut), `eyeLookDown{Right,Left}` (vers le bas).
+///
+/// Ces valeurs sont mesurées via la caméra TrueDepth + l'inférence ML interne d'ARKit
+/// — elles intègrent déjà la distance du visage, l'écart inter-pupillaire, l'angle de tête.
+/// Aucune calibration géométrique ne peut faire mieux que ce signal natif.
+///
+/// On combine les 8 valeurs en un vecteur 2D :
+///   horizontal = ((outR + inL) − (outL + inR)) / 2   →  −1 (gauche) … +1 (droite)
+///   vertical   = ((upR + upL)  − (dnR + dnL))  / 2   →  −1 (bas)    … +1 (haut)
+///
+/// Puis amplification × rotation selon l'orientation interface → coordonnées écran.
+/// La calibration tap absorbe l'amplitude individuelle.
 final class ARFaceViewController: UIViewController, ARSessionDelegate {
 
     private static let log = Logger(subsystem: "fr.afsr.RettApp", category: "EyeGame.AR")
@@ -26,13 +28,10 @@ final class ARFaceViewController: UIViewController, ARSessionDelegate {
     let arSession = ARSession()
     var onGazeUpdate: ((CGPoint) -> Void)?
 
-    /// Distance assumée entre la face et le plan virtuel d'intersection (m).
-    private let screenDistance: Float = 0.30
-
-    /// Demi-plage attendue sur le plan virtuel (m). Diminuer = dot plus réactif.
-    /// Le calibrateur tap-based corrige le scale réel.
-    private let halfRangePortraitX: Float = 0.025   // largeur en mètres
-    private let halfRangePortraitY: Float = 0.05    // hauteur en mètres
+    /// Amplification du signal blendShape vers l'écran. Au-dessus de 1, le regard
+    /// couvre tout l'écran avec une amplitude oculaire plus modeste (typique des
+    /// enfants qui ne tournent pas beaucoup les yeux).
+    private let amplification: CGFloat = 1.6
 
     private var lastLogTime: CFTimeInterval = 0
 
@@ -64,63 +63,96 @@ final class ARFaceViewController: UIViewController, ARSessionDelegate {
         guard let faceAnchor = anchors.compactMap({ $0 as? ARFaceAnchor }).first,
               faceAnchor.isTracked else { return }
 
-        let leftEye = faceAnchor.leftEyeTransform
-        let rightEye = faceAnchor.rightEyeTransform
-
-        let leftPos = SIMD3<Float>(leftEye.columns.3.x, leftEye.columns.3.y, leftEye.columns.3.z)
-        let rightPos = SIMD3<Float>(rightEye.columns.3.x, rightEye.columns.3.y, rightEye.columns.3.z)
-        let avgEye = (leftPos + rightPos) / 2
-
-        // Eye Z+ pointe vers l'arrière du globe → gaze = -Z
-        let leftFwd = -SIMD3<Float>(leftEye.columns.2.x, leftEye.columns.2.y, leftEye.columns.2.z)
-        let rightFwd = -SIMD3<Float>(rightEye.columns.2.x, rightEye.columns.2.y, rightEye.columns.2.z)
-        var gaze = leftFwd + rightFwd
-        let lenSq = simd_length_squared(gaze)
-        guard lenSq > 1e-6 else { return }
-        gaze /= lenSq.squareRoot()
-
-        // Intersection avec le plan z = screenDistance dans face-anchor local
-        let xLocal: Float
-        let yLocal: Float
-        if abs(gaze.z) > 1e-3 {
-            let t = (screenDistance - avgEye.z) / gaze.z
-            // On ne filtre PAS sur t. Si la projection est hors plage raisonnable,
-            // on émet quand même — la calibration sera capable d'ajuster.
-            let hit = avgEye + t * gaze
-            xLocal = hit.x
-            yLocal = hit.y
-        } else {
-            // Fallback sur lookAtPoint (à 3 m, scaler agressivement)
-            let look = faceAnchor.lookAtPoint
-            xLocal = look.x / 10   // ramène à l'échelle ~30cm
-            yLocal = look.y / 10
+        let blends = faceAnchor.blendShapes
+        @inline(__always) func b(_ key: ARFaceAnchor.BlendShapeLocation) -> CGFloat {
+            CGFloat(truncating: blends[key] ?? 0)
         }
 
-        // Adaptation orientation : en paysage, écran large × peu haut → permuter ranges.
+        // Directions oculaires (par œil)
+        let outR = b(.eyeLookOutRight),   inR = b(.eyeLookInRight)
+        let outL = b(.eyeLookOutLeft),    inL = b(.eyeLookInLeft)
+        let upR  = b(.eyeLookUpRight),    upL = b(.eyeLookUpLeft)
+        let dnR  = b(.eyeLookDownRight),  dnL = b(.eyeLookDownLeft)
+
+        // Combinaison binoculaire :
+        //   regarder à droite : œil droit "outRight" + œil gauche "inLeft" actifs
+        //   regarder à gauche : œil droit "inRight" + œil gauche "outLeft" actifs
+        let horizontal = ((outR + inL) - (outL + inR)) / 2  // ≈ [-1, 1]
+        let vertical   = ((upR + upL) - (dnR + dnL)) / 2    // ≈ [-1, 1]
+
+        // Mapping en coordonnées d'interface — varie selon l'orientation
         let bounds = UIScreen.main.bounds
-        let isLandscape = bounds.width > bounds.height
-        let halfX = isLandscape ? halfRangePortraitY : halfRangePortraitX
-        let halfY = isLandscape ? halfRangePortraitX : halfRangePortraitY
+        let orientation = currentInterfaceOrientation()
+        let screenPoint = mapToScreen(horizontal: horizontal, vertical: vertical,
+                                      bounds: bounds, orientation: orientation)
 
-        let xNorm = CGFloat(xLocal) / CGFloat(halfX)        // ≈ [-1, 1]
-        let yNorm = CGFloat(yLocal) / CGFloat(halfY)        // ≈ [-1, 1]
-
-        let xPoint = (xNorm * 0.5 + 0.5) * bounds.width
-        let yPoint = (1 - (yNorm * 0.5 + 0.5)) * bounds.height
-
-        // Diagnostic léger : log toutes les 2 secondes max pour ne pas inonder.
+        // Diagnostic : log toutes les 2 s
         let now = CACurrentMediaTime()
         if now - lastLogTime > 2.0 {
             lastLogTime = now
             Self.log.info(
-                "gaze x=\(xLocal, format: .fixed(precision: 3)) y=\(yLocal, format: .fixed(precision: 3)) → screen \(Int(xPoint))/\(Int(yPoint))  (orient \(isLandscape ? "L" : "P"))"
+                "blend h=\(horizontal, format: .fixed(precision: 3)) v=\(vertical, format: .fixed(precision: 3)) → screen \(Int(screenPoint.x))/\(Int(screenPoint.y)) orient=\(orientationName(orientation))"
             )
         }
 
-        let screenPoint = CGPoint(x: xPoint, y: yPoint)
         DispatchQueue.main.async { [weak self] in
             self?.onGazeUpdate?(screenPoint)
         }
+    }
+
+    // MARK: - Orientation handling
+
+    private func currentInterfaceOrientation() -> UIInterfaceOrientation {
+        if let scene = view.window?.windowScene {
+            return scene.interfaceOrientation
+        }
+        // Fallback : déduire de l'aspect des bounds
+        return UIScreen.main.bounds.width > UIScreen.main.bounds.height ? .landscapeRight : .portrait
+    }
+
+    private func orientationName(_ o: UIInterfaceOrientation) -> String {
+        switch o {
+        case .portrait: return "P"
+        case .portraitUpsideDown: return "P↻"
+        case .landscapeLeft: return "L←"
+        case .landscapeRight: return "L→"
+        default: return "?"
+        }
+    }
+
+    /// Convertit (horizontal, vertical) ∈ [-1, 1] en CGPoint écran selon l'orientation.
+    /// Les blendShapes sont dans le repère du visage : "horizontal" = utilisateur regarde
+    /// à sa droite. Quand le device est tourné, on doit re-mapper vers les axes écran.
+    private func mapToScreen(horizontal: CGFloat, vertical: CGFloat,
+                             bounds: CGRect, orientation: UIInterfaceOrientation) -> CGPoint {
+        let h = horizontal * amplification
+        let v = vertical   * amplification
+
+        // Calcule les coordonnées normalisées dans le repère du visage de l'utilisateur :
+        //   userX ∈ [-1, +1] (droite = +1)
+        //   userY ∈ [-1, +1] (haut  = +1)
+        // puis transforme selon l'orientation.
+        let nx, ny: CGFloat
+        switch orientation {
+        case .portraitUpsideDown:
+            nx = -h; ny = v   // X et Y inversés en up-side-down
+        case .landscapeLeft:
+            // device tourné de 90° vers la gauche depuis portrait
+            // user "right" (h+) → screen "down" (y+)
+            // user "up"    (v+) → screen "right" (x+)
+            nx = v;  ny = h
+        case .landscapeRight:
+            // device tourné de 90° vers la droite
+            // user "right" (h+) → screen "up" (y-)
+            // user "up"    (v+) → screen "left" (x-)
+            nx = -v; ny = -h
+        default: // portrait
+            nx = h;  ny = -v
+        }
+
+        let x = (nx * 0.5 + 0.5) * bounds.width
+        let y = (ny * 0.5 + 0.5) * bounds.height
+        return CGPoint(x: x, y: y)
     }
 }
 
