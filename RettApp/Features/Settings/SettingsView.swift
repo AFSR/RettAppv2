@@ -25,26 +25,70 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            // ENFANT
-            childSection
-
-            // CONFIGURATION DU SUIVI
-            medicationsSection
-            eyeGameSection
-            notificationsSection
-            healthSection
-
-            // EXPORTS / DOCUMENTS À DESTINATION DES PROFESSIONNELS
-            documentsSection
-            dataSection
-
-            // ASSOCIATION
-            sharingSection
+            // ── DON AFSR (en tête, priorité haute)
             supportSection
 
-            // LÉGAL ET COMPTE
-            medicalDisclaimerSection
-            aboutSection
+            // ── PROFIL ENFANT
+            childSection
+
+            // ── CONFIGURATION DU SUIVI (sous-page hiérarchique)
+            Section {
+                NavigationLink {
+                    ConfigurationSubView()
+                } label: {
+                    Label("Configuration du suivi", systemImage: "slider.horizontal.3")
+                }
+            } footer: {
+                Text("Plan médicamenteux, jeu du regard, notifications, Apple Santé.")
+            }
+
+            // ── DOCUMENTS MÉDICAUX
+            Section {
+                NavigationLink {
+                    MedicalReportView()
+                } label: {
+                    Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
+                }
+                NavigationLink {
+                    FollowUpBookletView()
+                } label: {
+                    Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
+                }
+            } header: {
+                Text("Documents médicaux")
+            }
+
+            // ── DONNÉES (sous-page hiérarchique)
+            Section {
+                NavigationLink {
+                    DataSubView()
+                } label: {
+                    Label("Données", systemImage: "internaldrive")
+                }
+            } footer: {
+                Text("Export CSV, données de démonstration, effacement.")
+            }
+
+            // ── PARTAGE ENTRE PARENTS
+            sharingSection
+
+            // ── LÉGAL & À PROPOS (sous-page hiérarchique)
+            Section {
+                NavigationLink {
+                    MedicalDisclaimerSubView()
+                } label: {
+                    Label("Avertissement médical", systemImage: "exclamationmark.shield.fill")
+                }
+                NavigationLink {
+                    AboutSubView()
+                } label: {
+                    Label("À propos", systemImage: "info.circle.fill")
+                }
+            } header: {
+                Text("Légal")
+            }
+
+            // ── COMPTE
             accountSection
         }
         .navigationTitle("Réglages")
@@ -435,7 +479,7 @@ struct SettingsView: View {
         // V1 : on redirige vers la page de don de l'AFSR (Safari).
         // V2 (futur) : intégrer Apple Pay directement (nécessite merchant ID configuré
         //              côté AFSR + processeur de paiement type Stripe/Adyen).
-        if let url = URL(string: "https://afsr.fr/don") {
+        if let url = URL(string: "https://afsr.fr/nous-soutenir/faire-un-don") {
             UIApplication.shared.open(url)
         }
     }

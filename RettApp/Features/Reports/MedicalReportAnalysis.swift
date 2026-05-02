@@ -216,7 +216,7 @@ enum MedicalReportAnalysis {
                 : dayMoods.map { Double($0.levelRaw) }.reduce(0, +) / Double(dayMoods.count)
 
             let obs = input.observations.first { calendar.isDate($0.dayStart, inSameDayAs: cursor) }
-            let meal: Double? = (obs?.mealRatingRaw ?? 0) > 0 ? Double(obs!.mealRatingRaw) : nil
+            let meal: Double? = (obs?.averageMealRatingRaw ?? 0) > 0 ? Double(obs!.averageMealRatingRaw) : nil
             let sleep: Double? = (obs?.nightSleepRatingRaw ?? 0) > 0 ? Double(obs!.nightSleepRatingRaw) : nil
 
             let dayLogs = input.logs.filter { !$0.isAdHoc && $0.scheduledTime >= cursor && $0.scheduledTime < dayEnd }

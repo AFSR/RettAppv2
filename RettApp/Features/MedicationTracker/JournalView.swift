@@ -17,6 +17,7 @@ struct JournalView: View {
     @State private var showObservationSheet = false
     @State private var showSeizureTracker = false
     @State private var showSeizureHistory = false
+    @State private var showManualSeizureEntry = false
 
     private var profile: ChildProfile? { profiles.first }
     private var epilepsyEnabled: Bool { profile?.hasEpilepsy ?? false }
@@ -67,6 +68,9 @@ struct JournalView: View {
                         }
                         if epilepsyEnabled {
                             Divider()
+                            Button { showManualSeizureEntry = true } label: {
+                                Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
+                            }
                             Button { showSeizureHistory = true } label: {
                                 Label("Historique des crises", systemImage: "list.bullet.rectangle.portrait")
                             }
@@ -85,6 +89,9 @@ struct JournalView: View {
         .sheet(isPresented: $showAdHoc) { AdHocLogSheet() }
         .sheet(isPresented: $showSeizureHistory) {
             NavigationStack { SeizureHistoryView() }
+        }
+        .sheet(isPresented: $showManualSeizureEntry) {
+            ManualSeizureEntrySheet()
         }
         .fullScreenCover(isPresented: $showSeizureTracker) {
             NavigationStack { SeizureTrackerView() }
@@ -274,7 +281,7 @@ private struct JournalContent: View {
                 }
                 if let obs = dayObs, obs.isPopulated {
                     HStack(spacing: 8) {
-                        if let r = obs.mealRating {
+                        if let r = obs.averageMealRating {
                             Label(r.label, systemImage: "fork.knife")
                                 .font(AFSRFont.caption())
                                 .foregroundStyle(.secondary)
