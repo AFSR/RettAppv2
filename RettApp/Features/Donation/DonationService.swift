@@ -16,6 +16,17 @@ enum DonationService {
 
     static let log = Logger(subsystem: "fr.afsr.RettApp", category: "Donation")
 
+    /// **Feature flag — Apple Pay activé / désactivé.**
+    /// Maintenu à `false` tant que :
+    ///   - le compte Stripe AFSR n'est pas finalisé,
+    ///   - le backend Vercel n'est pas déployé,
+    ///   - le SDK Stripe iOS n'est pas ajouté au projet,
+    ///   - le merchant ID `merchant.fr.afsr.RettApp` n'est pas validé chez
+    ///     Apple ET déclaré côté Stripe.
+    /// Quand tout est branché, passer à `true` (un seul flag — pas besoin de
+    /// modifier la vue).
+    static let isApplePayEnabled = false
+
     /// Identifiant marchand déclaré dans les entitlements. **Doit** être
     /// préalablement créé dans Apple Developer Portal → Certificates,
     /// Identifiers & Profiles → Identifiers → Merchant IDs et associé au

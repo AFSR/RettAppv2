@@ -1,10 +1,13 @@
 import SwiftUI
 import PassKit
 
-/// Écran de don à l'AFSR. Propose des montants préréglés, un montant libre,
-/// et un bouton Apple Pay. Si Apple Pay n'est pas disponible (appareil non
-/// compatible, pas de carte ajoutée, merchant ID non encore actif côté Apple
-/// Developer Portal), on bascule sur l'ouverture du formulaire web AFSR.
+/// Écran de don à l'AFSR.
+///
+/// Deux modes selon `DonationService.isApplePayEnabled` :
+///   - **Désactivé** (état actuel) : présentation simple avec un seul bouton
+///     qui renvoie vers le formulaire de don sur le site de l'AFSR.
+///   - **Activé** (futur, quand Stripe + backend Vercel + SDK seront branchés) :
+///     montants préréglés, paiement Apple Pay natif, historique de dons.
 struct DonationView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -27,17 +30,21 @@ struct DonationView: View {
     var body: some View {
         Form {
             heroSection
-            amountSection
-            paymentSection
 
-            if !DonationLedger.all().isEmpty {
-                Section {
-                    Button {
-                        showHistory = true
-                    } label: {
-                        Label("Historique de mes dons", systemImage: "clock.arrow.circlepath")
+            if DonationService.isApplePayEnabled {
+                amountSection
+                paymentSection
+                if !DonationLedger.all().isEmpty {
+                    Section {
+                        Button {
+                            showHistory = true
+                        } label: {
+                            Label("Historique de mes dons", systemImage: "clock.arrow.circlepath")
+                        }
                     }
                 }
+            } else {
+                websiteDonationSection
             }
 
             taxBenefitSection
@@ -56,6 +63,38 @@ struct DonationView: View {
         }
         .sheet(isPresented: $showHistory) {
             NavigationStack { DonationHistoryView() }
+        }
+    }
+
+    // MARK: - Don via le site (mode actuel — Apple Pay désactivé)
+
+    private var websiteDonationSection: some View {
+        Section {
+            Button {
+                UIApplication.shared.open(DonationService.fallbackURL)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "heart.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.afsrEmergency)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Faire un don sur le site de l'AFSR")
+                            .font(AFSRFont.headline(15))
+                            .foregroundStyle(.primary)
+                        Text("Ouvre afsr.fr dans Safari")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right.square")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("Faire un don")
+        } footer: {
+            Text("Le paiement Apple Pay intégré à l'application sera disponible dans une prochaine version. En attendant, le formulaire en ligne de l'AFSR accepte carte bancaire, virement et prélèvement, et vous adresse automatiquement votre reçu fiscal.")
         }
     }
 
@@ -173,7 +212,7 @@ struct DonationView: View {
                     .font(AFSRFont.caption())
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if amountIsValid {
+                if DonationService.isApplePayEnabled && amountIsValid {
                     Divider().padding(.vertical, 2)
                     HStack {
                         Text("Coût réel après réduction :")
@@ -185,6 +224,11 @@ struct DonationView: View {
                             .foregroundStyle(.afsrPurpleAdaptive)
                             .monospacedDigit()
                     }
+                } else if !DonationService.isApplePayEnabled {
+                    Divider().padding(.vertical, 2)
+                    Text("Exemple : un don de 50 € ne vous coûte réellement que 17 € après déduction.")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.afsrPurpleAdaptive)
                 }
             }
         }
