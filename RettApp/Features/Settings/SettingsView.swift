@@ -288,8 +288,8 @@ struct SettingsView: View {
 
     private var supportSection: some View {
         Section {
-            Button {
-                openDonationPage()
+            NavigationLink {
+                DonationView()
             } label: {
                 Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
                     .foregroundStyle(.afsrEmergency)
@@ -468,17 +468,6 @@ struct SettingsView: View {
     private func runPurgeDemo() {
         let count = DemoDataGenerator.purgeDemoData(in: modelContext)
         demoSummary = "\(count) entrée(s) de démonstration supprimée(s)."
-    }
-
-    private func openDonationPage() {
-        // Apple App Store Review Guideline 3.2.1(vii) : les apps peuvent collecter des
-        // dons aux orgas reconnues via Apple Pay OU via Safari.
-        // V1 : on redirige vers la page de don de l'AFSR (Safari).
-        // V2 (futur) : intégrer Apple Pay directement (nécessite merchant ID configuré
-        //              côté AFSR + processeur de paiement type Stripe/Adyen).
-        if let url = URL(string: "https://afsr.fr/nous-soutenir/faire-un-don") {
-            UIApplication.shared.open(url)
-        }
     }
 
     private func eraseAll() {
