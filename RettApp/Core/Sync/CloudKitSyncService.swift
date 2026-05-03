@@ -294,7 +294,7 @@ final class CloudKitSyncService {
                 continue
             }
             do {
-                let identity = try await container.discoverUserIdentity(withUserRecordID: userRecordID)
+                let identity = try await discoverIdentity(userRecordID: userRecordID)
                 enriched.append(ParticipantInfo(
                     from: p,
                     isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID,
@@ -306,6 +306,19 @@ final class CloudKitSyncService {
             }
         }
         return enriched
+    }
+
+    /// Wrapper de `discoverUserIdentity(withUserRecordID:completionHandler:)` en
+    /// async/await. L'API ObjC originale n'a pas de variante async auto-bridgée
+    /// dans le SDK iOS 17 — il faut explicitement wrapper avec
+    /// `withCheckedThrowingContinuation` pour utiliser `try await`.
+    private func discoverIdentity(userRecordID: CKRecord.ID) async throws -> CKUserIdentity? {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<CKUserIdentity?, Error>) in
+            container.discoverUserIdentity(withUserRecordID: userRecordID) { identity, error in
+                if let error { cont.resume(throwing: error) }
+                else { cont.resume(returning: identity) }
+            }
+        }
     }
 
     /// Le propriétaire arrête le partage (supprime le CKShare).
