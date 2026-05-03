@@ -50,6 +50,27 @@ struct AdHocLogSheet: View {
                     case .freeEntry:
                         TextField("Nom du médicament", text: $freeName)
                             .autocorrectionDisabled()
+                            .textInputAutocapitalization(.words)
+
+                        // Autocomplétion sur la liste française fréquente
+                        let suggestions = CommonFrenchMedications.suggestions(matching: freeName)
+                        if !suggestions.isEmpty {
+                            ForEach(suggestions, id: \.self) { suggestion in
+                                Button {
+                                    freeName = suggestion.components(separatedBy: " (").first ?? suggestion
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "pills.fill")
+                                            .foregroundStyle(.afsrPurpleAdaptive)
+                                            .imageScale(.small)
+                                        Text(suggestion)
+                                            .foregroundStyle(.primary)
+                                            .font(AFSRFont.body(14))
+                                        Spacer()
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 

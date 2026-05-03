@@ -15,7 +15,8 @@ enum PreviewData {
             Medication.self,
             MedicationLog.self,
             MoodEntry.self,
-            DailyObservation.self
+            DailyObservation.self,
+            SymptomEvent.self
         ])
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try! ModelContainer(for: schema, configurations: [config])
@@ -63,7 +64,8 @@ enum PreviewData {
             Medication.self,
             MedicationLog.self,
             MoodEntry.self,
-            DailyObservation.self
+            DailyObservation.self,
+            SymptomEvent.self
         ])
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try! ModelContainer(for: schema, configurations: [config])

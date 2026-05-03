@@ -15,6 +15,7 @@ struct JournalView: View {
     @State private var showDatePicker = false
     @State private var showMoodSheet = false
     @State private var showObservationSheet = false
+    @State private var showSymptomSheet = false
     @State private var showSeizureTracker = false
     @State private var showSeizureHistory = false
     @State private var showManualSeizureEntry = false
@@ -26,62 +27,60 @@ struct JournalView: View {
         ZStack {
             Color.afsrBackground.ignoresSafeArea()
 
-            JournalContent(
-                selectedDate: viewModel.selectedDate,
-                medications: medications,
-                profile: profile,
-                viewModel: viewModel,
-                emergencyAction: epilepsyEnabled ? { showSeizureTracker = true } : nil,
-                showSeizureHistory: { showSeizureHistory = true }
-            )
+            VStack(spacing: 0) {
+                // Bandeau dédié à la navigation de date — séparé des actions toolbar
+                dateNavigationBar
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+
+                JournalContent(
+                    selectedDate: viewModel.selectedDate,
+                    medications: medications,
+                    profile: profile,
+                    viewModel: viewModel,
+                    emergencyAction: epilepsyEnabled ? { showSeizureTracker = true } : nil,
+                    showSeizureHistory: { showSeizureHistory = true }
+                )
+            }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { shift(-1) } label: { Image(systemName: "chevron.left") }
-            }
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showDatePicker = true
+                    showAdHoc = true
                 } label: {
-                    Text(viewModel.selectedDate, format: .dateTime.weekday(.wide).day().month())
-                        .font(AFSRFont.headline(16))
+                    Image(systemName: "plus.circle.fill")
                 }
+                .accessibilityLabel("Ajouter une prise ponctuelle")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    Button { shift(1) } label: { Image(systemName: "chevron.right") }
-                    Button {
-                        showAdHoc = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(.afsrPurpleAdaptive)
+                Menu {
+                    Button { showMoodSheet = true } label: {
+                        Label("Saisir une humeur", systemImage: "face.smiling")
                     }
-                    .accessibilityLabel("Ajouter une prise ponctuelle")
-                    Menu {
-                        Button { showMoodSheet = true } label: {
-                            Label("Saisir une humeur", systemImage: "face.smiling")
-                        }
-                        Button { showObservationSheet = true } label: {
-                            Label("Repas / sommeil du jour", systemImage: "fork.knife")
-                        }
-                        if epilepsyEnabled {
-                            Divider()
-                            Button { showManualSeizureEntry = true } label: {
-                                Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
-                            }
-                            Button { showSeizureHistory = true } label: {
-                                Label("Historique des crises", systemImage: "list.bullet.rectangle.portrait")
-                            }
-                        }
+                    Button { showSymptomSheet = true } label: {
+                        Label("Saisir un symptôme", systemImage: "stethoscope")
+                    }
+                    Button { showObservationSheet = true } label: {
+                        Label("Repas / sommeil du jour", systemImage: "fork.knife")
+                    }
+                    if epilepsyEnabled {
                         Divider()
-                        Button { showPlan = true } label: {
-                            Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
+                        Button { showManualSeizureEntry = true } label: {
+                            Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Button { showSeizureHistory = true } label: {
+                            Label("Historique des crises", systemImage: "list.bullet.rectangle.portrait")
+                        }
                     }
+                    Divider()
+                    Button { showPlan = true } label: {
+                        Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -97,6 +96,7 @@ struct JournalView: View {
             NavigationStack { SeizureTrackerView() }
         }
         .sheet(isPresented: $showMoodSheet) { MoodSheet() }
+        .sheet(isPresented: $showSymptomSheet) { SymptomSheet() }
         .sheet(isPresented: $showObservationSheet) {
             DailyObservationSheet(dayStart: viewModel.selectedDate)
         }
@@ -121,6 +121,46 @@ struct JournalView: View {
         }
         .onChange(of: viewModel.selectedDate) { _, newDate in
             viewModel.ensureLogsExist(for: newDate, medications: medications, profile: profile, in: modelContext)
+        }
+    }
+
+    /// Bandeau « ◀ Lundi 26 mai ▶ » — séparé visuellement des actions toolbar.
+    private var dateNavigationBar: some View {
+        HStack(spacing: 8) {
+            Button { shift(-1) } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 40, height: 36)
+            }
+            .buttonStyle(.bordered)
+            .tint(.afsrPurpleAdaptive)
+            .accessibilityLabel("Jour précédent")
+
+            Button {
+                showDatePicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(viewModel.selectedDate, format: .dateTime.weekday(.wide).day().month())
+                        .font(AFSRFont.headline(15))
+                }
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .padding(.horizontal, 12)
+                .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                .foregroundStyle(.afsrPurpleAdaptive)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Choisir une date")
+
+            Button { shift(1) } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 40, height: 36)
+            }
+            .buttonStyle(.bordered)
+            .tint(.afsrPurpleAdaptive)
+            .accessibilityLabel("Jour suivant")
         }
     }
 
@@ -156,6 +196,7 @@ private struct JournalContent: View {
     @Query private var moods: [MoodEntry]
     @Query private var observations: [DailyObservation]
     @Query private var seizures: [SeizureEvent]
+    @Query private var symptoms: [SymptomEvent]
 
     @State private var showMood = false
     @State private var showObservation = false
@@ -185,6 +226,10 @@ private struct JournalContent: View {
         self._seizures = Query(
             filter: #Predicate<SeizureEvent> { $0.startTime >= day && $0.startTime < nextDay },
             sort: \SeizureEvent.startTime
+        )
+        self._symptoms = Query(
+            filter: #Predicate<SymptomEvent> { $0.timestamp >= day && $0.timestamp < nextDay },
+            sort: \SymptomEvent.timestamp
         )
     }
 
@@ -224,12 +269,13 @@ private struct JournalContent: View {
         }
     }
 
-    /// Combine logs médicament, crises et humeurs en un feed chronologique unique.
+    /// Combine logs médicament, crises, humeurs et symptômes en un feed chronologique unique.
     private var combinedFeed: [JournalFeedItem] {
         var items: [JournalFeedItem] = []
         items.append(contentsOf: logs.map { JournalFeedItem.medication($0) })
         items.append(contentsOf: seizures.map { JournalFeedItem.seizure($0) })
         items.append(contentsOf: moods.map { JournalFeedItem.mood($0) })
+        items.append(contentsOf: symptoms.map { JournalFeedItem.symptom($0) })
         return items.sorted { $0.time < $1.time }
     }
 
@@ -366,12 +412,14 @@ private enum JournalFeedItem: Identifiable {
     case medication(MedicationLog)
     case seizure(SeizureEvent)
     case mood(MoodEntry)
+    case symptom(SymptomEvent)
 
     var id: String {
         switch self {
         case .medication(let l): return "med-\(l.id.uuidString)"
         case .seizure(let s): return "seiz-\(s.id.uuidString)"
         case .mood(let m): return "mood-\(m.id.uuidString)"
+        case .symptom(let s): return "symp-\(s.id.uuidString)"
         }
     }
     var time: Date {
@@ -379,6 +427,7 @@ private enum JournalFeedItem: Identifiable {
         case .medication(let l): return l.effectiveTime
         case .seizure(let s): return s.startTime
         case .mood(let m): return m.timestamp
+        case .symptom(let s): return s.timestamp
         }
     }
 }
@@ -399,7 +448,50 @@ private struct JournalFeedRow: View {
             SeizureRowCompact(event: s, onTap: onSeizureTap)
         case .mood(let m):
             MoodRowCompact(entry: m)
+        case .symptom(let s):
+            SymptomRowCompact(event: s)
         }
+    }
+}
+
+private struct SymptomRowCompact: View {
+    let event: SymptomEvent
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: event.symptomType.icon)
+                .font(.system(size: 22))
+                .foregroundStyle(.afsrPurpleAdaptive)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.symptomType.label)
+                    .font(AFSRFont.headline(15))
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(event.timestamp, format: .dateTime.hour().minute())
+                        .font(AFSRFont.caption())
+                    if event.intensityRaw > 0 {
+                        Text("· intensité \(event.intensityRaw)/5")
+                            .font(AFSRFont.caption())
+                    }
+                    if event.durationMinutes > 0 {
+                        Text("· \(event.durationMinutes) min")
+                            .font(AFSRFont.caption())
+                    }
+                }
+                .foregroundStyle(.secondary)
+                if !event.notes.isEmpty {
+                    Text(event.notes)
+                        .font(AFSRFont.caption())
+                        .italic()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
     }
 }
 

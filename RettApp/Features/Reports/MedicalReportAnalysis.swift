@@ -287,7 +287,19 @@ enum MedicalReportAnalysis {
             let missedIntakes: Int
             let lateIntakes: Int           // > 30 min de retard
         }
+
+        /// Synthèse d'un médicament pris à la demande sur la période.
+        struct AdHocMed {
+            let name: String
+            let occurrences: Int           // nb de prises
+            let totalDose: Double          // dose cumulée
+            let unitLabel: String
+            let lastTaken: Date?
+            let mostFrequentReason: String?  // raison ad-hoc la plus fréquente
+        }
+
         let perMedication: [PerMed]
+        let adHocSummary: [AdHocMed]
         let regularMedicationsCount: Int
         let adhocMedicationsCount: Int
         /// Adhérence pondérée par nb de prises planifiées.
@@ -344,8 +356,40 @@ enum MedicalReportAnalysis {
         let regularCount = input.medications.filter { $0.kind == .regular && $0.isActive }.count
         let adhocCount = input.medications.filter { $0.kind == .adhoc && $0.isActive }.count
 
+        // ── Synthèse des prises ad-hoc sur la période
+        // Groupe par nom (les ad-hoc peuvent être saisis librement, on consolide par libellé).
+        var adhocByName: [String: (count: Int, totalDose: Double, lastTaken: Date?, unit: String, reasons: [String])] = [:]
+        for log in input.logs where log.isAdHoc {
+            let key = log.medicationName
+            var entry = adhocByName[key] ?? (0, 0, nil, log.doseUnit.label, [])
+            entry.count += 1
+            entry.totalDose += log.dose
+            if let t = log.takenTime, t > (entry.lastTaken ?? .distantPast) {
+                entry.lastTaken = t
+            }
+            if !log.adhocReason.isEmpty {
+                entry.reasons.append(log.adhocReason)
+            }
+            adhocByName[key] = entry
+        }
+        let adHocSummary: [MedicationAnalysis.AdHocMed] = adhocByName
+            .map { (name, data) in
+                let topReason = Dictionary(grouping: data.reasons, by: { $0 })
+                    .max(by: { $0.value.count < $1.value.count })?.key
+                return MedicationAnalysis.AdHocMed(
+                    name: name,
+                    occurrences: data.count,
+                    totalDose: data.totalDose,
+                    unitLabel: data.unit,
+                    lastTaken: data.lastTaken,
+                    mostFrequentReason: topReason
+                )
+            }
+            .sorted { $0.occurrences > $1.occurrences }
+
         return MedicationAnalysis(
             perMedication: perMed,
+            adHocSummary: adHocSummary,
             regularMedicationsCount: regularCount,
             adhocMedicationsCount: adhocCount,
             weightedAdherence: weighted
@@ -391,8 +435,12 @@ enum MedicalReportAnalysis {
             let pct = Int((medicationAnalysis.weightedAdherence * 100).rounded())
             lines.append("Observance médicamenteuse pondérée : \(pct) % sur \(medicationAnalysis.regularMedicationsCount) traitement\(medicationAnalysis.regularMedicationsCount > 1 ? "s" : "") récurrent\(medicationAnalysis.regularMedicationsCount > 1 ? "s" : "").")
         }
-        if medicationAnalysis.adhocMedicationsCount > 0 {
-            lines.append("\(medicationAnalysis.adhocMedicationsCount) traitement\(medicationAnalysis.adhocMedicationsCount > 1 ? "s" : "") à la demande référencé\(medicationAnalysis.adhocMedicationsCount > 1 ? "s" : "").")
+        let totalAdHocIntakes = medicationAnalysis.adHocSummary.reduce(0) { $0 + $1.occurrences }
+        if totalAdHocIntakes > 0 {
+            let topName = medicationAnalysis.adHocSummary.first?.name ?? ""
+            lines.append("\(totalAdHocIntakes) prise\(totalAdHocIntakes > 1 ? "s" : "") ponctuelle\(totalAdHocIntakes > 1 ? "s" : "") (à la demande) sur la période — principalement \(topName).")
+        } else if medicationAnalysis.adhocMedicationsCount > 0 {
+            lines.append("\(medicationAnalysis.adhocMedicationsCount) traitement à la demande référencé mais aucune prise enregistrée sur la période.")
         }
 
         // Humeur

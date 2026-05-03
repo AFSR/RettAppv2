@@ -15,12 +15,13 @@ struct RettAppApp: App {
             Medication.self,
             MedicationLog.self,
             MoodEntry.self,
-            DailyObservation.self
+            DailyObservation.self,
+            SymptomEvent.self
         ])
 
         // On utilise un nom de fichier versionné — ça évite tout résidu d'un store
         // antérieur dont le schéma serait incompatible (lightweight migration absente).
-        let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v4.store")
+        let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v5.store")
         // IMPORTANT : `cloudKitDatabase: .none` désactive la sync auto SwiftData ↔ CloudKit.
         // Sans cela, comme on a déclaré l'entitlement iCloud (pour le partage entre parents),
         // SwiftData tenterait d'activer son intégration CloudKit native — qui exige que
@@ -71,7 +72,8 @@ struct RettAppApp: App {
             ("Medication", Medication.self),
             ("MedicationLog", MedicationLog.self),
             ("MoodEntry", MoodEntry.self),
-            ("DailyObservation", DailyObservation.self)
+            ("DailyObservation", DailyObservation.self),
+            ("SymptomEvent", SymptomEvent.self)
         ]
         for (name, model) in models {
             let s = Schema([model])
