@@ -58,6 +58,17 @@ struct SettingsView: View {
                 Text("Documents médicaux")
             }
 
+            // ── DONNÉES APPLE SANTÉ DE L'ENFANT
+            Section {
+                NavigationLink {
+                    HealthDataView()
+                } label: {
+                    Label("Données Apple Santé", systemImage: "heart.text.square")
+                }
+            } footer: {
+                Text("Sommeil, rythme cardiaque et activité partagés depuis l'iPhone ou l'Apple Watch de l'enfant via le partage familial iCloud.")
+            }
+
             // ── DONNÉES (sous-page hiérarchique)
             Section {
                 NavigationLink {
