@@ -368,6 +368,34 @@ enum MedicalReportGenerator {
         let pct = Int((analysis.weightedAdherence * 100).rounded())
         drawText("Adhérence pondérée tous traitements : \(pct) %. La régularité (σ) mesure la dispersion des décalages horaires entre la prise réelle et l'heure planifiée — plus la valeur est faible, plus les prises sont régulières.", italic: true, ctx: &ctx)
         ctx.y += 8
+
+        // Section dédiée aux prises ponctuelles (à la demande)
+        if !analysis.adHocSummary.isEmpty {
+            ctx.ensureSpace(80, context: context)
+            drawSectionTitle("Prises ponctuelles (à la demande)", ctx: &ctx)
+            drawText("Médicaments donnés en dehors du plan régulier (antipyrétiques, anticonvulsifs d'urgence, etc.). Le détail chronologique est en annexe.", italic: true, ctx: &ctx)
+
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "fr_FR")
+            df.dateFormat = "dd/MM/yyyy HH:mm"
+
+            let adhocHeaders = ["Médicament", "Prises", "Dose cumulée", "Dernière prise", "Raison principale"]
+            let adhocWidths: [CGFloat] = [130, 55, 90, 100, 140]
+            let adhocRows: [[String]] = analysis.adHocSummary.map { ah in
+                let dose = ah.totalDose.truncatingRemainder(dividingBy: 1) == 0
+                    ? "\(Int(ah.totalDose)) \(ah.unitLabel)"
+                    : String(format: "%.1f \(ah.unitLabel)", ah.totalDose)
+                return [
+                    ah.name,
+                    "\(ah.occurrences)",
+                    dose,
+                    ah.lastTaken.map { df.string(from: $0) } ?? "—",
+                    ah.mostFrequentReason ?? "—"
+                ]
+            }
+            drawTable(headers: adhocHeaders, columnWidths: adhocWidths, rows: adhocRows, ctx: &ctx, context: context)
+            ctx.y += 8
+        }
     }
 
     private static func drawSynthesis(
