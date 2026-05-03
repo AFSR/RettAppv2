@@ -4,89 +4,57 @@ import HealthKit
 enum HealthKitError: LocalizedError {
     case unavailable
     case notAuthorized
+    case unsupportedType
     case write(Error)
 
     var errorDescription: String? {
         switch self {
         case .unavailable: return "Apple Santé n'est pas disponible sur cet appareil."
         case .notAuthorized: return "Permission Apple Santé refusée."
+        case .unsupportedType: return "Le type HealthKit requis n'est pas disponible sur cette version d'iOS."
         case .write(let e): return "Impossible d'écrire dans Apple Santé : \(e.localizedDescription)"
         }
     }
 }
 
+/// Gestionnaire HealthKit central.
+///
+/// ⚠️ L'API publique `HKCategoryTypeIdentifier.seizure` n'existe pas dans le SDK iOS 17.
+/// L'écriture des crises dans Apple Santé n'est donc pas possible via HealthKit
+/// aujourd'hui — les crises sont stockées uniquement en SwiftData et peuvent être
+/// exportées en CSV depuis les réglages.
+///
+/// Ce manager reste en place pour :
+/// - vérifier la disponibilité de HealthKit sur l'appareil,
+/// - servir de point d'entrée futur si Apple expose un type dédié,
+/// - laisser les entitlements HealthKit actifs pour d'éventuels autres types.
 final class HealthKitManager {
     static let shared = HealthKitManager()
     private let store = HKHealthStore()
 
-    private var seizureType: HKCategoryType? {
-        if #available(iOS 17.0, *) {
-            return HKCategoryType(.seizure)
-        }
-        return nil
-    }
-
-    private var typesToShare: Set<HKSampleType> {
-        var set: Set<HKSampleType> = []
-        if let seizureType { set.insert(seizureType) }
-        return set
-    }
-
-    private var typesToRead: Set<HKObjectType> {
-        var set: Set<HKObjectType> = []
-        if let seizureType { set.insert(seizureType) }
-        return set
-    }
-
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
-    /// Demande les permissions nécessaires. À appeler à la première écriture.
+    /// Statut d'autorisation simplifié pour l'UI (aucun type réellement demandé tant
+    /// que l'API seizure n'est pas disponible publiquement).
+    enum SimpleAuthStatus { case notDetermined, denied, authorized, unavailable }
+
+    func authorizationStatus() -> SimpleAuthStatus {
+        isAvailable ? .notDetermined : .unavailable
+    }
+
+    /// Demande d'autorisation — no-op tant qu'aucun type n'est pris en charge.
     @discardableResult
     func requestAuthorizationIfNeeded() async throws -> Bool {
         guard isAvailable else { throw HealthKitError.unavailable }
-        do {
-            try await store.requestAuthorization(toShare: typesToShare, read: typesToRead)
-            return true
-        } catch {
-            throw HealthKitError.write(error)
-        }
-    }
-
-    func authorizationStatus() -> HKAuthorizationStatus {
-        guard let seizureType else { return .notDetermined }
-        return store.authorizationStatus(for: seizureType)
+        return true
     }
 
     // MARK: - Seizure writes
 
+    /// Écrit (théoriquement) une crise dans Apple Santé. Indisponible aujourd'hui
+    /// car le type catégorie `.seizure` n'est pas exposé publiquement.
     func writeSeizure(event: SeizureEvent, childFirstName: String) async throws {
         guard isAvailable else { throw HealthKitError.unavailable }
-        guard let seizureType else { throw HealthKitError.unavailable }
-
-        let status = store.authorizationStatus(for: seizureType)
-        if status == .notDetermined {
-            try await store.requestAuthorization(toShare: [seizureType], read: [seizureType])
-        }
-
-        let metadata: [String: Any] = [
-            HKMetadataKeyExternalUUID: event.id.uuidString,
-            "AFSRChildFirstName": childFirstName,
-            "AFSRSeizureType": event.seizureType.rawValue,
-            "AFSRTrigger": event.trigger.rawValue
-        ]
-
-        let sample = HKCategorySample(
-            type: seizureType,
-            value: HKCategoryValueSeverity.moderate.rawValue,
-            start: event.startTime,
-            end: event.endTime,
-            metadata: metadata
-        )
-
-        do {
-            try await store.save(sample)
-        } catch {
-            throw HealthKitError.write(error)
-        }
+        throw HealthKitError.unsupportedType
     }
 }

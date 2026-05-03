@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Colors
 
@@ -7,11 +8,21 @@ extension Color {
     static let afsrPurpleLight = Color(hex: "#9B6FC8")
     static let afsrPurpleDark  = Color(hex: "#4A2070")
     static let afsrWhite       = Color.white
-    static let afsrBackground  = Color(hex: "#F8F5FC")
     static let afsrAccent      = Color(hex: "#E8D5F7")
     static let afsrEmergency   = Color(hex: "#E53935")
     static let afsrSuccess     = Color(hex: "#43A047")
     static let afsrWarning     = Color(hex: "#FB8C00")
+
+    /// Fond principal des écrans : lavande très pâle en mode clair (identité AFSR),
+    /// fond sombre système en mode sombre (cohérent avec Forms/Lists système).
+    static let afsrBackground = Color(UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor.systemGroupedBackground
+        default:
+            return UIColor(red: 0.973, green: 0.961, blue: 0.988, alpha: 1) // #F8F5FC
+        }
+    })
 
     init(hex: String) {
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -35,6 +46,36 @@ extension Color {
         }
         self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
     }
+}
+
+// MARK: - Adaptive colors (automatically adjust to dark/light mode)
+
+extension Color {
+    /// Violet AFSR adaptatif : foncé en mode clair (bon contraste sur blanc),
+    /// clair en mode sombre (bon contraste sur noir). Utilisée pour les
+    /// éléments d'accentuation comme la teinte des onglets (`.tint`).
+    static let afsrPurpleAdaptive = Color(UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor(Color.afsrPurpleLight)
+        default:
+            return UIColor(Color.afsrPurple)
+        }
+    })
+}
+
+// MARK: - ShapeStyle shortcuts (for `.foregroundStyle(.afsrPurple)` syntax)
+
+extension ShapeStyle where Self == Color {
+    static var afsrPurple: Color         { .afsrPurple }
+    static var afsrPurpleLight: Color    { .afsrPurpleLight }
+    static var afsrPurpleDark: Color     { .afsrPurpleDark }
+    static var afsrPurpleAdaptive: Color { .afsrPurpleAdaptive }
+    static var afsrBackground: Color     { .afsrBackground }
+    static var afsrAccent: Color         { .afsrAccent }
+    static var afsrEmergency: Color      { .afsrEmergency }
+    static var afsrSuccess: Color        { .afsrSuccess }
+    static var afsrWarning: Color        { .afsrWarning }
 }
 
 // MARK: - Typography

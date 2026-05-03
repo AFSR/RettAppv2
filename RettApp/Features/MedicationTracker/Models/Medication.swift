@@ -13,6 +13,19 @@ enum DoseUnit: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Type de médicament : régulier (planifié) ou ponctuel (à la demande, sans horaires).
+enum MedicationKind: String, Codable, CaseIterable, Identifiable {
+    case regular   // pris selon des horaires planifiés
+    case adhoc     // pris en cas de besoin (Rivotril en cas de crise, antipyrétique sur fièvre, etc.)
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .regular: return "Récurrent"
+        case .adhoc:   return "À la demande"
+        }
+    }
+}
+
 @Model
 final class Medication {
     @Attribute(.unique) var id: UUID
@@ -27,9 +40,18 @@ final class Medication {
     @Relationship var childProfile: ChildProfile?
     var createdAt: Date
 
+    /// Type : régulier ou ponctuel. Ajouté en V1.3.0 — par défaut « régulier »
+    /// pour préserver le comportement des médicaments existants.
+    var kindRaw: String = MedicationKind.regular.rawValue
+
     var doseUnit: DoseUnit {
         get { DoseUnit(rawValue: doseUnitRaw) ?? .mg }
         set { doseUnitRaw = newValue.rawValue }
+    }
+
+    var kind: MedicationKind {
+        get { MedicationKind(rawValue: kindRaw) ?? .regular }
+        set { kindRaw = newValue.rawValue }
     }
 
     var scheduledHours: [HourMinute] {
@@ -43,6 +65,7 @@ final class Medication {
         doseAmount: Double,
         doseUnit: DoseUnit,
         scheduledHours: [HourMinute],
+        kind: MedicationKind = .regular,
         isActive: Bool = true,
         createdAt: Date = Date()
     ) {
@@ -51,6 +74,7 @@ final class Medication {
         self.doseAmount = doseAmount
         self.doseUnitRaw = doseUnit.rawValue
         self.scheduledHoursData = (try? JSONEncoder().encode(scheduledHours)) ?? Data()
+        self.kindRaw = kind.rawValue
         self.isActive = isActive
         self.createdAt = createdAt
     }

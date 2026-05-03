@@ -1,24 +1,36 @@
 import Foundation
 import SwiftData
 
-#if DEBUG
+/// Données de prévisualisation. N'est pas entouré de `#if DEBUG` : les macros
+/// `#Preview { }` SwiftUI sont compilées en Release aussi — si PreviewData
+/// n'est pas visible, l'Archive échoue. Coût zéro en production : les `let`
+/// statiques sont lazy, donc les stores en mémoire ne sont créés que si
+/// quelqu'un référence `PreviewData.container` (ce qui n'arrive jamais hors
+/// canvas Xcode).
 enum PreviewData {
     static let container: ModelContainer = {
         let schema = Schema([
             ChildProfile.self,
             SeizureEvent.self,
             Medication.self,
-            MedicationLog.self
+            MedicationLog.self,
+            MoodEntry.self,
+            DailyObservation.self,
+            SymptomEvent.self
         ])
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try! ModelContainer(for: schema, configurations: [config])
+
+        // Utilise un ModelContext dédié (non main-actor) pour peupler depuis
+        // un static let init (qui n'est pas isolé au main actor).
+        let context = ModelContext(container)
 
         let child = ChildProfile(
             firstName: "Léa",
             birthDate: Calendar.current.date(byAdding: .year, value: -8, to: Date()),
             hasEpilepsy: true
         )
-        container.mainContext.insert(child)
+        context.insert(child)
 
         let keppra = Medication(
             name: "Keppra",
@@ -28,7 +40,7 @@ enum PreviewData {
             isActive: true
         )
         keppra.childProfile = child
-        container.mainContext.insert(keppra)
+        context.insert(keppra)
 
         let now = Date()
         let seizure = SeizureEvent(
@@ -39,8 +51,9 @@ enum PreviewData {
             notes: "Forte fièvre la veille."
         )
         seizure.childProfileId = child.id
-        container.mainContext.insert(seizure)
+        context.insert(seizure)
 
+        try? context.save()
         return container
     }()
 
@@ -49,10 +62,13 @@ enum PreviewData {
             ChildProfile.self,
             SeizureEvent.self,
             Medication.self,
-            MedicationLog.self
+            MedicationLog.self,
+            MoodEntry.self,
+            DailyObservation.self,
+            SymptomEvent.self
         ])
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try! ModelContainer(for: schema, configurations: [config])
     }()
 }
-#endif
+

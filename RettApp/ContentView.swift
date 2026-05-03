@@ -19,20 +19,19 @@ struct ContentView: View {
 
     var body: some View {
         TabView {
-            NavigationStack { NewsListView() }
-                .tabItem { Label("Actualités", systemImage: "newspaper.fill") }
-
-            if epilepsyEnabled {
-                NavigationStack { SeizureTrackerView() }
-                    .tabItem { Label("Épilepsie", systemImage: "waveform.path.ecg") }
-                    .badge(currentMonthSeizureCount)
+            if FeatureFlags.newsEnabled {
+                NavigationStack { NewsListView() }
+                    .tabItem { Label("Actualités", systemImage: "newspaper.fill") }
             }
 
-            NavigationStack { MedicationListView() }
-                .tabItem { Label("Médicaments", systemImage: "pill.fill") }
+            NavigationStack { JournalView() }
+                .tabItem { Label("Journal", systemImage: "book.pages.fill") }
+                .badge(epilepsyEnabled ? currentMonthSeizureCount : 0)
 
-            NavigationStack { EyeGameView() }
-                .tabItem { Label("Jeu Regard", systemImage: "eye.fill") }
+            if epilepsyEnabled {
+                NavigationStack { DashboardView() }
+                    .tabItem { Label("Bilan", systemImage: "chart.bar.xaxis") }
+            }
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("Réglages", systemImage: "gear") }

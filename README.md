@@ -49,30 +49,40 @@ RettAppTests/                    # Tests unitaires
 
 > Les composants partagés gardent le préfixe `AFSR*` (`AFSRButton`, `AFSRTheme`, `AFSRPurple`…) car ils incarnent la charte graphique de l'**Association Française du Syndrome de Rett**.
 
-## Générer le projet Xcode
+## Ouvrir le projet Xcode
 
-Le dépôt ne contient pas de `.xcodeproj` — le projet est décrit dans `project.yml` (XcodeGen).
-
-### Avec XcodeGen (recommandé)
+Le dépôt contient déjà `RettApp.xcodeproj`. Après clone :
 
 ```bash
-brew install xcodegen
-xcodegen generate
 open RettApp.xcodeproj
 ```
 
-### Sans XcodeGen
+### Régénérer le projet
 
-1. Dans Xcode : **File → New → Project → iOS → App**
-2. Product name : `RettApp`, Bundle ID : `fr.afsr.RettApp`, Interface : SwiftUI, Language : Swift
-3. Glisser le dossier `RettApp/` dans le navigator (ne pas cocher "Copy items")
-4. Dans **Signing & Capabilities**, ajouter :
+Si tu ajoutes/renommes/déplaces des fichiers sources, régénère le `.xcodeproj` pour que Xcode les détecte :
+
+```bash
+# Option 1 — script Ruby (cross-platform, dépendance unique : gem xcodeproj)
+gem install xcodeproj --user-install
+ruby scripts/generate_xcodeproj.rb
+
+# Option 2 — XcodeGen (macOS)
+brew install xcodegen
+xcodegen generate
+```
+
+Les deux utilisent la même structure de dossiers comme source de vérité.
+
+### Configuration initiale dans Xcode
+
+Après le premier `open RettApp.xcodeproj` :
+
+1. Target **RettApp** → **Signing & Capabilities** → sélectionne ton **Team**
+2. Vérifie que ces capabilities sont présentes (elles sont déclarées dans `RettApp.entitlements` mais doivent être actives dans ton profil) :
    - Sign in with Apple
-   - HealthKit (avec Clinical Health Records désactivé)
+   - HealthKit (Clinical Health Records désactivé)
    - Push Notifications
    - Background Modes → Background fetch
-5. Remplacer l'`Info.plist` par celui de `RettApp/Resources/Info.plist`
-6. Associer `RettApp/Resources/RettApp.entitlements` au target
 
 ## Configuration API
 
@@ -93,7 +103,6 @@ enum APIConfig {
 ## Tests
 
 ```bash
-xcodegen generate
 xcodebuild test -scheme RettApp -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 

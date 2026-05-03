@@ -3,8 +3,10 @@ import Foundation
 // MARK: - API configuration
 
 enum APIConfig {
-    /// Base URL Statamic de l'AFSR. À remplacer par la vraie URL avant release.
-    static var baseURL: URL = URL(string: "https://www.afsr.fr/api")!
+    /// Base URL Statamic de l'AFSR.
+    static var baseURL: URL = URL(string: "https://afsr.fr/api")!
+    /// Handle de la collection Statamic des actualités.
+    static var newsCollection: String = "actualites"
     /// Bearer token optionnel (laisser vide si endpoint public).
     static var apiKey: String = ""
 }

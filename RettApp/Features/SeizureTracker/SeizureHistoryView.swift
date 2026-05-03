@@ -6,10 +6,12 @@ struct SeizureHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \SeizureEvent.startTime, order: .reverse) private var seizures: [SeizureEvent]
+    @Query private var profiles: [ChildProfile]
 
     @State private var exportURL: URL?
     @State private var showShareSheet = false
     @State private var toDelete: SeizureEvent?
+    @State private var importSummary: SeizureImporter.ImportResult?
 
     var body: some View {
         Group {
@@ -37,13 +39,41 @@ struct SeizureHistoryView: View {
                 Button("Fermer") { dismiss() }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    exportCSV()
-                } label: {
-                    Label("Exporter CSV", systemImage: "square.and.arrow.up")
+                HStack {
+                    CSVImportMenu(
+                        buildTemplate: { try SeizureImporter.writeTemplate() },
+                        onImportedContent: { content in
+                            let result = SeizureImporter.importCSV(
+                                contents: content,
+                                childProfile: profiles.first,
+                                context: modelContext
+                            )
+                            importSummary = result
+                        }
+                    )
+                    Button {
+                        exportCSV()
+                    } label: {
+                        Label("Exporter CSV", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(seizures.isEmpty)
                 }
-                .disabled(seizures.isEmpty)
             }
+        }
+        .alert("Import terminé", isPresented: Binding(
+            get: { importSummary != nil },
+            set: { if !$0 { importSummary = nil } }
+        ), presenting: importSummary) { _ in
+            Button("OK") { importSummary = nil }
+        } message: { result in
+            var msg = "Importées : \(result.imported)\nIgnorées : \(result.skipped)"
+            if !result.errors.isEmpty {
+                msg += "\n\n" + result.errors.prefix(5).joined(separator: "\n")
+                if result.errors.count > 5 {
+                    msg += "\n… et \(result.errors.count - 5) autres"
+                }
+            }
+            return Text(msg)
         }
         .sheet(isPresented: $showShareSheet) {
             if let url = exportURL {

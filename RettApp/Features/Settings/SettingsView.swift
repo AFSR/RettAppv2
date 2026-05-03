@@ -12,21 +12,83 @@ struct SettingsView: View {
     @Query(sort: \MedicationLog.scheduledTime) private var logs: [MedicationLog]
 
     @State private var notificationsEnabled: Bool = false
-    @State private var healthKitStatus: HKAuthorizationStatus = .notDetermined
+    @State private var healthKitStatus: HealthKitManager.SimpleAuthStatus = .notDetermined
     @State private var showChildEditor = false
     @State private var showMedicationPlan = false
     @State private var showEraseConfirm = false
+    @State private var showDemoConfirm = false
+    @State private var showPurgeDemoConfirm = false
+    @State private var demoSummary: String?
+    @State private var showSharingSoon = false
     @State private var exportURL: URL?
     @State private var showShareSheet = false
 
     var body: some View {
         List {
+            // ── DON AFSR (en tête, priorité haute)
+            supportSection
+
+            // ── PROFIL ENFANT
             childSection
-            medicationsSection
-            healthSection
-            notificationsSection
-            dataSection
-            aboutSection
+
+            // ── CONFIGURATION DU SUIVI (sous-page hiérarchique)
+            Section {
+                NavigationLink {
+                    ConfigurationSubView()
+                } label: {
+                    Label("Configuration du suivi", systemImage: "slider.horizontal.3")
+                }
+            } footer: {
+                Text("Plan médicamenteux, jeu du regard, notifications, Apple Santé.")
+            }
+
+            // ── DOCUMENTS MÉDICAUX
+            Section {
+                NavigationLink {
+                    MedicalReportView()
+                } label: {
+                    Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
+                }
+                NavigationLink {
+                    FollowUpBookletView()
+                } label: {
+                    Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
+                }
+            } header: {
+                Text("Documents médicaux")
+            }
+
+            // ── DONNÉES (sous-page hiérarchique)
+            Section {
+                NavigationLink {
+                    DataSubView()
+                } label: {
+                    Label("Données", systemImage: "internaldrive")
+                }
+            } footer: {
+                Text("Export CSV, données de démonstration, effacement.")
+            }
+
+            // ── PARTAGE ENTRE PARENTS
+            sharingSection
+
+            // ── LÉGAL & À PROPOS (sous-page hiérarchique)
+            Section {
+                NavigationLink {
+                    MedicalDisclaimerSubView()
+                } label: {
+                    Label("Avertissement médical", systemImage: "exclamationmark.shield.fill")
+                }
+                NavigationLink {
+                    AboutSubView()
+                } label: {
+                    Label("À propos", systemImage: "info.circle.fill")
+                }
+            } header: {
+                Text("Légal")
+            }
+
+            // ── COMPTE
             accountSection
         }
         .navigationTitle("Réglages")
@@ -48,6 +110,31 @@ struct SettingsView: View {
         } message: {
             Text("Cette action supprimera le profil, les crises, les médicaments et les prises. Irréversible.")
         }
+        .confirmationDialog("Générer des données de démonstration ?", isPresented: $showDemoConfirm) {
+            Button("Générer") { runGenerateDemo() }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Crée 3 mois de crises synthétiques + 2 médicaments de démo + 14 jours de prises. Vos données réelles ne sont pas modifiées.")
+        }
+        .confirmationDialog("Supprimer les données de démonstration ?", isPresented: $showPurgeDemoConfirm) {
+            Button("Supprimer", role: .destructive) { runPurgeDemo() }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Seules les entrées identifiées comme démo seront retirées. Vos données réelles sont conservées.")
+        }
+        .alert("Données de démonstration", isPresented: Binding(
+            get: { demoSummary != nil },
+            set: { if !$0 { demoSummary = nil } }
+        ), presenting: demoSummary) { _ in
+            Button("OK") { demoSummary = nil }
+        } message: { msg in
+            Text(msg)
+        }
+        .alert("Partage entre parents", isPresented: $showSharingSoon) {
+            Button("OK") { }
+        } message: {
+            Text("La synchronisation iCloud entre parents arrive dans une prochaine version. En attendant, vous pouvez exporter vos données en CSV (Réglages → Données → Exporter) et les transmettre par AirDrop, Messages ou e-mail.")
+        }
     }
 
     // MARK: - Sections
@@ -58,7 +145,7 @@ struct SettingsView: View {
                 Button { showChildEditor = true } label: {
                     HStack {
                         Image(systemName: "person.circle.fill")
-                            .foregroundStyle(.afsrPurple)
+                            .foregroundStyle(.afsrPurpleAdaptive)
                         VStack(alignment: .leading) {
                             Text(profile.firstName).font(AFSRFont.headline(17)).foregroundStyle(.primary)
                             if let age = profile.ageYears {
@@ -81,6 +168,7 @@ struct SettingsView: View {
         }
     }
 
+
     private var healthSection: some View {
         Section {
             HStack {
@@ -99,7 +187,7 @@ struct SettingsView: View {
         } header: {
             Text("Santé")
         } footer: {
-            Text("HealthKit enregistre les crises de votre enfant dans Apple Santé avec des métadonnées identifiant le prénom. Les médicaments sont stockés localement uniquement (limitation API HealthKit).")
+            Text("Toutes les données (crises, médicaments, prises) sont stockées localement sur l'appareil. L'API publique HealthKit n'expose pas encore de type pour les crises d'épilepsie — utilisez l'export CSV pour partager les données avec un professionnel de santé.")
         }
     }
 
@@ -136,18 +224,101 @@ struct SettingsView: View {
         }
     }
 
+    private var documentsSection: some View {
+        Section {
+            NavigationLink {
+                MedicalReportView()
+            } label: {
+                Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
+            }
+            NavigationLink {
+                FollowUpBookletView()
+            } label: {
+                Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
+            }
+        } header: {
+            Text("Documents médicaux")
+        } footer: {
+            Text("Le rapport médecin produit un PDF structuré (statistiques, corrélations, plan médicamenteux, calendrier en annexe). Le cahier de suivi est un PDF imprimable à confier à l'équipe encadrante.")
+        }
+    }
+
     private var dataSection: some View {
-        Section("Données") {
+        Section {
             Button {
                 exportAllCSV()
             } label: {
                 Label("Exporter toutes les données (CSV)", systemImage: "square.and.arrow.up")
             }
+            Button {
+                showDemoConfirm = true
+            } label: {
+                Label("Générer des données de démonstration", systemImage: "wand.and.stars")
+            }
+            Button(role: .destructive) {
+                showPurgeDemoConfirm = true
+            } label: {
+                Label("Supprimer les données de démonstration", systemImage: "wand.and.stars.inverse")
+            }
             Button(role: .destructive) {
                 showEraseConfirm = true
             } label: {
-                Label("Effacer les données de l'application", systemImage: "trash")
+                Label("Effacer toutes les données", systemImage: "trash")
             }
+        } header: {
+            Text("Données")
+        } footer: {
+            Text("Vos données restent sur cet appareil. L'export CSV sert à les transmettre vous-même à un professionnel de santé.")
+        }
+    }
+
+    private var sharingSection: some View {
+        Section {
+            NavigationLink {
+                ParentSharingView()
+            } label: {
+                Label("Partage entre parents", systemImage: "person.2.badge.plus.fill")
+            }
+        } header: {
+            Text("Partage")
+        } footer: {
+            Text("Synchronisez le suivi avec un second parent via iCloud (CloudKit Sharing).")
+        }
+    }
+
+    private var supportSection: some View {
+        Section {
+            Button {
+                openDonationPage()
+            } label: {
+                Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
+                    .foregroundStyle(.afsrEmergency)
+            }
+        } header: {
+            Text("Soutenir l'association")
+        } footer: {
+            Text("L'AFSR est une association loi 1901 reconnue d'intérêt général. Vos dons sont déductibles à 66 % de votre impôt sur le revenu (dans la limite de 20 % du revenu imposable).")
+        }
+    }
+
+    private var medicalDisclaimerSection: some View {
+        Section {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.afsrWarning)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("RettApp n'est pas un dispositif médical")
+                        .font(AFSRFont.headline(15))
+                    Text("Cette application est un outil de suivi destiné aux parents et aidants. Elle ne constitue pas un dispositif médical au sens du règlement européen 2017/745 (MDR) et ne remplace en aucun cas un avis, un diagnostic ou un traitement médical délivré par un professionnel de santé. En cas d'urgence, contactez le 15 ou le 112.")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Avertissement médical")
         }
     }
 
@@ -193,9 +364,9 @@ struct SettingsView: View {
     private var healthKitStatusLabel: String {
         switch healthKitStatus {
         case .notDetermined: return "Non demandé"
-        case .sharingDenied: return "Refusé"
-        case .sharingAuthorized: return "Autorisé"
-        @unknown default: return "Inconnu"
+        case .denied: return "Refusé"
+        case .authorized: return "Autorisé"
+        case .unavailable: return "Indisponible"
         }
     }
 
@@ -289,6 +460,27 @@ struct SettingsView: View {
         return needsQuotes ? "\"\(escaped)\"" : escaped
     }
 
+    private func runGenerateDemo() {
+        let result = DemoDataGenerator.generate(in: modelContext)
+        demoSummary = "\(result.seizuresCreated) crises · \(result.medicationsCreated) médicaments · \(result.logsCreated) prises générées."
+    }
+
+    private func runPurgeDemo() {
+        let count = DemoDataGenerator.purgeDemoData(in: modelContext)
+        demoSummary = "\(count) entrée(s) de démonstration supprimée(s)."
+    }
+
+    private func openDonationPage() {
+        // Apple App Store Review Guideline 3.2.1(vii) : les apps peuvent collecter des
+        // dons aux orgas reconnues via Apple Pay OU via Safari.
+        // V1 : on redirige vers la page de don de l'AFSR (Safari).
+        // V2 (futur) : intégrer Apple Pay directement (nécessite merchant ID configuré
+        //              côté AFSR + processeur de paiement type Stripe/Adyen).
+        if let url = URL(string: "https://afsr.fr/nous-soutenir/faire-un-don") {
+            UIApplication.shared.open(url)
+        }
+    }
+
     private func eraseAll() {
         for e in seizures { modelContext.delete(e) }
         for l in logs { modelContext.delete(l) }
@@ -310,8 +502,15 @@ struct ChildProfileEditor: View {
 
     var body: some View {
         Form {
-            Section("Prénom") {
+            Section {
                 TextField("Prénom", text: $profile.firstName)
+                    .textContentType(.givenName)
+                TextField("Nom de famille (optionnel)", text: $profile.lastName)
+                    .textContentType(.familyName)
+            } header: {
+                Text("Identité")
+            } footer: {
+                Text("Le nom de famille n'est utilisé que dans les documents imprimés (rapport médecin, cahier de suivi).")
             }
             Section {
                 Toggle("Date de naissance", isOn: $hasBirthDate)

@@ -10,6 +10,7 @@ struct SeizureTrackerView: View {
     @State private var pulse = false
     @State private var showHistory = false
     @State private var showQualification = false
+    @State private var showManualEntry = false
 
     private var profile: ChildProfile? { profiles.first }
     private var lastSeizure: SeizureEvent? { seizures.first }
@@ -26,7 +27,7 @@ struct SeizureTrackerView: View {
             }
             .padding(AFSRTokens.spacingLarge)
         }
-        .navigationTitle("Épilepsie")
+        .navigationTitle("Suivi épilepsie")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -40,6 +41,9 @@ struct SeizureTrackerView: View {
         }
         .sheet(isPresented: $showHistory) {
             NavigationStack { SeizureHistoryView() }
+        }
+        .sheet(isPresented: $showManualEntry) {
+            ManualSeizureEntrySheet()
         }
         .sheet(isPresented: $showQualification, onDismiss: {
             if case .qualifying = viewModel.phase {
@@ -97,6 +101,15 @@ struct SeizureTrackerView: View {
                 viewModel.start()
             }
             .accessibilityHint("Démarre un chronomètre pour enregistrer la durée d'une crise.")
+
+            Button {
+                showManualEntry = true
+            } label: {
+                Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
+                    .font(AFSRFont.body(15))
+            }
+            .buttonStyle(.bordered)
+            .tint(.afsrPurpleAdaptive)
 
             if let last = lastSeizure {
                 SectionCard(title: "Dernière crise", systemImage: "clock.arrow.circlepath") {
@@ -197,6 +210,7 @@ struct SeizureQualificationSheet: View {
     @State private var trigger: SeizureTrigger = .none
     @State private var triggerNotes: String = ""
     @State private var notes: String = ""
+    @State private var infoType: SeizureType?
 
     var body: some View {
         NavigationStack {
@@ -206,14 +220,19 @@ struct SeizureQualificationSheet: View {
                         .font(AFSRFont.headline())
                 }
 
-                Section("Type de crise") {
-                    Picker("Type", selection: $type) {
-                        ForEach(SeizureType.allCases) { t in
-                            Text(t.label).tag(t)
-                        }
+                Section {
+                    ForEach(SeizureType.allCases) { t in
+                        SeizureTypeRow(
+                            type: t,
+                            selected: type == t,
+                            onSelect: { type = t },
+                            onInfo: { infoType = t }
+                        )
                     }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
+                } header: {
+                    Text("Type de crise")
+                } footer: {
+                    Text("Touchez ⓘ pour une description en langage simple.")
                 }
 
                 Section("Déclencheur possible") {
@@ -248,7 +267,81 @@ struct SeizureQualificationSheet: View {
                     .bold()
                 }
             }
+            .sheet(item: $infoType) { t in
+                SeizureTypeInfoSheet(type: t)
+            }
         }
+    }
+}
+
+// MARK: - Type row + info sheet
+
+private struct SeizureTypeRow: View {
+    let type: SeizureType
+    let selected: Bool
+    let onSelect: () -> Void
+    let onInfo: () -> Void
+
+    var body: some View {
+        HStack {
+            Button(action: onSelect) {
+                HStack(spacing: 12) {
+                    Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(selected ? Color.afsrPurpleAdaptive : .secondary)
+                        .font(.system(size: 20))
+                    Text(type.label)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onInfo) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                    .font(.system(size: 20))
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Description : \(type.label)")
+        }
+    }
+}
+
+private struct SeizureTypeInfoSheet: View {
+    let type: SeizureType
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color(hex: type.color))
+                            .frame(width: 16, height: 16)
+                        Text(type.label)
+                            .font(AFSRFont.title(26))
+                    }
+                    Text(type.parentDescription)
+                        .font(AFSRFont.body())
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Cette description est volontairement simplifiée pour les parents. Elle ne remplace pas l'avis de votre neurologue.")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                }
+                .padding()
+            }
+            .navigationTitle("Type de crise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fermer") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

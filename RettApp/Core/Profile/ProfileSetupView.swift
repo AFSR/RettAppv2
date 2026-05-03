@@ -6,11 +6,13 @@ struct ProfileSetupView: View {
     @Environment(AuthManager.self) private var authManager
 
     @State private var firstName: String = ""
+    @State private var lastName: String = ""
     @State private var hasBirthDate: Bool = false
     @State private var birthDate: Date = Date()
     @State private var hasEpilepsy: Bool = false
     @State private var initialMedications: [DraftMedication] = []
     @State private var step: Step = .intro
+    @State private var disclaimerAcknowledged: Bool = false
 
     enum Step { case intro, child, epilepsy, medications, done }
 
@@ -53,32 +55,74 @@ struct ProfileSetupView: View {
     // MARK: - Steps
 
     private var introStep: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "person.2.circle.fill")
-                .resizable().scaledToFit()
-                .frame(width: 120, height: 120)
-                .foregroundStyle(.afsrPurple)
-            Text("Bienvenue")
-                .font(AFSRFont.title())
-            Text("Nous allons configurer le profil de votre enfant.\nCes informations restent sur votre appareil.")
-                .font(AFSRFont.body())
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 20) {
+                Image(systemName: "person.2.circle.fill")
+                    .resizable().scaledToFit()
+                    .frame(width: 100, height: 100)
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                    .padding(.top, 24)
+                Text("Bienvenue")
+                    .font(AFSRFont.title())
+                Text("Nous allons configurer le profil de votre enfant.\nCes informations restent sur votre appareil.")
+                    .font(AFSRFont.body())
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+
+                disclaimerCard
+
+                Toggle(isOn: $disclaimerAcknowledged) {
+                    Text("J'ai lu et compris cet avertissement.")
+                        .font(AFSRFont.body(15))
+                }
                 .padding(.horizontal)
-            Spacer()
-            AFSRPrimaryButton(title: "Commencer") { step = .child }
-                .padding(.horizontal)
+                .tint(.afsrPurpleAdaptive)
+
+                AFSRPrimaryButton(title: "Commencer") { step = .child }
+                    .padding(.horizontal)
+                    .disabled(!disclaimerAcknowledged)
+                    .opacity(disclaimerAcknowledged ? 1 : 0.5)
+                    .padding(.bottom, 24)
+            }
         }
-        .padding()
+    }
+
+    private var disclaimerCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .foregroundStyle(.afsrWarning)
+                Text("Avertissement médical")
+                    .font(AFSRFont.headline(16))
+            }
+            Text("RettApp est un outil de suivi destiné aux parents et aidants. **Ce n'est pas un dispositif médical** au sens du règlement UE 2017/745 (MDR). L'application ne diagnostique pas, ne traite pas et ne remplace pas l'avis d'un professionnel de santé.\n\nEn cas d'urgence, appelez le **15** (Samu) ou le **112**.")
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(Color.afsrWarning.opacity(0.12), in: RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius)
+                .stroke(Color.afsrWarning.opacity(0.4), lineWidth: 1)
+        )
+        .padding(.horizontal)
     }
 
     private var childStep: some View {
         Form {
-            Section("Prénom de l'enfant") {
+            Section {
                 TextField("Prénom", text: $firstName)
                     .textContentType(.givenName)
                     .autocorrectionDisabled()
+                TextField("Nom de famille (optionnel)", text: $lastName)
+                    .textContentType(.familyName)
+                    .autocorrectionDisabled()
+            } header: {
+                Text("Identité de l'enfant")
+            } footer: {
+                Text("Le nom de famille n'apparaît que dans les documents imprimés (rapport médecin, cahier de suivi). Il reste sur votre appareil.")
             }
             Section {
                 Toggle("Renseigner la date de naissance", isOn: $hasBirthDate)
@@ -135,7 +179,7 @@ struct ProfileSetupView: View {
                         }
                     } label: {
                         Label("Ajouter un médicament", systemImage: "plus.circle.fill")
-                            .foregroundStyle(.afsrPurple)
+                            .foregroundStyle(.afsrPurpleAdaptive)
                     }
                 } header: {
                     Text("Médicaments en cours")
@@ -180,6 +224,7 @@ struct ProfileSetupView: View {
 
         let profile = ChildProfile(
             firstName: firstName.trimmingCharacters(in: .whitespaces),
+            lastName: lastName.trimmingCharacters(in: .whitespaces),
             birthDate: hasBirthDate ? birthDate : nil,
             hasEpilepsy: hasEpilepsy,
             appleUserID: appleID
