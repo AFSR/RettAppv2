@@ -10,7 +10,7 @@ import os.log
 /// - Une zone CKRecordZone unique « FamilyData » contient tous les records partagés
 /// - Le parent **propriétaire** crée la zone dans sa privateCloudDatabase puis crée un
 ///   `CKShare` sur la zone. L'URL du share est envoyée au second parent (Messages, Mail).
-/// - Le parent **invité** accepte le share via `ARFaceViewController` (callback système),
+/// - Le parent **invité** accepte le share via `RettAppSceneDelegate` (callback système),
 ///   la zone apparaît dans sa sharedCloudDatabase, identique en lecture/écriture.
 /// - `replicateAll()` pousse tout SwiftData → CloudKit (utilisé au moment du partage initial)
 /// - `pullChanges()` ramène tout CloudKit → SwiftData (utilisé après acceptation et au refresh manuel)

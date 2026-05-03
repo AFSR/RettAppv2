@@ -27,8 +27,6 @@ struct ConfigurationSubView: View {
                 Text("Médicaments")
             }
 
-            EyeGameSettingsSection()
-
             Section {
                 Toggle(isOn: Binding(
                     get: { notificationsEnabled },
