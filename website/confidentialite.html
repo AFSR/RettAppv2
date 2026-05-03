@@ -174,6 +174,25 @@ En <strong>mode parent</strong>, RettApp <em>n'accède pas</em> à Apple Santé.
 RettApp ne collecte <strong>ni identifiants publicitaires</strong>, <strong>ni données de localisation</strong>, <strong>ni statistiques d'usage anonymisées</strong>. Aucun outil d'analytique tiers (Google Analytics, Firebase Analytics, etc.) n'est intégré.
 </p>
 
+<h3>2.4 Données faciales (TrueDepth, ARKit, Vision)</h3>
+<div class="callout">
+  <strong>RettApp ne collecte, ne stocke et ne transmet aucune donnée faciale.</strong>
+</div>
+<p>
+RettApp <strong>n'utilise pas l'API TrueDepth</strong> (caméra à profondeur de champ, reconnaissance faciale, ARFaceTracking). L'application ne demande pas de permission Face ID, ne lit aucun blendshape, ne traite aucune géométrie faciale, ne capture aucun maillage 3D du visage et n'effectue aucune reconnaissance faciale.
+</p>
+<p>
+La permission caméra (<code>NSCameraUsageDescription</code>) est demandée <strong>uniquement</strong> pour la fonctionnalité de scan du cahier de suivi papier (rempli par l'école ou le centre). Une photo est prise, traitée localement par <code>VNRecognizeTextRequest</code> (reconnaissance optique de caractères Apple Vision) pour extraire le texte de la page, puis présentée à l'utilisateur pour vérification. La photo et son texte OCR :
+</p>
+<ul>
+  <li>Restent <strong>uniquement sur l'iPhone</strong> de l'utilisateur,</li>
+  <li>Ne sont <strong>jamais transmis à un serveur AFSR ou tiers</strong>,</li>
+  <li>Sont <strong>supprimés à la fermeture du sheet d'import</strong> sauf si l'utilisateur a confirmé la création d'une fiche journalière (auquel cas seules les données structurées extraites — repas, hydratation, sommeil — sont enregistrées dans la base SwiftData locale, pas la photo).</li>
+</ul>
+<p>
+Le précédent module « Jeu du regard » qui utilisait <code>ARFaceTrackingConfiguration</code> a été <strong>retiré de RettApp</strong> et publié comme application séparée (<em>RettGame</em>) avec son propre identifiant App Store, son propre Info.plist et sa propre politique de confidentialité. RettApp et RettGame ne partagent ni code ni données.
+</p>
+
 <h2>3. Pourquoi traitons-nous ces données ?</h2>
 <table>
   <thead>
