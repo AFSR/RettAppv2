@@ -15,6 +15,7 @@ struct JournalView: View {
     @State private var showDatePicker = false
     @State private var showMoodSheet = false
     @State private var showObservationSheet = false
+    @State private var showSymptomSheet = false
     @State private var showSeizureTracker = false
     @State private var showSeizureHistory = false
     @State private var showManualSeizureEntry = false
@@ -59,6 +60,9 @@ struct JournalView: View {
                     Button { showMoodSheet = true } label: {
                         Label("Saisir une humeur", systemImage: "face.smiling")
                     }
+                    Button { showSymptomSheet = true } label: {
+                        Label("Saisir un symptôme", systemImage: "stethoscope")
+                    }
                     Button { showObservationSheet = true } label: {
                         Label("Repas / sommeil du jour", systemImage: "fork.knife")
                     }
@@ -92,6 +96,7 @@ struct JournalView: View {
             NavigationStack { SeizureTrackerView() }
         }
         .sheet(isPresented: $showMoodSheet) { MoodSheet() }
+        .sheet(isPresented: $showSymptomSheet) { SymptomSheet() }
         .sheet(isPresented: $showObservationSheet) {
             DailyObservationSheet(dayStart: viewModel.selectedDate)
         }
@@ -191,6 +196,7 @@ private struct JournalContent: View {
     @Query private var moods: [MoodEntry]
     @Query private var observations: [DailyObservation]
     @Query private var seizures: [SeizureEvent]
+    @Query private var symptoms: [SymptomEvent]
 
     @State private var showMood = false
     @State private var showObservation = false
@@ -220,6 +226,10 @@ private struct JournalContent: View {
         self._seizures = Query(
             filter: #Predicate<SeizureEvent> { $0.startTime >= day && $0.startTime < nextDay },
             sort: \SeizureEvent.startTime
+        )
+        self._symptoms = Query(
+            filter: #Predicate<SymptomEvent> { $0.timestamp >= day && $0.timestamp < nextDay },
+            sort: \SymptomEvent.timestamp
         )
     }
 
@@ -259,12 +269,13 @@ private struct JournalContent: View {
         }
     }
 
-    /// Combine logs médicament, crises et humeurs en un feed chronologique unique.
+    /// Combine logs médicament, crises, humeurs et symptômes en un feed chronologique unique.
     private var combinedFeed: [JournalFeedItem] {
         var items: [JournalFeedItem] = []
         items.append(contentsOf: logs.map { JournalFeedItem.medication($0) })
         items.append(contentsOf: seizures.map { JournalFeedItem.seizure($0) })
         items.append(contentsOf: moods.map { JournalFeedItem.mood($0) })
+        items.append(contentsOf: symptoms.map { JournalFeedItem.symptom($0) })
         return items.sorted { $0.time < $1.time }
     }
 
@@ -401,12 +412,14 @@ private enum JournalFeedItem: Identifiable {
     case medication(MedicationLog)
     case seizure(SeizureEvent)
     case mood(MoodEntry)
+    case symptom(SymptomEvent)
 
     var id: String {
         switch self {
         case .medication(let l): return "med-\(l.id.uuidString)"
         case .seizure(let s): return "seiz-\(s.id.uuidString)"
         case .mood(let m): return "mood-\(m.id.uuidString)"
+        case .symptom(let s): return "symp-\(s.id.uuidString)"
         }
     }
     var time: Date {
@@ -414,6 +427,7 @@ private enum JournalFeedItem: Identifiable {
         case .medication(let l): return l.effectiveTime
         case .seizure(let s): return s.startTime
         case .mood(let m): return m.timestamp
+        case .symptom(let s): return s.timestamp
         }
     }
 }
@@ -434,7 +448,50 @@ private struct JournalFeedRow: View {
             SeizureRowCompact(event: s, onTap: onSeizureTap)
         case .mood(let m):
             MoodRowCompact(entry: m)
+        case .symptom(let s):
+            SymptomRowCompact(event: s)
         }
+    }
+}
+
+private struct SymptomRowCompact: View {
+    let event: SymptomEvent
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: event.symptomType.icon)
+                .font(.system(size: 22))
+                .foregroundStyle(.afsrPurpleAdaptive)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.symptomType.label)
+                    .font(AFSRFont.headline(15))
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(event.timestamp, format: .dateTime.hour().minute())
+                        .font(AFSRFont.caption())
+                    if event.intensityRaw > 0 {
+                        Text("· intensité \(event.intensityRaw)/5")
+                            .font(AFSRFont.caption())
+                    }
+                    if event.durationMinutes > 0 {
+                        Text("· \(event.durationMinutes) min")
+                            .font(AFSRFont.caption())
+                    }
+                }
+                .foregroundStyle(.secondary)
+                if !event.notes.isEmpty {
+                    Text(event.notes)
+                        .font(AFSRFont.caption())
+                        .italic()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
     }
 }
 
