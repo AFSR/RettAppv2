@@ -1,0 +1,17 @@
+{
+  "name": "rettapp-donations-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Stripe-backed Apple Pay donations endpoint for RettApp",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "stripe": "^15.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
