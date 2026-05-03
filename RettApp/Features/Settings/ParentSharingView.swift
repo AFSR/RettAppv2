@@ -20,6 +20,7 @@ struct ParentSharingView: View {
         Form {
             accountSection
             shareStatusSection
+            participantsSection
             actionsSection
             infoSection
         }
@@ -27,6 +28,9 @@ struct ParentSharingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await sync.refreshAccountStatus()
+            // Demande la permission de découvrir les autres participants par
+            // e-mail / nom Apple ID (best effort — l'iOS gère la feuille système).
+            await sync.requestParticipantsDiscoverability()
             await sync.refreshShareStatus()
         }
         .sheet(isPresented: $presentInviteCard) {
@@ -167,6 +171,33 @@ struct ParentSharingView: View {
         case .none: return "Créez une invitation pour synchroniser le suivi avec un autre parent."
         case .owner: return "Vous êtes le propriétaire des données partagées."
         case .participant: return "Les modifications sont visibles des deux côtés."
+        }
+    }
+
+    @ViewBuilder
+    private var participantsSection: some View {
+        if sync.role == .none {
+            EmptyView()
+        } else {
+            Section {
+                if sync.participants.isEmpty {
+                    HStack {
+                        Image(systemName: "hourglass")
+                            .foregroundStyle(.secondary)
+                        Text("Récupération de la liste des participants…")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    ForEach(sync.participants) { p in
+                        ParticipantRow(participant: p)
+                    }
+                }
+            } header: {
+                Text("Parents avec accès")
+            } footer: {
+                Text("Les e-mails sont communiqués par CloudKit selon les Réglages iCloud du parent. Si seul « Apple ID anonyme » s'affiche, demandez-lui d'activer Réglages iOS → [son nom] → Contacts → Permettre aux autres de me trouver par e-mail.")
+            }
         }
     }
 
@@ -347,6 +378,50 @@ private struct InvitationCardView: View {
                 }
             }
         }
+    }
+}
+
+private struct ParticipantRow: View {
+    let participant: ParticipantInfo
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: participant.isOwner ? "crown.fill" : "person.fill")
+                .foregroundStyle(participant.isOwner ? .afsrPurpleAdaptive : .secondary)
+                .frame(width: 24, height: 24)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(participant.bestLabel)
+                        .font(AFSRFont.body(15))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if participant.isCurrentUser {
+                        Text("(vous)")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let email = participant.email,
+                   !email.isEmpty,
+                   participant.displayName != nil {
+                    Text(email)
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                HStack(spacing: 6) {
+                    Text(participant.isOwner ? "Propriétaire" : participant.permissionLabel)
+                    Text("·")
+                    Text(participant.acceptanceLabel)
+                }
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 2)
     }
 }
 

@@ -106,9 +106,12 @@ struct ConfigurationSubView: View {
 
     private func sendTestNotification() async {
         let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
+        var settings = await center.notificationSettings()
+        if settings.authorizationStatus == .notDetermined {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            settings = await center.notificationSettings()
+        }
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
-            _ = try? await center.requestAuthorization(options: [.alert, .sound])
             return
         }
         let content = UNMutableNotificationContent()
@@ -118,7 +121,7 @@ struct ConfigurationSubView: View {
         let req = UNNotificationRequest(
             identifier: "afsr.test.\(UUID().uuidString)",
             content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
         )
         try? await center.add(req)
     }
