@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de privacidade — RettApp</title>
+<meta name="description" content="Política de privacidade da aplicação RettApp editada pela Association Française du Syndrome de Rett (AFSR). Em conformidade com o RGPD e o App Store Privacy Manifest.">
+<style>
+  :root {
+    --purple: #6B41A1;
+    --text: #1F1F1F;
+    --muted: #5A5A5A;
+    --bg: #FFFFFF;
+    --line: #E5E5E5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--text); background: var(--bg); line-height: 1.55;
+  }
+  header { background: var(--purple); color: #fff; padding: 24px 0; }
+  header .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+  header p { margin: 4px 0 0; opacity: 0.85; font-size: 14px; }
+  .langs { font-size: 13px; margin-top: 8px; }
+  .langs a { color: #fff; opacity: 0.7; text-decoration: none; margin-right: 12px; }
+  .langs a.active { opacity: 1; text-decoration: underline; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 24px 64px; }
+  h2 { font-size: 18px; margin: 32px 0 12px; color: var(--purple); }
+  h3 { font-size: 15px; margin: 20px 0 8px; color: var(--text); }
+  p, li { font-size: 15px; }
+  ul { padding-left: 20px; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+  a { color: var(--purple); }
+  footer { border-top: 1px solid var(--line); padding: 16px 24px; text-align: center; color: var(--muted); font-size: 12px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #F4EEFB; color: var(--text); font-weight: 600; }
+  .callout { background: #F4EEFB; border-left: 4px solid var(--purple); padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Política de privacidade</h1>
+    <p>RettApp — Association Française du Syndrome de Rett</p>
+    <p class="langs">
+      <a href="confidentialite.html">Français</a>
+      <a href="privacy-policy.html">English</a>
+      <a href="politica-de-privacidade.html" class="active">Português</a>
+    </p>
+  </div>
+</header>
+<main>
+
+<p class="meta">Última atualização: 3 de maio de 2026 — Versão 1.3</p>
+
+<div class="callout">
+  <strong>Em resumo.</strong> A RettApp guarda os seus dados <strong>localmente no seu iPhone</strong>. Se ativar a <em>partilha entre pais</em>, os seus dados passam pelo seu <strong>iCloud pessoal</strong> (Apple). A AFSR <strong>não opera nenhum servidor</strong> que recolha os seus dados. Nenhum dado é vendido, partilhado com terceiros comerciais ou utilizado para fins publicitários.
+</div>
+
+<h2>1. Quem é o responsável pelo tratamento?</h2>
+<p>
+O responsável pelo tratamento na aceção do Regulamento (UE) 2016/679 (RGPD) é:
+</p>
+<ul>
+  <li><strong>Association Française du Syndrome de Rett (AFSR)</strong></li>
+  <li>Sede: a completar pela AFSR</li>
+  <li>Correio eletrónico: <a href="mailto:contact@afsr.fr">contact@afsr.fr</a></li>
+</ul>
+
+<h2>2. Que dados tratamos?</h2>
+<p>
+A RettApp trata apenas os dados estritamente necessários ao acompanhamento médico informal de uma criança com síndrome de Rett, introduzidos voluntariamente pelo pai, mãe ou cuidador.
+</p>
+
+<h3>2.1 Dados introduzidos na aplicação</h3>
+<table>
+  <thead>
+    <tr><th>Categoria</th><th>Detalhe</th><th>Local de armazenamento</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Perfil da criança</td><td>Nome próprio, apelido (opcional), data de nascimento, indicador de epilepsia.</td><td>Local (SwiftData)</td></tr>
+    <tr><td>Crises de epilepsia</td><td>Data, hora, duração, tipo, fator desencadeante, notas.</td><td>Local + iCloud (se houver partilha)</td></tr>
+    <tr><td>Medicamentos</td><td>Nome do tratamento, dose, horários, tomas efetivas, motivos das tomas pontuais.</td><td>Local + iCloud (se houver partilha)</td></tr>
+    <tr><td>Humor, refeições, sono</td><td>Notas qualitativas, durações de sono / sesta, hidratação.</td><td>Local + iCloud (se houver partilha)</td></tr>
+    <tr><td>Sintomas Rett observados</td><td>Tipo, intensidade, duração, data.</td><td>Local + iCloud (se houver partilha)</td></tr>
+    <tr><td>Identificadores Apple</td><td>Identificador Iniciar sessão com a Apple (token opaco) para a autenticação de sessão.</td><td>Porta-chaves do iOS</td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 Dados lidos na app Saúde da Apple (HealthKit)</h3>
+<p>
+Quando a aplicação está configurada no <strong>modo criança</strong> (definição local explícita), a RettApp pode ler na app Saúde os tipos que o utilizador ativa de forma explícita:
+</p>
+<ul>
+  <li>Hidratação (volume de água ingerida),</li>
+  <li>Refeições (energia alimentar consumida, número de refeições),</li>
+  <li>Sono noturno e sestas (sessões registadas na Saúde),</li>
+  <li>Ritmo cardíaco (médio e em repouso),</li>
+  <li>Atividade (passos, energia ativa gasta).</li>
+</ul>
+<p>
+Por predefinição, nenhum dado da app Saúde é lido. Os dados lidos pela RettApp são agregados para apresentação no ecrã e para inclusão no relatório PDF para o médico, e permanecem armazenados na app Saúde da Apple no aparelho do utilizador.
+</p>
+<p>
+No <strong>modo pai/mãe</strong>, a RettApp <em>não</em> acede à app Saúde.
+</p>
+
+<h3>2.3 Dados técnicos</h3>
+<p>
+A RettApp não recolhe <strong>nenhum identificador publicitário</strong>, <strong>nenhum dado de localização</strong> nem <strong>estatísticas de utilização anonimizadas</strong>. Não está integrada nenhuma ferramenta de análise de terceiros (Google Analytics, Firebase Analytics, etc.).
+</p>
+
+<h3>2.4 Dados faciais (TrueDepth, ARKit, Vision)</h3>
+<div class="callout">
+  <strong>A RettApp não recolhe, não armazena nem transmite quaisquer dados faciais.</strong>
+</div>
+<p>
+A RettApp <strong>não utiliza a API TrueDepth</strong> (câmara com profundidade, reconhecimento facial, ARFaceTracking). A aplicação não pede permissão Face ID, não lê qualquer blendshape, não trata qualquer geometria facial, não captura qualquer malha 3D do rosto e não efetua qualquer reconhecimento facial.
+</p>
+<p>
+A permissão de câmara (<code>NSCameraUsageDescription</code>) é solicitada <strong>apenas</strong> para a funcionalidade de digitalização do caderno de acompanhamento em papel (preenchido pela escola ou centro). É tirada uma fotografia, processada localmente por <code>VNRecognizeTextRequest</code> (OCR Apple Vision) para extrair o texto da página, e em seguida apresentada ao utilizador para verificação. A fotografia e o respetivo texto OCR:
+</p>
+<ul>
+  <li>Permanecem <strong>apenas no iPhone do utilizador</strong>,</li>
+  <li><strong>Nunca são transmitidos a um servidor da AFSR ou a terceiros</strong>,</li>
+  <li>São <strong>descartados ao fechar a folha de importação</strong>, exceto os campos estruturados (refeição, hidratação, sono) que o utilizador confirma — esses são guardados na base SwiftData local (a fotografia, não).</li>
+</ul>
+<p>
+O anterior módulo «Jogo do olhar» que utilizava <code>ARFaceTrackingConfiguration</code> foi <strong>removido da RettApp</strong> e publicado como aplicação separada (<em>RettGame</em>), com o seu próprio identificador na App Store, o seu próprio <code>Info.plist</code> e a sua própria política de privacidade. A RettApp e a RettGame não partilham código nem dados.
+</p>
+
+<h2>3. Por que tratamos estes dados?</h2>
+<table>
+  <thead><tr><th>Finalidade</th><th>Base legal (RGPD)</th></tr></thead>
+  <tbody>
+    <tr><td>Acompanhamento médico informal por pais e cuidadores</td><td>Consentimento (artigo 6.º, n.º 1, alínea a)) e interesse vital do titular dos dados (artigo 9.º, n.º 2, alínea c))</td></tr>
+    <tr><td>Geração de relatórios PDF para o médico</td><td>Consentimento do utilizador</td></tr>
+    <tr><td>Partilha entre pais via iCloud</td><td>Consentimento explícito (interruptor dedicado)</td></tr>
+    <tr><td>Autenticação (Iniciar sessão com a Apple)</td><td>Execução de uma medida pré-contratual a pedido do utilizador</td></tr>
+    <tr><td>Donativo à AFSR via Apple Pay</td><td>Consentimento e interesse legítimo (recolha de fundos por uma associação de utilidade pública)</td></tr>
+  </tbody>
+</table>
+
+<h2>4. Com quem partilhamos estes dados?</h2>
+<p>
+<strong>Nenhum servidor operado pela AFSR recebe os seus dados.</strong> Os únicos terceiros suscetíveis de aceder a dados técnicos relacionados com a sua utilização da RettApp são:
+</p>
+<ul>
+  <li><strong>Apple Inc.</strong> (One Apple Park Way, Cupertino, CA 95014, EUA) — para o alojamento iCloud (CloudKit), Apple Pay e a distribuição na App Store. A Apple atua como subcontratante ou responsável pelo tratamento, consoante o serviço. Consulte <a href="https://www.apple.com/pt/legal/privacy/">a política de privacidade da Apple</a>.</li>
+  <li><strong>O ou os outros pais</strong> a quem concedeu acesso explicitamente através da funcionalidade de partilha por AirDrop. A partilha é revogável a qualquer momento nas Definições da aplicação.</li>
+  <li><strong>O médico destinatário</strong> do relatório PDF que decidir enviar pessoalmente, fora da aplicação.</li>
+</ul>
+
+<h2>5. Durante quanto tempo conservamos os seus dados?</h2>
+<p>
+Os dados são conservados <strong>enquanto a aplicação estiver instalada</strong>. A qualquer momento pode:
+</p>
+<ul>
+  <li>Apagar todos os dados em Definições → Dados → Apagar todos os dados.</li>
+  <li>Desinstalar a RettApp: o iOS apaga então a base local e revoga o acesso iCloud.</li>
+  <li>Desativar a partilha entre pais: a zona iCloud partilhada é então eliminada.</li>
+</ul>
+<p>
+O histórico de donativos guardado localmente é apagado ao mesmo tempo que os outros dados. A AFSR não conserva qualquer registo do lado do servidor.
+</p>
+
+<h2>6. Segurança</h2>
+<p>
+Os dados são protegidos pelos mecanismos nativos do iOS e do iCloud:
+</p>
+<ul>
+  <li>Cifragem em repouso no iPhone (Data Protection do iOS).</li>
+  <li>Cifragem em trânsito (TLS) entre o iPhone e o iCloud.</li>
+  <li>Cifragem em repouso do lado do iCloud da Apple.</li>
+  <li>Autenticação Apple ID + 2FA gerida pela Apple.</li>
+  <li>A partilha entre pais ocorre exclusivamente por AirDrop (em presença física dos dois iPhones), para impedir qualquer interceção da ligação de convite.</li>
+  <li>O donativo por Apple Pay assenta na conformidade com a PSD2 (3-D Secure / Autenticação Forte do Cliente); <strong>nenhuma informação bancária passa pela RettApp</strong>.</li>
+</ul>
+
+<h2>7. Os seus direitos</h2>
+<p>
+Em conformidade com o RGPD, dispõe sobre os seus dados pessoais dos seguintes direitos:
+</p>
+<ul>
+  <li><strong>Acesso</strong> e <strong>portabilidade</strong>: exporte os seus dados em Definições → Dados → Exportar em CSV.</li>
+  <li><strong>Retificação</strong> e <strong>apagamento</strong>: edite ou apague cada entrada diretamente a partir do diário e das subpáginas dedicadas.</li>
+  <li><strong>Limitação</strong> e <strong>oposição</strong>: desative as funcionalidades em causa (Saúde, partilha entre pais, notificações) nas Definições do iOS ou da RettApp.</li>
+  <li><strong>Retirada do consentimento</strong>: a qualquer momento, sem efeito retroativo nos tratamentos já realizados.</li>
+  <li>Direito de apresentar uma <strong>reclamação à autoridade de controlo francesa CNIL</strong> (<a href="https://www.cnil.fr/fr/plaintes">www.cnil.fr</a>) ou à autoridade de controlo do seu país (em Portugal, a CNPD: <a href="https://www.cnpd.pt">www.cnpd.pt</a>).</li>
+</ul>
+<p>
+Para exercer estes direitos sobre os dados detidos pela AFSR (por exemplo, o seu identificador Iniciar sessão com a Apple, caso nos tenha contactado), escreva para <a href="mailto:contact@afsr.fr">contact@afsr.fr</a>. Para os dados armazenados no seu aparelho ou no seu iCloud, mantém o controlo total sem intermediário.
+</p>
+
+<h2>8. Menores</h2>
+<p>
+A RettApp foi concebida para o acompanhamento por <strong>pais e cuidadores adultos</strong> de uma criança com síndrome de Rett. A aplicação não se destina a ser utilizada diretamente por menores sem a supervisão de um pai ou tutor legal. Não é efetuada qualquer publicidade ou definição de perfis dirigida a menores.
+</p>
+
+<h2>9. Cookies e rastreadores</h2>
+<p>
+A aplicação RettApp <strong>não utiliza qualquer cookie nem rastreador</strong>. O presente sítio Web não coloca qualquer cookie de rastreamento; apenas podem ser utilizados cookies técnicos estritamente necessários à apresentação das páginas.
+</p>
+
+<h2>10. Transferências fora da União Europeia</h2>
+<p>
+Os dados armazenados no iCloud podem transitar por servidores da Apple situados nos Estados Unidos, ao abrigo do regime do <strong>Data Privacy Framework</strong> (decisão de adequação da Comissão Europeia de 10 de julho de 2023). A Apple compromete-se a aplicar as Cláusulas Contratuais-Tipo (CCT) para qualquer transferência fora da UE não abrangida por essa decisão.
+</p>
+
+<h2>11. Alterações</h2>
+<p>
+A presente política pode ser atualizada para refletir a evolução da aplicação ou da regulamentação aplicável. Qualquer alteração substancial será assinalada na aplicação e a data de «última atualização» acima será atualizada.
+</p>
+
+<h2>12. Contacto</h2>
+<p>
+Para qualquer questão relativa aos seus dados ou à presente política, escreva para <a href="mailto:contact@afsr.fr">contact@afsr.fr</a>.
+</p>
+
+<hr>
+<p>Ver também: <a href="avisos-legais.html">Avisos legais</a>.</p>
+
+</main>
+<footer>
+  © Association Française du Syndrome de Rett — RettApp
+</footer>
+</body>
+</html>
