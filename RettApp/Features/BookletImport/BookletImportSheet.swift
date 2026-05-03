@@ -2,34 +2,39 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// Workflow rapide pour importer une journée du cahier de suivi papier dans
-/// l'app — alternative à la ressaisie manuelle dans le Journal.
+/// Workflow d'import d'une journée du cahier de suivi papier.
 ///
 /// Étapes :
-///   1. L'utilisateur prend une photo de la page (VNDocumentCameraViewController)
-///   2. OCR avec Vision (`BookletOCR`)
-///   3. Parsing heuristique (`BookletParser`) pour pré-remplir un formulaire
-///   4. L'utilisateur vérifie / complète et valide
-///   5. Création ou mise à jour de la `DailyObservation` du jour ciblé
+///   1. Présentation : explication + bouton « Prendre une photo »
+///   2. Scan : VNDocumentCameraViewController présenté en plein écran
+///      (`.fullScreenCover`) — c'est la seule présentation correcte pour ce VC.
+///      Une présentation embarquée inline ne déclenchait pas la session caméra
+///      ⇒ « rien ne se passe » côté utilisateur (V1).
+///   3. OCR : feedback de progression page par page (« Lecture de la page 1/2… »)
+///   4. Review : formulaire pré-rempli côte à côte avec la photo pour
+///      vérification visuelle. Le parser s'aligne sur les codes du nouveau
+///      cahier (R/P/M/B/T pour les repas, 0/1/2-3/4+ pour les crises, etc.).
+///   5. Save : crée ou met à jour la `DailyObservation` du jour ciblé.
 struct BookletImportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [ChildProfile]
     @Query private var observations: [DailyObservation]
 
-    @State private var step: Step = .start
+    enum Phase {
+        case intro
+        case ocr           // OCR en cours — affiche un loader avec progression
+        case review        // formulaire à valider
+    }
+
+    @State private var phase: Phase = .intro
+    @State private var showScanner = false
+    @State private var ocrProgress: String = ""
     @State private var scanError: String?
+    @State private var scannedImages: [UIImage] = []
     @State private var ocrText: String = ""
-    @State private var processing = false
     @State private var extracted = BookletParser.Extracted()
     @State private var dayDate: Date = Calendar.current.startOfDay(for: Date())
-
-    enum Step {
-        case start          // accueil + bouton scanner
-        case scanning       // VNDocumentCameraVC affichée
-        case processing     // OCR en cours
-        case review         // formulaire pré-rempli à valider
-    }
 
     var body: some View {
         NavigationStack {
@@ -40,12 +45,20 @@ struct BookletImportSheet: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Annuler") { dismiss() }
                     }
-                    if step == .review {
+                    if phase == .review {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Enregistrer") { saveAndDismiss() }.bold()
                         }
                     }
                 }
+        }
+        // VNDocumentCameraVC en plein écran : c'est la seule présentation correcte.
+        .fullScreenCover(isPresented: $showScanner) {
+            BookletScannerView { result in
+                showScanner = false
+                handleScanResult(result)
+            }
+            .ignoresSafeArea()
         }
         .alert("Scan impossible", isPresented: Binding(
             get: { scanError != nil },
@@ -59,17 +72,16 @@ struct BookletImportSheet: View {
 
     @ViewBuilder
     private var content: some View {
-        switch step {
-        case .start:           startView
-        case .scanning:        scannerSheet
-        case .processing:      processingView
-        case .review:          reviewForm
+        switch phase {
+        case .intro:   introView
+        case .ocr:     ocrLoadingView
+        case .review:  reviewForm
         }
     }
 
-    // MARK: - Steps
+    // MARK: - Intro
 
-    private var startView: some View {
+    private var introView: some View {
         ScrollView {
             VStack(spacing: 16) {
                 Image(systemName: "doc.text.viewfinder")
@@ -78,7 +90,7 @@ struct BookletImportSheet: View {
                     .padding(.top, 24)
                 Text("Scanner une page du cahier")
                     .font(AFSRFont.title(20))
-                Text("Prenez une photo de la page papier remplie par l'école ou le centre. RettApp lira automatiquement les repas, le sommeil, l'hydratation et les remarques pour pré-remplir le journal du jour.")
+                Text("Prenez une photo de la page papier remplie par l'école ou le centre. RettApp détectera la date, les repas, le sommeil, l'hydratation et les remarques pour pré-remplir le journal du jour.")
                     .font(AFSRFont.body(14))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -86,7 +98,7 @@ struct BookletImportSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Button {
-                    step = .scanning
+                    showScanner = true
                 } label: {
                     Label("Prendre une photo", systemImage: "camera.fill")
                         .font(AFSRFont.headline(15))
@@ -98,47 +110,79 @@ struct BookletImportSheet: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
 
-                Text("Astuce : posez la page à plat sur une surface bien éclairée. L'iPhone ajuste les bords automatiquement.")
-                    .font(AFSRFont.caption())
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-                    .padding(.top, 4)
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Posez la page à plat sur une surface bien éclairée.", systemImage: "lightbulb")
+                    Label("L'iPhone détecte les bords automatiquement.", systemImage: "rectangle.dashed")
+                    Label("Comme le cahier utilise des cases à cocher, la lecture sera approximative — vérifiez le formulaire avant d'enregistrer.", systemImage: "checkmark.circle")
+                }
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 32)
+                .padding(.top, 4)
 
                 Spacer()
             }
         }
     }
 
-    private var scannerSheet: some View {
-        BookletScannerView { result in
-            switch result {
-            case .success(let images):
-                step = .processing
-                Task { await runOCR(images: images) }
-            case .cancelled:
-                step = .start
-            case .failed(let err):
-                scanError = err.localizedDescription
-                step = .start
-            }
-        }
-        .ignoresSafeArea()
-    }
+    // MARK: - OCR loading
 
-    private var processingView: some View {
-        VStack(spacing: 16) {
+    private var ocrLoadingView: some View {
+        VStack(spacing: 20) {
             ProgressView()
                 .controlSize(.large)
-            Text("Lecture de la page…")
+            Text(ocrProgress.isEmpty ? "Analyse en cours…" : ocrProgress)
                 .font(AFSRFont.body(15))
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal)
+            // Aperçu des miniatures déjà capturées pour rassurer l'utilisateur
+            // que la prise de photo a bien été enregistrée.
+            if !scannedImages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(scannedImages.enumerated()), id: \.offset) { _, img in
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 70, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.3)))
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .frame(height: 110)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Review form
+
     private var reviewForm: some View {
         Form {
+            // Aperçu de la page scannée pour comparer pendant la saisie.
+            if !scannedImages.isEmpty {
+                Section("Page scannée (référence)") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Array(scannedImages.enumerated()), id: \.offset) { _, img in
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxHeight: 220)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
+                            }
+                        }
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .padding(.vertical, 8)
+                }
+            }
+
             Section {
                 DatePicker("Date du jour", selection: $dayDate, displayedComponents: .date)
             } header: {
@@ -148,58 +192,55 @@ struct BookletImportSheet: View {
             }
 
             Section("Repas") {
-                ratingRow("Petit-déjeuner", $extracted.breakfastRating, notes: $extracted.breakfastNotes)
-                ratingRow("Déjeuner", $extracted.lunchRating, notes: $extracted.lunchNotes)
-                ratingRow("Goûter", $extracted.snackRating, notes: $extracted.snackNotes)
-                ratingRow("Dîner", $extracted.dinnerRating, notes: $extracted.dinnerNotes)
+                ratingRow("Petit-déjeuner", $extracted.breakfastRating)
+                ratingRow("Déjeuner", $extracted.lunchRating)
+                ratingRow("Goûter", $extracted.snackRating)
+                ratingRow("Dîner", $extracted.dinnerRating)
             }
 
             Section("Hydratation") {
-                ratingRow("Hydratation", $extracted.hydrationRating, notes: $extracted.hydrationNotes)
+                ratingRow("Hydratation", $extracted.hydrationRating)
             }
 
             Section("Sommeil") {
-                ratingRow("Nuit (qualité)", $extracted.nightSleepRating, notes: $extracted.nightSleepNotes)
+                ratingRow("Nuit (qualité)", $extracted.nightSleepRating)
                 durationRow("Durée nuit", minutes: $extracted.nightSleepDurationMinutes)
                 durationRow("Durée sieste", minutes: $extracted.napDurationMinutes)
-                if !extracted.napNotes.isEmpty {
-                    TextField("Notes sieste", text: $extracted.napNotes, axis: .vertical)
-                        .lineLimit(1...3)
-                }
             }
 
-            Section("Remarques") {
-                TextField("Notes générales", text: $extracted.generalNotes, axis: .vertical)
-                    .lineLimit(2...8)
+            Section("Notes générales (optionnel)") {
+                TextField("Tout ajout libre que vous souhaitez consigner", text: $extracted.generalNotes, axis: .vertical)
+                    .lineLimit(1...4)
             }
 
             if !ocrText.isEmpty {
-                Section("Texte OCR brut (pour vérification)") {
-                    Text(ocrText)
-                        .font(.system(.footnote, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                Section {
+                    DisclosureGroup("Texte OCR brut (vérification)") {
+                        Text(ocrText)
+                            .font(.system(.footnote, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func ratingRow(_ label: String, _ value: Binding<Int>, notes: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(label).font(AFSRFont.body(14))
-                Spacer()
-                Stepper(value: value, in: 0...5) {
-                    Text(value.wrappedValue == 0 ? "—" : "\(value.wrappedValue)/5")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-                .frame(width: 140)
+    private func ratingRow(_ label: String, _ value: Binding<Int>) -> some View {
+        HStack {
+            Text(label).font(AFSRFont.body(14))
+            Spacer()
+            Picker("", selection: value) {
+                Text("—").tag(0)
+                Text("R").tag(1)
+                Text("P").tag(2)
+                Text("M").tag(3)
+                Text("B").tag(4)
+                Text("T").tag(5)
             }
-            TextField("Notes (optionnel)", text: notes, axis: .vertical)
-                .font(AFSRFont.caption())
-                .lineLimit(1...3)
+            .pickerStyle(.segmented)
+            .frame(width: 200)
         }
     }
 
@@ -217,20 +258,42 @@ struct BookletImportSheet: View {
         }
     }
 
-    // MARK: - Pipeline
+    // MARK: - Scan result
 
+    private func handleScanResult(_ result: BookletScannerView.Result) {
+        switch result {
+        case .success(let images):
+            scannedImages = images
+            phase = .ocr
+            ocrProgress = "Préparation…"
+            Task { await runOCR(images: images) }
+        case .cancelled:
+            // L'utilisateur a fermé le scanner sans prendre de photo — on
+            // reste sur l'intro pour qu'il puisse réessayer.
+            phase = .intro
+        case .failed(let err):
+            scanError = err.localizedDescription
+            phase = .intro
+        }
+    }
+
+    // MARK: - OCR pipeline
+
+    @MainActor
     private func runOCR(images: [UIImage]) async {
         var combined: [String] = []
-        for image in images {
+        for (idx, image) in images.enumerated() {
+            ocrProgress = "Lecture de la page \(idx + 1)/\(images.count)…"
             do {
                 let txt = try await BookletOCR.recognizeText(from: image)
                 if !txt.isEmpty { combined.append(txt) }
             } catch {
                 scanError = "L'OCR a échoué : \(error.localizedDescription)"
-                step = .start
+                phase = .intro
                 return
             }
         }
+        ocrProgress = "Analyse du contenu…"
         let allText = combined.joined(separator: "\n\n")
         ocrText = allText
         let parsed = BookletParser.parse(allText)
@@ -238,7 +301,7 @@ struct BookletImportSheet: View {
         if let parsedDate = parsed.dayDate {
             dayDate = parsedDate
         }
-        step = .review
+        phase = .review
     }
 
     private func saveAndDismiss() {
@@ -255,22 +318,14 @@ struct BookletImportSheet: View {
             modelContext.insert(target)
         }
 
-        // On n'écrase une valeur existante que si on a quelque chose de neuf.
         if extracted.breakfastRating > 0 { target.breakfastRatingRaw = extracted.breakfastRating }
-        if !extracted.breakfastNotes.isEmpty { target.breakfastNotes = extracted.breakfastNotes }
         if extracted.lunchRating > 0 { target.lunchRatingRaw = extracted.lunchRating }
-        if !extracted.lunchNotes.isEmpty { target.lunchNotes = extracted.lunchNotes }
         if extracted.snackRating > 0 { target.snackRatingRaw = extracted.snackRating }
-        if !extracted.snackNotes.isEmpty { target.snackNotes = extracted.snackNotes }
         if extracted.dinnerRating > 0 { target.dinnerRatingRaw = extracted.dinnerRating }
-        if !extracted.dinnerNotes.isEmpty { target.dinnerNotes = extracted.dinnerNotes }
         if extracted.hydrationRating > 0 { target.hydrationRatingRaw = extracted.hydrationRating }
-        if !extracted.hydrationNotes.isEmpty { target.hydrationNotes = extracted.hydrationNotes }
         if extracted.nightSleepRating > 0 { target.nightSleepRatingRaw = extracted.nightSleepRating }
         if extracted.nightSleepDurationMinutes > 0 { target.nightSleepDurationMinutes = extracted.nightSleepDurationMinutes }
-        if !extracted.nightSleepNotes.isEmpty { target.nightSleepNotes = extracted.nightSleepNotes }
         if extracted.napDurationMinutes > 0 { target.napDurationMinutes = extracted.napDurationMinutes }
-        if !extracted.napNotes.isEmpty { target.napNotes = extracted.napNotes }
         if !extracted.generalNotes.isEmpty {
             if !target.generalNotes.isEmpty { target.generalNotes += "\n" }
             target.generalNotes += extracted.generalNotes
