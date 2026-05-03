@@ -38,25 +38,21 @@ final class HealthKitManager {
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
-    /// Types qu'on souhaite lire pour le suivi parental. La permission par type
-    /// est gérée par l'OS (Réglages → Confidentialité → Santé).
+    /// Tous les types qu'on est susceptible de lire (cumul des modes parent + enfant).
+    /// On demande l'autorisation pour l'union — l'utilisateur peut décocher
+    /// chaque type individuellement dans la feuille système.
     private var readTypes: Set<HKObjectType> {
         var types: Set<HKObjectType> = []
-        if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
-            types.insert(sleep)
-        }
-        if let hr = HKObjectType.quantityType(forIdentifier: .heartRate) {
-            types.insert(hr)
-        }
-        if let restingHr = HKObjectType.quantityType(forIdentifier: .restingHeartRate) {
-            types.insert(restingHr)
-        }
-        if let steps = HKObjectType.quantityType(forIdentifier: .stepCount) {
-            types.insert(steps)
-        }
-        if let energy = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) {
-            types.insert(energy)
-        }
+        if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) { types.insert(sleep) }
+        if let hr = HKObjectType.quantityType(forIdentifier: .heartRate) { types.insert(hr) }
+        if let restingHr = HKObjectType.quantityType(forIdentifier: .restingHeartRate) { types.insert(restingHr) }
+        if let steps = HKObjectType.quantityType(forIdentifier: .stepCount) { types.insert(steps) }
+        if let energy = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) { types.insert(energy) }
+        if let water = HKObjectType.quantityType(forIdentifier: .dietaryWater) { types.insert(water) }
+        if let kcalIn = HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed) { types.insert(kcalIn) }
+        if let carbs = HKObjectType.quantityType(forIdentifier: .dietaryCarbohydrates) { types.insert(carbs) }
+        if let protein = HKObjectType.quantityType(forIdentifier: .dietaryProtein) { types.insert(protein) }
+        if let fat = HKObjectType.quantityType(forIdentifier: .dietaryFatTotal) { types.insert(fat) }
         return types
     }
 
@@ -93,7 +89,12 @@ final class HealthKitManager {
 
     /// Agrège les données de santé par jour sur la période demandée. Utilise les
     /// API statistique pour le rythme cardiaque et de discrete sample pour le sommeil.
-    func dailyAggregates(start: Date, end: Date) async throws -> [DailyHealthAggregate] {
+    /// `selection` permet d'opter explicitement pour les types à lire — utile
+    /// notamment sur l'iPhone de l'enfant pour ne tirer que ce qui est utile.
+    func dailyAggregates(
+        start: Date, end: Date,
+        selection: ChildHealthSelection = .defaults
+    ) async throws -> [DailyHealthAggregate] {
         guard isAvailable else { throw HealthKitError.unavailable }
         let cal = Calendar.current
         let dayStarts: [Date] = {
@@ -107,33 +108,70 @@ final class HealthKitManager {
             return result
         }()
 
-        async let sleep = sleepMinutesPerDay(dayStarts: dayStarts, calendar: cal)
-        async let avgHr = averageHeartRatePerDay(dayStarts: dayStarts, calendar: cal)
-        async let restingHr = restingHeartRatePerDay(dayStarts: dayStarts, calendar: cal)
-        async let steps = totalStepsPerDay(dayStarts: dayStarts, calendar: cal)
-        async let energy = activeEnergyPerDay(dayStarts: dayStarts, calendar: cal)
+        // Sommeil de nuit + siestes : on lance toujours la requête sleepAnalysis
+        // si l'un des deux est demandé, et on partitionne ensuite.
+        async let sleepBuckets = (selection.nightSleep || selection.naps)
+            ? sleepMinutesPerDay(dayStarts: dayStarts, calendar: cal)
+            : ([Date: SleepDay]())
+        async let avgHr = selection.heartRate
+            ? averageHeartRatePerDay(dayStarts: dayStarts, calendar: cal)
+            : [Date: Double]()
+        async let restingHr = selection.heartRate
+            ? restingHeartRatePerDay(dayStarts: dayStarts, calendar: cal)
+            : [Date: Double]()
+        async let steps = selection.activity
+            ? totalStepsPerDay(dayStarts: dayStarts, calendar: cal)
+            : [Date: Double]()
+        async let energy = selection.activity
+            ? activeEnergyPerDay(dayStarts: dayStarts, calendar: cal)
+            : [Date: Double]()
+        async let water = selection.hydration
+            ? hydrationMlPerDay(dayStarts: dayStarts, calendar: cal)
+            : [Date: Double]()
+        async let mealKcal = selection.meals
+            ? dietaryEnergyPerDay(dayStarts: dayStarts, calendar: cal)
+            : [Date: Double]()
+        async let mealCount = selection.meals
+            ? mealCountPerDay(dayStarts: dayStarts, calendar: cal)
+            : [Date: Int]()
 
-        let sleepResult = try await sleep
+        let sleepResult = try await sleepBuckets
         let hrResult = try await avgHr
         let restingResult = try await restingHr
         let stepsResult = try await steps
         let energyResult = try await energy
+        let waterResult = try await water
+        let mealKcalResult = try await mealKcal
+        let mealCountResult = try await mealCount
 
         return dayStarts.map { day in
-            DailyHealthAggregate(
+            let sleep = sleepResult[day]
+            return DailyHealthAggregate(
                 day: day,
-                sleepMinutes: sleepResult[day],
+                sleepMinutes: selection.nightSleep ? sleep?.nightMinutes : nil,
+                napMinutes: selection.naps ? sleep?.napMinutes : nil,
                 avgHeartRate: hrResult[day],
                 restingHeartRate: restingResult[day],
                 steps: stepsResult[day],
-                activeEnergyKcal: energyResult[day]
+                activeEnergyKcal: energyResult[day],
+                hydrationMl: waterResult[day],
+                mealKcal: mealKcalResult[day],
+                mealCount: mealCountResult[day]
             )
         }
     }
 
     // MARK: - Per-type queries
 
-    private func sleepMinutesPerDay(dayStarts: [Date], calendar: Calendar) async throws -> [Date: Int] {
+    /// Agrège séparément les minutes de sommeil de nuit et les siestes diurnes.
+    /// Convention : sieste = épisode de sommeil dont le `startDate` tombe entre
+    /// 7h et 19h (heure locale).
+    struct SleepDay: Equatable {
+        var nightMinutes: Int = 0
+        var napMinutes: Int = 0
+    }
+
+    private func sleepMinutesPerDay(dayStarts: [Date], calendar: Calendar) async throws -> [Date: SleepDay] {
         guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis),
               let first = dayStarts.first,
               let last = dayStarts.last else { return [:] }
@@ -141,10 +179,9 @@ final class HealthKitManager {
         let predicate = HKQuery.predicateForSamples(withStart: first, end: dayEnd, options: .strictStartDate)
         let samples = try await fetchSamples(of: type, predicate: predicate)
 
-        var result: [Date: Int] = [:]
+        var result: [Date: SleepDay] = [:]
         for sample in samples {
             guard let cat = sample as? HKCategorySample else { continue }
-            // On ne compte que les phases « endormi » (asleep* ou unspecified asleep).
             let value = cat.value
             let isAsleep = value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
                 || value == HKCategoryValueSleepAnalysis.asleepCore.rawValue
@@ -152,9 +189,52 @@ final class HealthKitManager {
                 || value == HKCategoryValueSleepAnalysis.asleepREM.rawValue
             guard isAsleep else { continue }
             let minutes = Int(cat.endDate.timeIntervalSince(cat.startDate) / 60)
-            // On rattache l'épisode au jour de son startDate.
             let dayKey = calendar.startOfDay(for: cat.startDate)
-            result[dayKey, default: 0] += minutes
+            let hour = calendar.component(.hour, from: cat.startDate)
+            let isNap = hour >= 7 && hour < 19
+            var entry = result[dayKey] ?? SleepDay()
+            if isNap { entry.napMinutes += minutes } else { entry.nightMinutes += minutes }
+            result[dayKey] = entry
+        }
+        return result
+    }
+
+    private func hydrationMlPerDay(dayStarts: [Date], calendar: Calendar) async throws -> [Date: Double] {
+        guard let type = HKObjectType.quantityType(forIdentifier: .dietaryWater) else { return [:] }
+        return try await statisticsCollection(
+            type: type,
+            unit: .literUnit(with: .milli),
+            options: .cumulativeSum,
+            dayStarts: dayStarts,
+            calendar: calendar,
+            extractor: { $0.sumQuantity() }
+        )
+    }
+
+    private func dietaryEnergyPerDay(dayStarts: [Date], calendar: Calendar) async throws -> [Date: Double] {
+        guard let type = HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed) else { return [:] }
+        return try await statisticsCollection(
+            type: type,
+            unit: .kilocalorie(),
+            options: .cumulativeSum,
+            dayStarts: dayStarts,
+            calendar: calendar,
+            extractor: { $0.sumQuantity() }
+        )
+    }
+
+    /// Heuristique simple : nombre de samples `dietaryEnergyConsumed` distincts dans la journée.
+    /// Apple Santé enregistre généralement un sample par repas, mais il y a des exceptions.
+    private func mealCountPerDay(dayStarts: [Date], calendar: Calendar) async throws -> [Date: Int] {
+        guard let type = HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed),
+              let first = dayStarts.first, let last = dayStarts.last else { return [:] }
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: last) ?? last
+        let predicate = HKQuery.predicateForSamples(withStart: first, end: dayEnd, options: .strictStartDate)
+        let samples = try await fetchSamples(of: type, predicate: predicate)
+        var result: [Date: Int] = [:]
+        for s in samples {
+            let key = calendar.startOfDay(for: s.startDate)
+            result[key, default: 0] += 1
         }
         return result
     }
@@ -268,14 +348,20 @@ final class HealthKitManager {
 struct DailyHealthAggregate: Identifiable {
     let id = UUID()
     let day: Date
-    let sleepMinutes: Int?
+    let sleepMinutes: Int?       // sommeil de nuit (épisodes hors plage diurne)
+    let napMinutes: Int?         // siestes (épisodes en journée)
     let avgHeartRate: Double?
     let restingHeartRate: Double?
     let steps: Double?
     let activeEnergyKcal: Double?
+    let hydrationMl: Double?     // total liquide ingéré (Apple Santé)
+    let mealKcal: Double?        // total kcal alimentaires consommées
+    let mealCount: Int?          // nombre de samples (≈ nb de repas)
 
     var hasAnyData: Bool {
-        sleepMinutes != nil || avgHeartRate != nil || restingHeartRate != nil
+        sleepMinutes != nil || napMinutes != nil
+            || avgHeartRate != nil || restingHeartRate != nil
             || steps != nil || activeEnergyKcal != nil
+            || hydrationMl != nil || mealKcal != nil || mealCount != nil
     }
 }

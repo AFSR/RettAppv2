@@ -28,6 +28,9 @@ struct SettingsView: View {
             // ── DON AFSR (en tête, priorité haute)
             supportSection
 
+            // ── RÔLE DE L'APPAREIL (Parent / Enfant)
+            deviceRoleSection
+
             // ── PROFIL ENFANT
             childSection
 
@@ -149,6 +152,24 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    private var deviceRoleSection: some View {
+        @Bindable var roleStore = DeviceRoleStore.shared
+        return Section {
+            Picker(selection: $roleStore.role) {
+                ForEach(DeviceRole.allCases) { r in
+                    Label(r.label, systemImage: r.systemImage).tag(r)
+                }
+            } label: {
+                Label("Cet iPhone est utilisé par", systemImage: "iphone")
+            }
+            .pickerStyle(.menu)
+        } header: {
+            Text("Configuration de l'appareil")
+        } footer: {
+            Text(DeviceRoleStore.shared.role.detailedLabel)
+        }
+    }
 
     private var childSection: some View {
         Section("Profil") {

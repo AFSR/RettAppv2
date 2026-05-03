@@ -28,6 +28,9 @@ struct ParentSharingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await sync.refreshAccountStatus()
+            // Demande la permission de découvrir les autres participants par
+            // e-mail / nom Apple ID (best effort — l'iOS gère la feuille système).
+            await sync.requestParticipantsDiscoverability()
             await sync.refreshShareStatus()
         }
         .sheet(isPresented: $presentInviteCard) {

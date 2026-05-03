@@ -48,19 +48,28 @@ final class MedicationViewModel {
 
     // MARK: - Notifications
 
-    func requestNotificationPermissionIfNeeded() async {
+    /// Demande la permission si elle n'a pas encore été décidée. Renvoie l'état
+    /// final pour que les appelants sachent s'ils doivent prévenir l'utilisateur.
+    @discardableResult
+    func requestNotificationPermissionIfNeeded() async -> UNAuthorizationStatus {
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         if settings.authorizationStatus == .notDetermined {
             _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            return await center.notificationSettings().authorizationStatus
         }
+        return settings.authorizationStatus
     }
 
     /// Recrée toutes les notifications calendaires à partir du plan médicamenteux.
+    /// Si la permission est `.notDetermined`, on la demande automatiquement avant
+    /// de planifier — sinon les notifications n'étaient jamais programmées
+    /// quand l'utilisateur ajoutait un premier médicament sans avoir activé
+    /// les notifications préalablement.
     func rescheduleAllNotifications(medications: [Medication], childFirstName: String) async {
         let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+        let status = await requestNotificationPermissionIfNeeded()
+        guard status == .authorized || status == .provisional else {
             return
         }
 
@@ -69,6 +78,7 @@ final class MedicationViewModel {
         let ids = pending.filter { $0.identifier.hasPrefix("afsr.med.") }.map { $0.identifier }
         center.removePendingNotificationRequests(withIdentifiers: ids)
 
+        var scheduled = 0
         for med in medications where med.isActive && med.kind == .regular {
             for slot in med.scheduledHours {
                 let identifier = "afsr.med.\(med.id.uuidString).\(slot.hour).\(slot.minute)"
@@ -85,9 +95,15 @@ final class MedicationViewModel {
                 comps.minute = slot.minute
                 let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
                 let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
-                try? await center.add(request)
+                do {
+                    try await center.add(request)
+                    scheduled += 1
+                } catch {
+                    print("⚠️ Échec planning notif \(identifier) : \(error.localizedDescription)")
+                }
             }
         }
+        print("ℹ️ Notifications planifiées : \(scheduled)")
     }
 
     func cancelAllNotifications() async {
