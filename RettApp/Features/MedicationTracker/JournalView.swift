@@ -10,13 +10,14 @@ struct JournalView: View {
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
 
     @State private var viewModel = MedicationViewModel()
+    @State private var seizureTracker = SeizureTrackerViewModel()
     @State private var showPlan = false
     @State private var showAdHoc = false
     @State private var showDatePicker = false
     @State private var showMoodSheet = false
     @State private var showObservationSheet = false
     @State private var showSymptomSheet = false
-    @State private var showSeizureTracker = false
+    @State private var showSeizureQualification = false
     @State private var showSeizureHistory = false
     @State private var showManualSeizureEntry = false
     @State private var showBookletImport = false
@@ -35,12 +36,22 @@ struct JournalView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
 
+                // Bannière chronomètre quand une crise est en cours d'enregistrement.
+                // Le déclenchement se fait directement depuis le bouton « Démarrer
+                // une crise » du Journal — plus de plein-écran intermédiaire.
+                if case .recording = seizureTracker.phase {
+                    seizureRecordingBanner
+                        .padding(.horizontal)
+                        .padding(.bottom, 6)
+                }
+
                 JournalContent(
                     selectedDate: viewModel.selectedDate,
                     medications: medications,
                     profile: profile,
                     viewModel: viewModel,
-                    emergencyAction: epilepsyEnabled ? { showSeizureTracker = true } : nil,
+                    seizureInProgress: { if case .recording = seizureTracker.phase { return true } else { return false } }(),
+                    emergencyAction: epilepsyEnabled ? { startSeizureTimer() } : nil,
                     showSeizureHistory: { showSeizureHistory = true }
                 )
             }
@@ -96,8 +107,36 @@ struct JournalView: View {
         .sheet(isPresented: $showManualSeizureEntry) {
             ManualSeizureEntrySheet()
         }
-        .fullScreenCover(isPresented: $showSeizureTracker) {
-            NavigationStack { SeizureTrackerView() }
+        .sheet(isPresented: $showSeizureQualification, onDismiss: {
+            // Si l'utilisateur ferme la sheet sans valider, on annule la crise
+            // (rien n'est sauvegardé). C'est volontaire : pas de demi-saisie.
+            if case .qualifying = seizureTracker.phase {
+                seizureTracker.cancelQualification()
+            }
+        }) {
+            if case .qualifying(let start, let end) = seizureTracker.phase {
+                SeizureQualificationSheet(
+                    start: start,
+                    end: end
+                ) { type, trigger, triggerNotes, notes in
+                    Task {
+                        await seizureTracker.save(
+                            context: modelContext,
+                            type: type,
+                            trigger: trigger,
+                            triggerNotes: triggerNotes,
+                            notes: notes,
+                            childProfile: profile,
+                            healthKit: HealthKitManager.shared
+                        )
+                        showSeizureQualification = false
+                    }
+                }
+                .interactiveDismissDisabled()
+            }
+        }
+        .onChange(of: seizureTracker.phase) { _, newValue in
+            if case .qualifying = newValue { showSeizureQualification = true }
         }
         .sheet(isPresented: $showMoodSheet) { MoodSheet() }
         .sheet(isPresented: $showSymptomSheet) { SymptomSheet() }
@@ -132,6 +171,53 @@ struct JournalView: View {
     }
 
     /// Bandeau « ◀ Lundi 26 mai ▶ » — séparé visuellement des actions toolbar.
+    /// Bannière compacte affichée au-dessus du journal pendant l'enregistrement
+    /// d'une crise : durée en cours + bouton « Terminer ». Remplace l'ancien
+    /// plein-écran SeizureTrackerView.
+    private var seizureRecordingBanner: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.afsrEmergency.opacity(0.25))
+                    .frame(width: 22, height: 22)
+                Circle()
+                    .fill(Color.afsrEmergency)
+                    .frame(width: 10, height: 10)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Crise en cours")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.afsrEmergency)
+                Text(seizureTracker.formattedCurrentDuration())
+                    .font(AFSRFont.headline(20))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+            }
+            Spacer()
+            Button {
+                seizureTracker.stop()
+            } label: {
+                Label("Terminer", systemImage: "checkmark.circle.fill")
+                    .font(AFSRFont.headline(14))
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.afsrSuccess)
+            .controlSize(.regular)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.afsrEmergency.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.afsrEmergency.opacity(0.4), lineWidth: 0.5)
+        )
+    }
+
+    private func startSeizureTimer() {
+        guard case .idle = seizureTracker.phase else { return }
+        seizureTracker.start()
+    }
+
     private var dateNavigationBar: some View {
         HStack(spacing: 8) {
             Button { shift(-1) } label: {
@@ -193,6 +279,9 @@ private struct JournalContent: View {
     let medications: [Medication]
     let profile: ChildProfile?
     let viewModel: MedicationViewModel
+    /// True si une crise est en cours d'enregistrement (la bannière prend
+    /// la place du bouton « Démarrer une crise »).
+    let seizureInProgress: Bool
     /// Action déclenchée par le gros bouton urgence (nil = pas d'épilepsie, bouton caché).
     let emergencyAction: (() -> Void)?
     /// Ouvre l'historique complet des crises.
@@ -209,11 +298,13 @@ private struct JournalContent: View {
     @State private var showObservation = false
 
     init(selectedDate: Date, medications: [Medication], profile: ChildProfile?, viewModel: MedicationViewModel,
+         seizureInProgress: Bool,
          emergencyAction: (() -> Void)?, showSeizureHistory: @escaping () -> Void) {
         self.selectedDate = selectedDate
         self.medications = medications
         self.profile = profile
         self.viewModel = viewModel
+        self.seizureInProgress = seizureInProgress
         self.emergencyAction = emergencyAction
         self.showSeizureHistory = showSeizureHistory
 
@@ -254,7 +345,9 @@ private struct JournalContent: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if let emergencyAction {
+                // Bouton « Démarrer une crise » uniquement quand aucune crise
+                // n'est en cours (sinon la bannière du JournalView prend le relais).
+                if let emergencyAction, !seizureInProgress {
                     AFSREmergencyButton(title: "Démarrer une crise", action: emergencyAction)
                         .padding(.horizontal)
                 }
