@@ -19,6 +19,7 @@ struct JournalView: View {
     @State private var showSeizureTracker = false
     @State private var showSeizureHistory = false
     @State private var showManualSeizureEntry = false
+    @State private var showBookletImport = false
 
     private var profile: ChildProfile? { profiles.first }
     private var epilepsyEnabled: Bool { profile?.hasEpilepsy ?? false }
@@ -66,6 +67,9 @@ struct JournalView: View {
                     Button { showObservationSheet = true } label: {
                         Label("Repas / sommeil du jour", systemImage: "fork.knife")
                     }
+                    Button { showBookletImport = true } label: {
+                        Label("Scanner le cahier de suivi", systemImage: "doc.text.viewfinder")
+                    }
                     if epilepsyEnabled {
                         Divider()
                         Button { showManualSeizureEntry = true } label: {
@@ -99,6 +103,9 @@ struct JournalView: View {
         .sheet(isPresented: $showSymptomSheet) { SymptomSheet() }
         .sheet(isPresented: $showObservationSheet) {
             DailyObservationSheet(dayStart: viewModel.selectedDate)
+        }
+        .sheet(isPresented: $showBookletImport) {
+            BookletImportSheet()
         }
         .sheet(isPresented: $showDatePicker) {
             NavigationStack {

@@ -28,6 +28,9 @@ struct SettingsView: View {
             // ── DON AFSR (en tête, priorité haute)
             supportSection
 
+            // ── RÔLE DE L'APPAREIL (Parent / Enfant)
+            deviceRoleSection
+
             // ── PROFIL ENFANT
             childSection
 
@@ -56,6 +59,17 @@ struct SettingsView: View {
                 }
             } header: {
                 Text("Documents médicaux")
+            }
+
+            // ── DONNÉES APPLE SANTÉ DE L'ENFANT
+            Section {
+                NavigationLink {
+                    HealthDataView()
+                } label: {
+                    Label("Données Apple Santé", systemImage: "heart.text.square")
+                }
+            } footer: {
+                Text("Sommeil, rythme cardiaque et activité partagés depuis l'iPhone ou l'Apple Watch de l'enfant via le partage familial iCloud.")
             }
 
             // ── DONNÉES (sous-page hiérarchique)
@@ -138,6 +152,24 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    private var deviceRoleSection: some View {
+        @Bindable var roleStore = DeviceRoleStore.shared
+        return Section {
+            Picker(selection: $roleStore.role) {
+                ForEach(DeviceRole.allCases) { r in
+                    Label(r.label, systemImage: r.systemImage).tag(r)
+                }
+            } label: {
+                Label("Cet iPhone est utilisé par", systemImage: "iphone")
+            }
+            .pickerStyle(.menu)
+        } header: {
+            Text("Configuration de l'appareil")
+        } footer: {
+            Text(DeviceRoleStore.shared.role.detailedLabel)
+        }
+    }
 
     private var childSection: some View {
         Section("Profil") {
@@ -288,8 +320,8 @@ struct SettingsView: View {
 
     private var supportSection: some View {
         Section {
-            Button {
-                openDonationPage()
+            NavigationLink {
+                DonationView()
             } label: {
                 Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
                     .foregroundStyle(.afsrEmergency)
@@ -468,17 +500,6 @@ struct SettingsView: View {
     private func runPurgeDemo() {
         let count = DemoDataGenerator.purgeDemoData(in: modelContext)
         demoSummary = "\(count) entrée(s) de démonstration supprimée(s)."
-    }
-
-    private func openDonationPage() {
-        // Apple App Store Review Guideline 3.2.1(vii) : les apps peuvent collecter des
-        // dons aux orgas reconnues via Apple Pay OU via Safari.
-        // V1 : on redirige vers la page de don de l'AFSR (Safari).
-        // V2 (futur) : intégrer Apple Pay directement (nécessite merchant ID configuré
-        //              côté AFSR + processeur de paiement type Stripe/Adyen).
-        if let url = URL(string: "https://afsr.fr/nous-soutenir/faire-un-don") {
-            UIApplication.shared.open(url)
-        }
     }
 
     private func eraseAll() {

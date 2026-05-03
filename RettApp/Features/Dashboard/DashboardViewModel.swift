@@ -121,10 +121,54 @@ final class DashboardViewModel {
         return Summary(totalCount: total, totalDurationSec: totalSec, avgDurationSec: avg)
     }
 
+    /// Statistiques de la période immédiatement précédente, calculées en décalant la fenêtre
+    /// d'une unité d'échelle vers le passé. Utilisé pour afficher la tendance vs N-1.
+    func previousSummary(for seizures: [SeizureEvent], calendar: Calendar = .current) -> Summary {
+        let cal = calendar
+        let (start, end) = windowBounds(calendar: cal)
+        guard let prevStart = cal.date(byAdding: scale.spanComponent, value: -1, to: start),
+              let prevEnd = cal.date(byAdding: scale.spanComponent, value: -1, to: end) else {
+            return Summary(totalCount: 0, totalDurationSec: 0, avgDurationSec: 0)
+        }
+        let inPrev = seizures.filter { $0.startTime >= prevStart && $0.startTime < prevEnd }
+        let total = inPrev.count
+        let totalSec = inPrev.reduce(0) { $0 + $1.durationSeconds }
+        let avg = total > 0 ? Double(totalSec) / Double(total) : 0
+        return Summary(totalCount: total, totalDurationSec: totalSec, avgDurationSec: avg)
+    }
+
     struct Summary {
         let totalCount: Int
         let totalDurationSec: Int
         let avgDurationSec: Double
+    }
+
+    /// Variation entre deux valeurs (en %). Sémantique :
+    /// - delta == nil  → pas de référence (période N-1 vide) : on ne peut pas comparer.
+    /// - delta == 0    → identique.
+    /// - delta > 0     → augmentation.
+    struct TrendDelta {
+        let current: Double
+        let previous: Double
+        /// Variation relative en pourcentage (nil si previous == 0 et current > 0 → "nouveau").
+        let percentChange: Double?
+        /// `true` si previous == 0 et current > 0 (apparition).
+        let isNewlyAppeared: Bool
+
+        var isUp: Bool { current > previous }
+        var isDown: Bool { current < previous }
+        var isFlat: Bool { current == previous }
+    }
+
+    static func trend(current: Double, previous: Double) -> TrendDelta {
+        if previous == 0 && current == 0 {
+            return TrendDelta(current: 0, previous: 0, percentChange: 0, isNewlyAppeared: false)
+        }
+        if previous == 0 {
+            return TrendDelta(current: current, previous: 0, percentChange: nil, isNewlyAppeared: true)
+        }
+        let pct = (current - previous) / previous * 100.0
+        return TrendDelta(current: current, previous: previous, percentChange: pct, isNewlyAppeared: false)
     }
 
     /// Décale `referenceDate` d'une unité d'échelle (négatif = passé).
@@ -180,6 +224,71 @@ final class DashboardViewModel {
             let avg = inBucket.map { Double($0[keyPath: keyPath]) }.reduce(0, +) / Double(inBucket.count)
             return ValueBucket(date: start, value: avg)
         }
+    }
+
+    /// Buckets « fréquence d'un symptôme » : nombre d'occurrences par bucket. Filtre
+    /// par type de symptôme si fourni, sinon agrège tous les symptômes confondus.
+    func symptomBuckets(
+        for events: [SymptomEvent],
+        type: RettSymptom? = nil,
+        calendar: Calendar = .current
+    ) -> [SeizureBucket] {
+        let cal = calendar
+        let (windowStart, windowEnd) = windowBounds(calendar: cal)
+        let starts = bucketStarts(calendar: cal)
+        let filtered = events.filter { e in
+            guard e.timestamp >= windowStart && e.timestamp < windowEnd else { return false }
+            if let type, e.symptomType != type { return false }
+            return true
+        }
+        var counts: [Date: Int] = [:]
+        var durations: [Date: Int] = [:]
+        for e in filtered {
+            guard let bucket = starts.last(where: { $0 <= e.timestamp }) else { continue }
+            counts[bucket, default: 0] += 1
+            durations[bucket, default: 0] += e.durationMinutes * 60
+        }
+        return starts.map { start in
+            SeizureBucket(
+                date: start,
+                count: counts[start] ?? 0,
+                totalDurationSec: durations[start] ?? 0
+            )
+        }
+    }
+
+    /// Buckets « intensité moyenne d'un symptôme » (échelle 1-5, nil si rien).
+    func symptomIntensityBuckets(
+        for events: [SymptomEvent],
+        type: RettSymptom? = nil,
+        calendar: Calendar = .current
+    ) -> [ValueBucket] {
+        let cal = calendar
+        let starts = bucketStarts(calendar: cal)
+        return starts.map { start in
+            let next = endForBucket(start: start, calendar: cal)
+            let inBucket = events.filter { e in
+                guard e.timestamp >= start && e.timestamp < next else { return false }
+                if let type, e.symptomType != type { return false }
+                return e.intensityRaw > 0
+            }
+            guard !inBucket.isEmpty else { return ValueBucket(date: start, value: nil) }
+            let avg = inBucket.map { Double($0.intensityRaw) }.reduce(0, +) / Double(inBucket.count)
+            return ValueBucket(date: start, value: avg)
+        }
+    }
+
+    /// Pour la période courante : occurrences par type de symptôme (triées décroissantes).
+    func symptomBreakdown(
+        for events: [SymptomEvent],
+        calendar: Calendar = .current
+    ) -> [(type: RettSymptom, count: Int)] {
+        let cal = calendar
+        let (windowStart, windowEnd) = windowBounds(calendar: cal)
+        let inWindow = events.filter { $0.timestamp >= windowStart && $0.timestamp < windowEnd }
+        var counts: [RettSymptom: Int] = [:]
+        for e in inWindow { counts[e.symptomType, default: 0] += 1 }
+        return counts.map { ($0.key, $0.value) }.sorted { $0.count > $1.count }
     }
 
     private func bucketStarts(calendar: Calendar) -> [Date] {

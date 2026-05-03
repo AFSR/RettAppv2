@@ -35,6 +35,7 @@ enum MedicalReportGenerator {
         let logs: [MedicationLog]
         let moods: [MoodEntry]
         let observations: [DailyObservation]
+        let symptoms: [SymptomEvent]
         let parentNotes: String
     }
 
@@ -58,7 +59,8 @@ enum MedicalReportGenerator {
         let analysisInput = MedicalReportAnalysis.Input(
             periodStart: input.periodStart, periodEnd: input.periodEnd,
             seizures: input.seizures, medications: input.medications,
-            logs: input.logs, moods: input.moods, observations: input.observations
+            logs: input.logs, moods: input.moods, observations: input.observations,
+            symptoms: input.symptoms
         )
         let overall = MedicalReportAnalysis.computeOverall(analysisInput)
         let granularity = MedicalReportAnalysis.granularity(for: overall.periodDays)
@@ -70,6 +72,7 @@ enum MedicalReportGenerator {
         let dailySignals = MedicalReportAnalysis.dailySignals(analysisInput)
         let correlations = MedicalReportAnalysis.correlations(from: dailySignals)
         let medAnalysis = MedicalReportAnalysis.analyzeMedicationPlan(analysisInput)
+        let symptomAnalysis = MedicalReportAnalysis.analyzeSymptoms(analysisInput)
 
         let layout = Layout(pageRect: pageRect)
         try renderer.writePDF(to: url) { context in
@@ -87,8 +90,11 @@ enum MedicalReportGenerator {
 
             drawMedicationAnalysis(analysis: medAnalysis, ctx: &ctx, context: context)
 
+            drawSymptomAnalysis(analysis: symptomAnalysis, ctx: &ctx, context: context)
+
             drawSynthesis(input: input, overall: overall,
                           correlations: correlations, medAnalysis: medAnalysis,
+                          symptomAnalysis: symptomAnalysis,
                           ctx: &ctx, context: context)
 
             drawParentNotes(input: input, ctx: &ctx, context: context)
@@ -402,6 +408,7 @@ enum MedicalReportGenerator {
         input: Input, overall: MedicalReportAnalysis.OverallStats,
         correlations: [MedicalReportAnalysis.Correlation],
         medAnalysis: MedicalReportAnalysis.MedicationAnalysis,
+        symptomAnalysis: MedicalReportAnalysis.SymptomAnalysis,
         ctx: inout DrawContext, context: UIGraphicsPDFRendererContext
     ) {
         ctx.ensureSpace(80, context: context)
@@ -410,9 +417,41 @@ enum MedicalReportGenerator {
             overall: overall,
             correlations: correlations,
             medicationAnalysis: medAnalysis,
+            symptomAnalysis: symptomAnalysis,
             childFirstName: input.child?.firstName ?? ""
         )
         drawText(text, italic: false, ctx: &ctx)
+        ctx.y += 8
+    }
+
+    private static func drawSymptomAnalysis(
+        analysis: MedicalReportAnalysis.SymptomAnalysis,
+        ctx: inout DrawContext, context: UIGraphicsPDFRendererContext
+    ) {
+        ctx.ensureSpace(80, context: context)
+        drawSectionTitle("Symptômes du syndrome de Rett", ctx: &ctx)
+
+        if analysis.totalObservations == 0 {
+            drawText("Aucun symptôme spécifique au syndrome de Rett saisi sur la période.", italic: true, ctx: &ctx)
+            ctx.y += 8
+            return
+        }
+
+        drawText("\(analysis.totalObservations) observation\(analysis.totalObservations > 1 ? "s" : "") consolidée\(analysis.totalObservations > 1 ? "s" : "") par type. L'intensité est sur une échelle 1-5 (vide si non renseignée).", italic: true, ctx: &ctx)
+
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM/yyyy HH:mm"
+
+        let headers = ["Symptôme", "Occurrences", "Intensité moy.", "Durée cumul.", "Dernière obs."]
+        let widths: [CGFloat] = [180, 70, 75, 75, 115]
+        let rows: [[String]] = analysis.perSymptom.map { p in
+            let intensity = p.avgIntensity.map { String(format: "%.1f / 5", $0) } ?? "—"
+            let duration = p.totalDurationMinutes > 0 ? "\(p.totalDurationMinutes) min" : "—"
+            let last = p.lastObserved.map { df.string(from: $0) } ?? "—"
+            return [p.type.label, "\(p.occurrences)", intensity, duration, last]
+        }
+        drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
         ctx.y += 8
     }
 

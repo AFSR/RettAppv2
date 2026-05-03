@@ -14,6 +14,7 @@ enum MedicalReportAnalysis {
         let logs: [MedicationLog]            // logs sur la période (planifiés ET adhoc)
         let moods: [MoodEntry]
         let observations: [DailyObservation]
+        let symptoms: [SymptomEvent]         // observations de symptômes sur la période
     }
 
     /// Échelle d'agrégation pour les graphiques, choisie en fonction de la longueur
@@ -396,6 +397,43 @@ enum MedicalReportAnalysis {
         )
     }
 
+    // MARK: - Analyse des symptômes Rett
+
+    struct SymptomAnalysis {
+        struct PerSymptom {
+            let type: RettSymptom
+            let occurrences: Int
+            /// Intensité moyenne sur les observations où l'intensité a été renseignée (>0).
+            let avgIntensity: Double?
+            /// Durée totale (minutes) cumulée — 0 si aucun épisode n'a renseigné de durée.
+            let totalDurationMinutes: Int
+            let lastObserved: Date?
+        }
+        let totalObservations: Int
+        let perSymptom: [PerSymptom]   // triés par fréquence décroissante
+    }
+
+    static func analyzeSymptoms(_ input: Input) -> SymptomAnalysis {
+        var groups: [RettSymptom: [SymptomEvent]] = [:]
+        for s in input.symptoms { groups[s.symptomType, default: []].append(s) }
+
+        let perSymptom: [SymptomAnalysis.PerSymptom] = groups.map { (type, events) in
+            let withIntensity = events.filter { $0.intensityRaw > 0 }
+            let avg: Double? = withIntensity.isEmpty ? nil
+                : withIntensity.map { Double($0.intensityRaw) }.reduce(0, +) / Double(withIntensity.count)
+            let totalMin = events.reduce(0) { $0 + $1.durationMinutes }
+            let last = events.map(\.timestamp).max()
+            return SymptomAnalysis.PerSymptom(
+                type: type, occurrences: events.count,
+                avgIntensity: avg, totalDurationMinutes: totalMin,
+                lastObserved: last
+            )
+        }
+        .sorted { $0.occurrences > $1.occurrences }
+
+        return SymptomAnalysis(totalObservations: input.symptoms.count, perSymptom: perSymptom)
+    }
+
     // MARK: - Synthèse textuelle pour le médecin
 
     /// Construit un texte de synthèse en français en consolidant les stats + corrélations
@@ -404,6 +442,7 @@ enum MedicalReportAnalysis {
         overall: OverallStats,
         correlations: [Correlation],
         medicationAnalysis: MedicationAnalysis,
+        symptomAnalysis: SymptomAnalysis,
         childFirstName: String
     ) -> String {
         let name = childFirstName.isEmpty ? "L'enfant" : childFirstName
@@ -447,6 +486,14 @@ enum MedicalReportAnalysis {
         if let avg = overall.avgMoodLevel {
             let label = MoodLevel(rawValue: Int(avg.rounded()))?.label ?? "—"
             lines.append("Humeur moyenne renseignée : \(String(format: "%.1f", avg))/5 (« \(label) »).")
+        }
+
+        // Symptômes Rett
+        if symptomAnalysis.totalObservations > 0 {
+            let topThree = symptomAnalysis.perSymptom.prefix(3)
+                .map { "\($0.type.label) (\($0.occurrences))" }
+                .joined(separator: ", ")
+            lines.append("Symptômes Rett observés : \(symptomAnalysis.totalObservations) saisie\(symptomAnalysis.totalObservations > 1 ? "s" : "") sur la période. Principaux : \(topThree).")
         }
 
         // Corrélations

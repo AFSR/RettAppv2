@@ -56,6 +56,9 @@ final class CloudKitSyncService {
     var lastSyncedAt: Date?
     var participantCount: Int = 0
     var lastErrorMessage: String?
+    /// Métadonnées des autres parents (e-mail / nom Apple ID, statut, droits).
+    /// Vide si on n'est pas en partage ou si CloudKit n'a pas encore renvoyé la liste.
+    var participants: [ParticipantInfo] = []
 
     // MARK: - Internals
 
@@ -172,37 +175,137 @@ final class CloudKitSyncService {
         return url
     }
 
-    /// Récupère le statut de partage actuel (si on est propriétaire ou participant).
+    /// Récupère le statut de partage actuel (si on est propriétaire ou participant)
+    /// **et** la liste des participants associés au share. Les identités proviennent
+    /// directement de CloudKit (Apple ID + e-mail si l'utilisateur a accepté de
+    /// les exposer côté Réglages iCloud).
     func refreshShareStatus() async {
         do {
-            let zone = try await ensureZone()
-            let shareRecordID = CKRecord.ID(
-                recordName: "share-\(zone.zoneID.zoneName)",
-                zoneID: zone.zoneID
-            )
+            // 1) Tenter le côté propriétaire : la zone existe-t-elle déjà dans la
+            //    privateCloudDatabase ? On NE crée PAS la zone ici (à la différence
+            //    de `ensureZone`) — sinon on l'amorce involontairement chez un
+            //    participant qui n'en a aucune et on perd la détection du rôle.
+            let zoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
             do {
-                let record = try await container.privateCloudDatabase.record(for: shareRecordID)
-                if let share = record as? CKShare {
-                    currentShare = share
-                    role = .owner
-                    participantCount = max(0, share.participants.count - 1) // exclut le propriétaire
-                    return
+                _ = try await container.privateCloudDatabase.recordZone(for: zoneID)
+                let shareRecordID = CKRecord.ID(
+                    recordName: "share-\(zoneID.zoneName)", zoneID: zoneID
+                )
+                do {
+                    let record = try await container.privateCloudDatabase.record(for: shareRecordID)
+                    if let share = record as? CKShare {
+                        currentShare = share
+                        role = .owner
+                        let infos = share.participants.map { p in
+                            ParticipantInfo(from: p, isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID)
+                        }
+                        participants = infos
+                        // exclut le propriétaire de la "shape" affichée
+                        participantCount = max(0, infos.filter { !$0.isOwner }.count)
+                        // Tente d'enrichir avec e-mail / nom (best-effort, async).
+                        let enriched = await enrichParticipants(from: share, currentList: infos)
+                        participants = enriched
+                        return
+                    }
+                } catch let error as CKError where error.code == .unknownItem {
+                    // pas de share owned
                 }
-            } catch let error as CKError where error.code == .unknownItem {
-                // pas de share owned
+            } catch let error as CKError where error.code == .zoneNotFound {
+                // Pas de zone côté privé — on bascule en check participant.
             }
 
-            // Vérifier si on est participant : zone dans sharedCloudDatabase
+            // 2) Côté participant : zone(s) présente(s) dans la sharedCloudDatabase ?
             let sharedZones = try await container.sharedCloudDatabase.allRecordZones()
-            if !sharedZones.isEmpty {
+            if let firstZone = sharedZones.first {
                 role = .participant
+                // Tenter de retrouver le CKShare pour exposer les autres participants
+                // (en particulier le propriétaire — c'est le plus utile à voir
+                //  pour un parent invité).
+                if let share = try? await fetchSharedZoneShare(zoneID: firstZone.zoneID) {
+                    currentShare = share
+                    let infos = share.participants.map { p in
+                        ParticipantInfo(from: p, isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID)
+                    }
+                    participants = infos
+                    participantCount = max(0, infos.filter { !$0.isOwner }.count)
+                    let enriched = await enrichParticipants(from: share, currentList: infos)
+                    participants = enriched
+                } else {
+                    participants = []
+                    participantCount = 0
+                }
                 return
             }
+            // 3) Aucun partage en cours
             role = .none
+            participants = []
+            participantCount = 0
+            currentShare = nil
         } catch {
             Self.log.error("refreshShareStatus error: \(error.localizedDescription)")
             lastErrorMessage = error.localizedDescription
         }
+    }
+
+    /// Cherche le CKShare attaché à une zone partagée (côté participant).
+    /// Le share apparaît comme un record de type `cloudkit.share` lors d'un
+    /// fetch des changements de zone.
+    private func fetchSharedZoneShare(zoneID: CKRecordZone.ID) async throws -> CKShare? {
+        let result = try await container.sharedCloudDatabase.recordZoneChanges(inZoneWith: zoneID, since: nil)
+        for (_, modResult) in result.modificationResultsByID {
+            if case .success(let mod) = modResult, let share = mod.record as? CKShare {
+                return share
+            }
+        }
+        return nil
+    }
+
+    /// Demande à l'utilisateur l'autorisation de découvrir l'identité des autres
+    /// participants (Apple ID, e-mail). Sans cette permission, CloudKit nous
+    /// renvoie des participants anonymes même quand les autres parents ont
+    /// activé la découvrabilité de leur côté.
+    func requestParticipantsDiscoverability() async {
+        do {
+            let status = try await container.requestApplicationPermission(.userDiscoverability)
+            Self.log.info("Discoverability permission: \(String(describing: status))")
+        } catch {
+            Self.log.error("Discoverability request failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Enrichit la liste des participants avec leur identité visible (e-mail,
+    /// nom complet) en interrogeant CloudKit. Nécessite que :
+    ///   - chaque parent ait activé la découvrabilité côté Réglages iOS,
+    ///   - cette app ait obtenu la permission `.userDiscoverability` (cf.
+    ///     `requestParticipantsDiscoverability()`).
+    private func enrichParticipants(from share: CKShare, currentList: [ParticipantInfo]) async -> [ParticipantInfo] {
+        var enriched: [ParticipantInfo] = []
+        for (i, p) in share.participants.enumerated() {
+            let base = currentList.indices.contains(i)
+                ? currentList[i]
+                : ParticipantInfo(from: p, isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID)
+            // Si on a déjà email/nom, on garde — sinon on tente la découverte.
+            if base.email != nil || base.displayName != nil {
+                enriched.append(base)
+                continue
+            }
+            guard let userRecordID = p.userIdentity.userRecordID else {
+                enriched.append(base)
+                continue
+            }
+            do {
+                let identity = try await container.discoverUserIdentity(withUserRecordID: userRecordID)
+                enriched.append(ParticipantInfo(
+                    from: p,
+                    isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID,
+                    overrideIdentity: identity
+                ))
+            } catch {
+                Self.log.error("discoverUserIdentity failed: \(error.localizedDescription)")
+                enriched.append(base)
+            }
+        }
+        return enriched
     }
 
     /// Le propriétaire arrête le partage (supprime le CKShare).
@@ -215,23 +318,89 @@ final class CloudKitSyncService {
         currentShare = nil
         role = .none
         participantCount = 0
+        participants = []
+        await refreshShareStatus()
     }
 
     /// Un participant (non propriétaire) quitte un partage en cours.
-    /// Effet : la zone partagée est supprimée de sa sharedCloudDatabase, ce qui
-    /// révoque son accès local. Le partage continue d'exister côté propriétaire.
+    ///
+    /// Apple a deux mécanismes documentés :
+    ///   1. Supprimer la zone partagée via `deleteRecordZone(withID:)` sur la
+    ///      sharedCloudDatabase. **C'EST LE CHEMIN QUI ÉCHOUE** avec
+    ///      « zone delete not allowed » sur iOS récents : la zone reste la
+    ///      propriété du parent qui partage.
+    ///   2. Supprimer le record `CKShare` lui-même via `modifyRecords(deleting:)`.
+    ///      C'est l'API canonique pour « retire-moi du partage ». CloudKit
+    ///      propage la révocation au propriétaire.
+    ///
+    /// On utilise (2) exclusivement et on inspecte le résultat per-record (la
+    /// version async/await de `modifyRecords` ne lève PAS pour les erreurs
+    /// per-record — on doit lire `deleteResults`).
     func leaveShare() async throws {
         guard role == .participant else { return }
         syncState = .syncing
         defer { syncState = .idle }
 
         let zones = try await container.sharedCloudDatabase.allRecordZones()
-        for zone in zones {
-            try await container.sharedCloudDatabase.deleteRecordZone(withID: zone.zoneID)
+        guard !zones.isEmpty else {
+            // Plus rien à quitter — on remet l'état à zéro et on sort.
+            currentShare = nil
+            role = .none
+            participantCount = 0
+            participants = []
+            return
         }
-        currentShare = nil
-        role = .none
-        participantCount = 0
+
+        var deletedAtLeastOne = false
+        var lastError: Error?
+        for zone in zones {
+            // 1) Récupérer le CKShare via le fetch des changements de zone.
+            //    La version async/await de recordZoneChanges peut elle-même
+            //    échouer (réseau, etc.) — on isole.
+            let share: CKShare?
+            do {
+                share = try await fetchSharedZoneShare(zoneID: zone.zoneID)
+            } catch {
+                Self.log.error("leaveShare: fetchSharedZoneShare a échoué — \(error.localizedDescription)")
+                lastError = error
+                continue
+            }
+            guard let share else { continue }
+
+            // 2) modifyRecords(deleting:) en supprimant le share lui-même.
+            //    On inspecte les résultats per-record (la version async/await
+            //    ne lève PAS pour les erreurs partielles).
+            do {
+                let result = try await container.sharedCloudDatabase.modifyRecords(
+                    saving: [], deleting: [share.recordID]
+                )
+                if let outcome = result.deleteResults[share.recordID] {
+                    switch outcome {
+                    case .success:
+                        deletedAtLeastOne = true
+                    case .failure(let err):
+                        Self.log.error("leaveShare: deleteResults indique échec — \(err.localizedDescription)")
+                        lastError = err
+                    }
+                }
+            } catch {
+                Self.log.error("leaveShare: modifyRecords a échoué — \(error.localizedDescription)")
+                lastError = error
+            }
+        }
+
+        if deletedAtLeastOne {
+            currentShare = nil
+            role = .none
+            participantCount = 0
+            participants = []
+            // Re-vérifie l'état pour que l'UI reflète la réalité côté serveur.
+            await refreshShareStatus()
+        } else if let err = lastError {
+            throw err
+        } else {
+            throw SyncError.shareURLUnavailable
+        }
     }
 
     // MARK: - Replication push (CloudKit ←  SwiftData)
@@ -423,6 +592,69 @@ final class CloudKitSyncService {
 
     private func appropriateDatabaseScope() -> CKDatabase.Scope {
         role == .participant ? .shared : .private
+    }
+}
+
+// MARK: - Participant info
+
+/// Vue publique d'un participant CloudKit. Encapsule `CKShare.Participant` pour
+/// que la couche UI n'ait pas à manipuler PassKit / CloudKit directement.
+///
+/// CloudKit n'expose les e-mails / numéros de téléphone que si l'utilisateur a
+/// **opté pour leur découvrabilité** dans Réglages iOS → [son nom] → Contacts
+/// → Permettre aux autres de me trouver. Sans cela, on n'a que l'identifiant
+/// interne (`userRecordID`) et éventuellement le nom complet.
+struct ParticipantInfo: Identifiable, Hashable {
+    let id: String   // userRecordID.recordName
+    let displayName: String?
+    let email: String?
+    let phone: String?
+    let isOwner: Bool
+    let isCurrentUser: Bool
+    let acceptanceLabel: String
+    let permissionLabel: String
+
+    init(from p: CKShare.Participant, isOwnerSlot: Bool, overrideIdentity: CKUserIdentity? = nil) {
+        self.id = p.userIdentity.userRecordID?.recordName ?? UUID().uuidString
+        // Priorité : overrideIdentity (récupéré via discoverUserIdentity) > userIdentity
+        //            de p (souvent vide pour les shares à publicPermission ouvert).
+        let identity = overrideIdentity ?? p.userIdentity
+        if let comps = identity.nameComponents {
+            let f = PersonNameComponentsFormatter()
+            f.style = .default
+            let s = f.string(from: comps)
+            self.displayName = s.isEmpty ? nil : s
+        } else {
+            self.displayName = nil
+        }
+        self.email = identity.lookupInfo?.emailAddress
+        self.phone = identity.lookupInfo?.phoneNumber
+        self.isOwner = isOwnerSlot || p.role == .owner
+        self.isCurrentUser = (p.userIdentity.userRecordID == CKRecord.ID(recordName: CKCurrentUserDefaultName))
+
+        switch p.acceptanceStatus {
+        case .accepted:    self.acceptanceLabel = "Invitation acceptée"
+        case .pending:     self.acceptanceLabel = "Invitation envoyée — en attente"
+        case .removed:     self.acceptanceLabel = "Retiré du partage"
+        case .unknown:     self.acceptanceLabel = "Statut inconnu"
+        @unknown default:  self.acceptanceLabel = "Statut inconnu"
+        }
+        switch p.permission {
+        case .readOnly:    self.permissionLabel = "Lecture seule"
+        case .readWrite:   self.permissionLabel = "Lecture / écriture"
+        case .none:        self.permissionLabel = "Aucun droit"
+        case .unknown:     self.permissionLabel = "Droits inconnus"
+        @unknown default:  self.permissionLabel = "Droits inconnus"
+        }
+    }
+
+    /// Étiquette « la plus parlante » pour l'utilisateur final : on préfère le nom,
+    /// puis l'e-mail, puis le téléphone, puis la mention « Apple ID anonyme ».
+    var bestLabel: String {
+        if let n = displayName, !n.isEmpty { return n }
+        if let e = email, !e.isEmpty { return e }
+        if let p = phone, !p.isEmpty { return p }
+        return "Apple ID anonyme"
     }
 }
 
