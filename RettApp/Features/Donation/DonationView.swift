@@ -122,7 +122,7 @@ struct DonationView: View {
         Section {
             if DonationService.canMakePayments {
                 ApplePayButtonRepresentable(type: .donate) {
-                    presentApplePay()
+                    Task { await presentApplePay() }
                 }
                 .frame(height: 50)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -190,7 +190,8 @@ struct DonationView: View {
 
     // MARK: - Actions
 
-    private func presentApplePay() {
+    @MainActor
+    private func presentApplePay() async {
         guard amountIsValid else { return }
         let coord = ApplePayDonationCoordinator(amount: amount) { outcome in
             switch outcome {
@@ -209,11 +210,11 @@ struct DonationView: View {
             case .cancelled:
                 break
             }
-            // Libère la référence du coordinator
             coordinator = nil
         }
         coordinator = coord
-        if !coord.present() {
+        let presented = await coord.present()
+        if !presented {
             statusMessage = StatusMessage(
                 title: "Apple Pay indisponible",
                 body: "La feuille de paiement n'a pas pu s'afficher. Vous pouvez utiliser le formulaire web ci-dessous.",

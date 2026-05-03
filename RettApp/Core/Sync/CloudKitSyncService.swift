@@ -321,6 +321,27 @@ final class CloudKitSyncService {
         }
     }
 
+    /// Retire un participant spécifique du share (action propriétaire). Le
+    /// participant perd l'accès immédiatement, mais le partage reste en place
+    /// pour les autres invités. Si c'est le dernier invité, le share reste
+    /// actif (vide) — utiliser `stopSharing()` pour tout supprimer.
+    func removeParticipant(_ info: ParticipantInfo) async throws {
+        guard role == .owner, let share = currentShare else { return }
+        guard let participant = share.participants.first(where: {
+            $0.userIdentity.userRecordID?.recordName == info.id
+        }) else { return }
+        guard !info.isOwner else { return } // on ne peut pas se retirer soi-même
+        syncState = .syncing
+        defer { syncState = .idle }
+
+        share.removeParticipant(participant)
+        _ = try await container.privateCloudDatabase.modifyRecords(
+            saving: [share], deleting: [],
+            savePolicy: .ifServerRecordUnchanged
+        )
+        await refreshShareStatus()
+    }
+
     /// Le propriétaire arrête le partage (supprime le CKShare).
     /// Effet : tous les invités perdent l'accès immédiatement.
     func stopSharing() async throws {

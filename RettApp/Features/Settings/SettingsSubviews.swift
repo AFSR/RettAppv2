@@ -57,24 +57,29 @@ struct ConfigurationSubView: View {
                 Text("Notifications")
             }
 
-            Section {
-                HStack {
-                    Label("Apple Santé", systemImage: "heart.fill")
-                        .foregroundStyle(.pink)
-                    Spacer()
-                    Text(healthKitStatusLabel)
-                        .font(AFSRFont.caption())
-                        .foregroundStyle(.secondary)
+            // Section Apple Santé uniquement quand l'app est configurée pour
+            // l'enfant — la lecture de Santé n'a aucun sens sur l'iPhone
+            // d'un parent (qui aurait sa propre Santé d'adulte, sans rapport).
+            if DeviceRoleStore.shared.role == .child {
+                Section {
+                    HStack {
+                        Label("Apple Santé", systemImage: "heart.fill")
+                            .foregroundStyle(.pink)
+                        Spacer()
+                        Text(healthKitStatusLabel)
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                    Button {
+                        if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
+                    } label: {
+                        Label("Gérer les permissions", systemImage: "gear")
+                    }
+                } header: {
+                    Text("Santé")
+                } footer: {
+                    Text("Choix des types de données dans Réglages → Données Apple Santé.")
                 }
-                Button {
-                    if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
-                } label: {
-                    Label("Gérer les permissions", systemImage: "gear")
-                }
-            } header: {
-                Text("Santé")
-            } footer: {
-                Text("Toutes les données restent stockées localement sur l'appareil. L'API publique HealthKit n'expose pas encore de type pour les crises d'épilepsie.")
             }
         }
         .navigationTitle("Configuration")
@@ -339,7 +344,7 @@ struct MedicalDisclaimerSubView: View {
                     .foregroundStyle(.secondary)
 
                 Link("Lire la politique de confidentialité",
-                     destination: URL(string: "https://afsr.fr/confidentialite")!)
+                     destination: URL(string: "https://rettapp.afsr.fr/confidentialite.html")!)
                     .font(AFSRFont.body())
                     .padding(.top, 4)
 
@@ -409,10 +414,10 @@ struct AboutSubView: View {
                 }
             }
             Section("Documents légaux") {
-                Link(destination: URL(string: "https://afsr.fr/mentions-legales")!) {
+                Link(destination: URL(string: "https://rettapp.afsr.fr/mentions-legales.html")!) {
                     Label("Mentions légales", systemImage: "doc.text")
                 }
-                Link(destination: URL(string: "https://afsr.fr/confidentialite")!) {
+                Link(destination: URL(string: "https://rettapp.afsr.fr/confidentialite.html")!) {
                     Label("Politique de confidentialité", systemImage: "lock.shield")
                 }
             }

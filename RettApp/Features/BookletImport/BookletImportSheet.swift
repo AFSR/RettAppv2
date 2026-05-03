@@ -78,7 +78,7 @@ struct BookletImportSheet: View {
                     .padding(.top, 24)
                 Text("Scanner une page du cahier")
                     .font(AFSRFont.title(20))
-                Text("Prenez une photo de la page papier remplie par l'école ou la halte-garderie. RettApp lira automatiquement les repas, le sommeil, l'hydratation et les remarques pour pré-remplir le journal du jour.")
+                Text("Prenez une photo de la page papier remplie par l'école ou le centre. RettApp lira automatiquement les repas, le sommeil, l'hydratation et les remarques pour pré-remplir le journal du jour.")
                     .font(AFSRFont.body(14))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

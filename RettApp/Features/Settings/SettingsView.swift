@@ -20,6 +20,8 @@ struct SettingsView: View {
     @State private var showPurgeDemoConfirm = false
     @State private var demoSummary: String?
     @State private var showSharingSoon = false
+    @State private var showRoleChangeConfirm = false
+    @State private var pendingRole: DeviceRole?
     @State private var exportURL: URL?
     @State private var showShareSheet = false
 
@@ -61,15 +63,19 @@ struct SettingsView: View {
                 Text("Documents médicaux")
             }
 
-            // ── DONNÉES APPLE SANTÉ DE L'ENFANT
-            Section {
-                NavigationLink {
-                    HealthDataView()
-                } label: {
-                    Label("Données Apple Santé", systemImage: "heart.text.square")
+            // ── DONNÉES APPLE SANTÉ — uniquement en mode enfant (sinon
+            //    confusant : Apple Santé du parent n'a pas vocation à être
+            //    affichée dans une app de suivi de l'enfant).
+            if DeviceRoleStore.shared.role == .child {
+                Section {
+                    NavigationLink {
+                        HealthDataView()
+                    } label: {
+                        Label("Données Apple Santé", systemImage: "heart.text.square")
+                    }
+                } footer: {
+                    Text("Choisissez les types de données (sommeil, hydratation, repas, etc.) à lire depuis l'iPhone de l'enfant et à transmettre aux parents.")
                 }
-            } footer: {
-                Text("Sommeil, rythme cardiaque et activité partagés depuis l'iPhone ou l'Apple Watch de l'enfant via le partage familial iCloud.")
             }
 
             // ── DONNÉES (sous-page hiérarchique)
@@ -144,6 +150,19 @@ struct SettingsView: View {
         } message: { msg in
             Text(msg)
         }
+        .alert(
+            "Basculer en mode \(pendingRole?.label.lowercased() ?? "")",
+            isPresented: $showRoleChangeConfirm,
+            presenting: pendingRole
+        ) { newRole in
+            Button("Confirmer le changement", role: .destructive) {
+                DeviceRoleStore.shared.role = newRole
+                pendingRole = nil
+            }
+            Button("Annuler", role: .cancel) { pendingRole = nil }
+        } message: { newRole in
+            Text(roleChangeWarning(target: newRole))
+        }
         .alert("Partage entre parents", isPresented: $showSharingSoon) {
             Button("OK") { }
         } message: {
@@ -154,16 +173,24 @@ struct SettingsView: View {
     // MARK: - Sections
 
     private var deviceRoleSection: some View {
-        @Bindable var roleStore = DeviceRoleStore.shared
-        return Section {
-            Picker(selection: $roleStore.role) {
-                ForEach(DeviceRole.allCases) { r in
-                    Label(r.label, systemImage: r.systemImage).tag(r)
-                }
-            } label: {
+        Section {
+            HStack {
                 Label("Cet iPhone est utilisé par", systemImage: "iphone")
+                Spacer()
+                Text(DeviceRoleStore.shared.role.label)
+                    .foregroundStyle(.secondary)
             }
-            .pickerStyle(.menu)
+            Button {
+                pendingRole = (DeviceRoleStore.shared.role == .parent) ? .child : .parent
+                showRoleChangeConfirm = true
+            } label: {
+                Label(
+                    DeviceRoleStore.shared.role == .parent
+                        ? "Basculer en mode enfant…"
+                        : "Basculer en mode parent…",
+                    systemImage: "arrow.triangle.2.circlepath"
+                )
+            }
         } header: {
             Text("Configuration de l'appareil")
         } footer: {
@@ -364,10 +391,10 @@ struct SettingsView: View {
             Link(destination: URL(string: "https://www.afsr.fr")!) {
                 Label("Site de l'AFSR", systemImage: "safari")
             }
-            Link(destination: URL(string: "https://www.afsr.fr/mentions-legales")!) {
+            Link(destination: URL(string: "https://rettapp.afsr.fr/mentions-legales.html")!) {
                 Label("Mentions légales", systemImage: "doc.text")
             }
-            Link(destination: URL(string: "https://www.afsr.fr/confidentialite")!) {
+            Link(destination: URL(string: "https://rettapp.afsr.fr/confidentialite.html")!) {
                 Label("Politique de confidentialité", systemImage: "lock.shield")
             }
         }
@@ -500,6 +527,15 @@ struct SettingsView: View {
     private func runPurgeDemo() {
         let count = DemoDataGenerator.purgeDemoData(in: modelContext)
         demoSummary = "\(count) entrée(s) de démonstration supprimée(s)."
+    }
+
+    private func roleChangeWarning(target: DeviceRole) -> String {
+        switch target {
+        case .child:
+            return "En basculant en mode enfant : les données Apple Santé locales (sommeil, hydratation, repas, rythme cardiaque, etc.) deviennent lisibles par RettApp. Cette installation se présentera comme l'iPhone de l'enfant aux autres parents qui rejoindront le partage. Ne basculez en mode enfant que sur l'iPhone effectivement utilisé par l'enfant."
+        case .parent:
+            return "En basculant en mode parent : RettApp arrêtera de lire les données Apple Santé de cet appareil et les retirera des graphiques. Le partage CloudKit avec d'autres parents reste actif. Effectuez ce changement uniquement si cet iPhone n'est plus utilisé par l'enfant."
+        }
     }
 
     private func eraseAll() {

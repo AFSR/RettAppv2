@@ -5,7 +5,7 @@ import UIKit
 
 /// Wrapper SwiftUI autour de `VNDocumentCameraViewController`. Permet à l'utilisateur
 /// de prendre une photo d'une page du cahier de suivi (papier rempli par l'école /
-/// la halte-garderie) — la page est ensuite passée à Vision pour OCR.
+/// le centre) — la page est ensuite passée à Vision pour OCR.
 struct BookletScannerView: UIViewControllerRepresentable {
     enum Result {
         case success(images: [UIImage])

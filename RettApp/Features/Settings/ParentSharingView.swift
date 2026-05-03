@@ -11,9 +11,9 @@ struct ParentSharingView: View {
     @Query private var profiles: [ChildProfile]
 
     @State private var sharingURL: URL?
-    @State private var presentAirDropSheet = false
     @State private var presentInviteCard = false
     @State private var presentStopConfirm = false
+    @State private var participantToRemove: ParticipantInfo?
     @State private var workingError: String?
 
     var body: some View {
@@ -38,17 +38,16 @@ struct ParentSharingView: View {
                 InvitationCardView(
                     url: url,
                     childName: profiles.first?.fullName ?? "votre enfant",
-                    onAirDrop: { presentAirDropSheet = true }
+                    onAirDrop: {
+                        // Présenté directement sur la window racine (cf.
+                        // ProximityShare.present) — un .sheet SwiftUI imbriqué
+                        // dans un autre sheet ne s'affichait jamais.
+                        ProximityShare.present(url: url) {
+                            Task { await sync.refreshShareStatus() }
+                        }
+                    }
                 )
                 .presentationDetents([.medium, .large])
-            }
-        }
-        .sheet(isPresented: $presentAirDropSheet) {
-            if let url = sharingURL {
-                ProximityShareSheet(url: url, onComplete: {
-                    presentAirDropSheet = false
-                    Task { await sync.refreshShareStatus() }
-                })
             }
         }
         .confirmationDialog(
@@ -65,6 +64,21 @@ struct ParentSharingView: View {
             } else {
                 Text("L'autre parent ne pourra plus accéder ni modifier les données. Vous pourrez créer une nouvelle invitation à tout moment.")
             }
+        }
+        .confirmationDialog(
+            "Retirer l'accès à \(participantToRemove?.bestLabel ?? "") ?",
+            isPresented: Binding(
+                get: { participantToRemove != nil },
+                set: { if !$0 { participantToRemove = nil } }
+            ),
+            presenting: participantToRemove
+        ) { p in
+            Button("Retirer l'accès", role: .destructive) {
+                Task { await removeParticipant(p) }
+            }
+            Button("Annuler", role: .cancel) { participantToRemove = nil }
+        } message: { p in
+            Text("\(p.bestLabel) ne pourra plus accéder ni modifier les données. Cette action est immédiate. Vous pourrez réinviter ce parent à tout moment.")
         }
         .alert("Erreur de synchronisation", isPresented: Binding(
             get: { workingError != nil },
@@ -191,6 +205,15 @@ struct ParentSharingView: View {
                 } else {
                     ForEach(sync.participants) { p in
                         ParticipantRow(participant: p)
+                            .swipeActions(edge: .trailing) {
+                                if sync.role == .owner && !p.isOwner {
+                                    Button(role: .destructive) {
+                                        participantToRemove = p
+                                    } label: {
+                                        Label("Retirer l'accès", systemImage: "person.crop.circle.badge.minus")
+                                    }
+                                }
+                            }
                     }
                 }
             } header: {
@@ -297,6 +320,15 @@ struct ParentSharingView: View {
             case .participant: try await sync.leaveShare()
             case .none:        break
             }
+        } catch {
+            workingError = error.localizedDescription
+        }
+    }
+
+    private func removeParticipant(_ p: ParticipantInfo) async {
+        do {
+            try await sync.removeParticipant(p)
+            participantToRemove = nil
         } catch {
             workingError = error.localizedDescription
         }

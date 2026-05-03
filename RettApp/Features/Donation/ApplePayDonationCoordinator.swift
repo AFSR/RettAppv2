@@ -25,17 +25,21 @@ final class ApplePayDonationCoordinator: NSObject, PKPaymentAuthorizationControl
         self.onComplete = onComplete
     }
 
-    /// Présente la feuille Apple Pay. Retourne `false` si la requête n'a pas pu être
-    /// affichée (rare — uniquement si le merchant ID est mal configuré).
-    func present() -> Bool {
+    /// Présente la feuille Apple Pay et retourne `true` une fois qu'elle est
+    /// effectivement affichée. La V1 retournait `didPresent` synchroniquement
+    /// avant le callback de PassKit — ce qui donnait toujours `false` même quand
+    /// la sheet apparaissait correctement, déclenchant un faux message
+    /// « Apple Pay indisponible » alors que l'utilisateur pouvait voir et
+    /// utiliser la feuille de paiement.
+    func present() async -> Bool {
         let request = DonationService.makeRequest(amount: amount)
         let controller = PKPaymentAuthorizationController(paymentRequest: request)
         controller.delegate = self
-        var didPresent = false
-        controller.present { presented in
-            didPresent = presented
+        return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            controller.present { presented in
+                cont.resume(returning: presented)
+            }
         }
-        return didPresent
     }
 
     // MARK: - Delegate
