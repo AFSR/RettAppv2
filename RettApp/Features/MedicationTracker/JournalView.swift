@@ -26,62 +26,57 @@ struct JournalView: View {
         ZStack {
             Color.afsrBackground.ignoresSafeArea()
 
-            JournalContent(
-                selectedDate: viewModel.selectedDate,
-                medications: medications,
-                profile: profile,
-                viewModel: viewModel,
-                emergencyAction: epilepsyEnabled ? { showSeizureTracker = true } : nil,
-                showSeizureHistory: { showSeizureHistory = true }
-            )
+            VStack(spacing: 0) {
+                // Bandeau dédié à la navigation de date — séparé des actions toolbar
+                dateNavigationBar
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+
+                JournalContent(
+                    selectedDate: viewModel.selectedDate,
+                    medications: medications,
+                    profile: profile,
+                    viewModel: viewModel,
+                    emergencyAction: epilepsyEnabled ? { showSeizureTracker = true } : nil,
+                    showSeizureHistory: { showSeizureHistory = true }
+                )
+            }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { shift(-1) } label: { Image(systemName: "chevron.left") }
-            }
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showDatePicker = true
+                    showAdHoc = true
                 } label: {
-                    Text(viewModel.selectedDate, format: .dateTime.weekday(.wide).day().month())
-                        .font(AFSRFont.headline(16))
+                    Image(systemName: "plus.circle.fill")
                 }
+                .accessibilityLabel("Ajouter une prise ponctuelle")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
-                    Button { shift(1) } label: { Image(systemName: "chevron.right") }
-                    Button {
-                        showAdHoc = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(.afsrPurpleAdaptive)
+                Menu {
+                    Button { showMoodSheet = true } label: {
+                        Label("Saisir une humeur", systemImage: "face.smiling")
                     }
-                    .accessibilityLabel("Ajouter une prise ponctuelle")
-                    Menu {
-                        Button { showMoodSheet = true } label: {
-                            Label("Saisir une humeur", systemImage: "face.smiling")
-                        }
-                        Button { showObservationSheet = true } label: {
-                            Label("Repas / sommeil du jour", systemImage: "fork.knife")
-                        }
-                        if epilepsyEnabled {
-                            Divider()
-                            Button { showManualSeizureEntry = true } label: {
-                                Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
-                            }
-                            Button { showSeizureHistory = true } label: {
-                                Label("Historique des crises", systemImage: "list.bullet.rectangle.portrait")
-                            }
-                        }
+                    Button { showObservationSheet = true } label: {
+                        Label("Repas / sommeil du jour", systemImage: "fork.knife")
+                    }
+                    if epilepsyEnabled {
                         Divider()
-                        Button { showPlan = true } label: {
-                            Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
+                        Button { showManualSeizureEntry = true } label: {
+                            Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Button { showSeizureHistory = true } label: {
+                            Label("Historique des crises", systemImage: "list.bullet.rectangle.portrait")
+                        }
                     }
+                    Divider()
+                    Button { showPlan = true } label: {
+                        Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -121,6 +116,46 @@ struct JournalView: View {
         }
         .onChange(of: viewModel.selectedDate) { _, newDate in
             viewModel.ensureLogsExist(for: newDate, medications: medications, profile: profile, in: modelContext)
+        }
+    }
+
+    /// Bandeau « ◀ Lundi 26 mai ▶ » — séparé visuellement des actions toolbar.
+    private var dateNavigationBar: some View {
+        HStack(spacing: 8) {
+            Button { shift(-1) } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 40, height: 36)
+            }
+            .buttonStyle(.bordered)
+            .tint(.afsrPurpleAdaptive)
+            .accessibilityLabel("Jour précédent")
+
+            Button {
+                showDatePicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(viewModel.selectedDate, format: .dateTime.weekday(.wide).day().month())
+                        .font(AFSRFont.headline(15))
+                }
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .padding(.horizontal, 12)
+                .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                .foregroundStyle(.afsrPurpleAdaptive)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Choisir une date")
+
+            Button { shift(1) } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 40, height: 36)
+            }
+            .buttonStyle(.bordered)
+            .tint(.afsrPurpleAdaptive)
+            .accessibilityLabel("Jour suivant")
         }
     }
 
