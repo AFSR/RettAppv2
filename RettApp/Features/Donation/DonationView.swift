@@ -119,8 +119,10 @@ struct DonationView: View {
 
     @ViewBuilder
     private var paymentSection: some View {
+        let availability = DonationService.availability()
         Section {
-            if DonationService.canMakePayments {
+            switch availability {
+            case .ready:
                 ApplePayButtonRepresentable(type: .donate) {
                     Task { await presentApplePay() }
                 }
@@ -128,20 +130,29 @@ struct DonationView: View {
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .disabled(!amountIsValid)
                 .opacity(amountIsValid ? 1 : 0.5)
-            } else if DonationService.deviceSupportsApplePay {
-                // Wallet présent mais aucune carte → proposer Wallet directement.
+                fallbackButton
+            case .noEligibleCard:
+                Label(availability.userMessage, systemImage: "creditcard.trianglebadge.exclamationmark")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
                 Button {
                     if let url = URL(string: "shoebox://") { UIApplication.shared.open(url) }
                 } label: {
-                    Label("Ajouter une carte à Wallet pour Apple Pay", systemImage: "wallet.pass")
+                    Label("Ouvrir Wallet pour ajouter une carte", systemImage: "wallet.pass")
                 }
-                .buttonStyle(.borderedProminent)
                 fallbackButton
-            } else {
+            case .noWalletConfigured, .unavailable:
+                Label(availability.userMessage, systemImage: "info.circle")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
                 fallbackButton
             }
+        } header: {
+            Text("Paiement")
         } footer: {
-            Text("Le paiement est sécurisé par Apple Pay (3-D Secure). Aucune information bancaire ne transite par RettApp.")
+            Text("Le paiement est sécurisé par Apple Pay (3-D Secure / SCA). Aucune information bancaire ne transite par RettApp. Tant que le traitement bancaire n'est pas activé côté AFSR, votre intention de don est consignée dans l'historique et l'AFSR vous contactera pour la finaliser.")
         }
     }
 

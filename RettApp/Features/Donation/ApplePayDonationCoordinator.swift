@@ -1,9 +1,21 @@
 import Foundation
 import PassKit
+import os.log
 
 /// Coordinator UIKit-style qui orchestre la feuille Apple Pay et notifie
-/// SwiftUI via callbacks. Utilise `PKPaymentAuthorizationController` (et non le
-/// VC) car il est plus simple à présenter sans hiérarchie de vues UIKit.
+/// SwiftUI via callbacks. Utilise `PKPaymentAuthorizationController` (et non
+/// le VC) car il est plus simple à présenter sans hiérarchie de vues UIKit.
+///
+/// **Pré-requis Apple Developer Portal** (sinon Apple Pay échoue silencieusement) :
+///   1. Créer un Merchant ID `merchant.fr.afsr.RettApp` dans Identifiers →
+///      Merchant IDs.
+///   2. Cocher la capability « Apple Pay » sur le Bundle ID `fr.afsr.RettApp`
+///      et lui rattacher le Merchant ID ci-dessus.
+///   3. Régénérer le Provisioning Profile et resigner le binaire.
+///   4. Optionnel mais recommandé : enregistrer un Payment Processing
+///      Certificate signé par un PSP (Stripe / Adyen) pour pouvoir débiter
+///      réellement. Sans certificat, le `payment.token` est généré mais
+///      inutilisable côté serveur.
 @MainActor
 final class ApplePayDonationCoordinator: NSObject, PKPaymentAuthorizationControllerDelegate {
 
@@ -13,12 +25,13 @@ final class ApplePayDonationCoordinator: NSObject, PKPaymentAuthorizationControl
         case cancelled
     }
 
+    private let log = Logger(subsystem: "fr.afsr.RettApp", category: "Donation")
+
     private let amount: Decimal
     private let onComplete: (Outcome) -> Void
 
-    /// Résultat final passé au handler de PassKit dans `didFinish`.
-    /// On le mémorise dans `didAuthorizePayment` pour pouvoir l'utiliser en sortie.
     private var pendingOutcome: Outcome = .cancelled
+    private var didReceiveAuthorization = false
 
     init(amount: Decimal, onComplete: @escaping (Outcome) -> Void) {
         self.amount = amount
@@ -26,20 +39,19 @@ final class ApplePayDonationCoordinator: NSObject, PKPaymentAuthorizationControl
     }
 
     /// Présente la feuille Apple Pay et retourne `true` une fois qu'elle est
-    /// effectivement affichée. La V1 retournait `didPresent` synchroniquement
-    /// avant le callback de PassKit — ce qui donnait toujours `false` même quand
-    /// la sheet apparaissait correctement, déclenchant un faux message
-    /// « Apple Pay indisponible » alors que l'utilisateur pouvait voir et
-    /// utiliser la feuille de paiement.
+    /// effectivement affichée par PassKit.
     func present() async -> Bool {
         let request = DonationService.makeRequest(amount: amount)
+        log.info("Presenting PKPaymentAuthorizationController for amount=\(NSDecimalNumber(decimal: self.amount).stringValue, privacy: .public)")
         let controller = PKPaymentAuthorizationController(paymentRequest: request)
         controller.delegate = self
-        return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+        let presented = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             controller.present { presented in
                 cont.resume(returning: presented)
             }
         }
+        log.info("PassKit present() callback returned presented=\(presented, privacy: .public)")
+        return presented
     }
 
     // MARK: - Delegate
@@ -49,30 +61,35 @@ final class ApplePayDonationCoordinator: NSObject, PKPaymentAuthorizationControl
         didAuthorizePayment payment: PKPayment,
         handler completion: @escaping (PKPaymentAuthorizationResult) -> Void
     ) {
-        // Idéalement : POST `payment.token.paymentData` à `https://api.afsr.fr/donations`
-        // avec montant et devise. La route renvoie 200 si le PSP (Stripe/Adyen) a
-        // accepté le débit.
+        didReceiveAuthorization = true
+        let networkLabel = payment.token.paymentMethod.network?.rawValue ?? "—"
+        log.info("Payment authorized by user, network=\(networkLabel, privacy: .public), token bytes=\(payment.token.paymentData.count, privacy: .public)")
+
+        // ⚠️ Pour un vrai débit, il faut POST `payment.token.paymentData` à un
+        //    backend AFSR qui parle à un PSP (Stripe / Adyen) et déchiffre le
+        //    token. Sans ce backend, le token reste dormant et aucun montant
+        //    n'est réellement prélevé sur la carte.
         //
-        // En l'absence du backend, on enregistre le don localement et on simule
-        // une réussite pour ne pas bloquer la file d'attente Apple Pay.
-        DonationLedger.recordPending(amount: amount, network: payment.token.paymentMethod.network?.rawValue ?? "—")
+        //    En l'absence du backend, on enregistre l'intention de don localement
+        //    et on signale clairement dans l'historique que ces dons sont
+        //    « en attente de traitement par l'AFSR ».
+        DonationLedger.recordPending(amount: amount, network: networkLabel)
         pendingOutcome = .success(amount: amount)
         completion(PKPaymentAuthorizationResult(status: .success, errors: nil))
     }
 
     func paymentAuthorizationControllerDidFinish(_ controller: PKPaymentAuthorizationController) {
+        log.info("PassKit didFinish; didReceiveAuthorization=\(self.didReceiveAuthorization, privacy: .public)")
         controller.dismiss { [weak self] in
             guard let self else { return }
-            // Si pendingOutcome est resté à .cancelled (ie didAuthorizePayment n'a jamais
-            // été appelé), c'est que l'utilisateur a annulé.
             self.onComplete(self.pendingOutcome)
         }
     }
 }
 
-/// Stocke localement les dons effectués (montant + date + réseau) en attendant
-/// que le backend AFSR de traitement Apple Pay soit opérationnel. Permet aussi
-/// à l'utilisateur de retrouver l'historique de ses dons depuis l'app.
+/// Stocke localement les dons effectués (montant + date + réseau). En attendant
+/// que le backend AFSR de traitement Apple Pay soit opérationnel, ces entrées
+/// reflètent une « intention de don » — pas un débit confirmé.
 enum DonationLedger {
     private static let key = "DonationLedger.entries.v1"
 
@@ -80,7 +97,7 @@ enum DonationLedger {
         let id: UUID
         let date: Date
         let amount: Decimal
-        let network: String   // "Visa", "Mastercard", "CartesBancaires", etc.
+        let network: String
     }
 
     static func recordPending(amount: Decimal, network: String) {

@@ -1,5 +1,6 @@
 import Foundation
 import PassKit
+import os.log
 
 /// Service centralisant la configuration Apple Pay pour les dons à l'AFSR.
 ///
@@ -9,11 +10,16 @@ import PassKit
 /// - Côté traitement bancaire, le token PassKit (`PKPaymentToken`) doit être
 ///   transmis à un PSP (Stripe / Adyen / etc.) configuré côté AFSR pour
 ///   réaliser le débit. Tant que ce backend n'existe pas, on stocke le don
-///   localement et on signale à l'utilisateur que la confirmation arrivera
-///   par e-mail (mode "demo" ; à remplacer par un vrai POST en V2).
+///   localement (cf. `DonationLedger`) et on signale à l'utilisateur via
+///   l'historique.
 enum DonationService {
-    /// Identifiant marchand déclaré dans les entitlements. Doit correspondre
-    /// au merchant ID provisionné dans Apple Developer pour l'AFSR.
+
+    static let log = Logger(subsystem: "fr.afsr.RettApp", category: "Donation")
+
+    /// Identifiant marchand déclaré dans les entitlements. **Doit** être
+    /// préalablement créé dans Apple Developer Portal → Certificates,
+    /// Identifiers & Profiles → Identifiers → Merchant IDs et associé au
+    /// même Team ID que celui qui signe l'app.
     static let merchantId = "merchant.fr.afsr.RettApp"
 
     /// Pays de l'AFSR (FR).
@@ -22,32 +28,51 @@ enum DonationService {
     /// Devise des dons (euro).
     static let currencyCode = "EUR"
 
-    /// Réseaux acceptés. Visa/Mastercard/Cartes Bancaires couvrent l'essentiel
-    /// du marché français. Amex est rajouté par confort.
+    /// Réseaux de cartes acceptés. Visa/Mastercard/Cartes Bancaires couvrent
+    /// l'essentiel du marché français. Amex est ajouté par confort.
     static let supportedNetworks: [PKPaymentNetwork] = [
         .visa, .masterCard, .amex, .cartesBancaires
     ]
 
-    /// Capacités requises : 3DS pour la conformité PSD2 (Strong Customer Authentication).
+    /// Capacités requises : 3DS pour la conformité PSD2 (SCA).
     static let merchantCapabilities: PKMerchantCapability = [.threeDSecure]
 
-    /// Vrai si l'appareil peut afficher le bouton Apple Pay (Wallet présente +
-    /// au moins une carte enregistrée compatible avec nos réseaux).
-    static var canMakePayments: Bool {
-        PKPaymentAuthorizationController.canMakePayments(
-            usingNetworks: supportedNetworks,
-            capabilities: merchantCapabilities
-        )
+    /// État de disponibilité Apple Pay sur cet appareil et compte.
+    enum Availability: Equatable {
+        case ready
+        case noWalletConfigured       // Wallet non disponible (iPad sans cellular ou compte iCloud sans Wallet)
+        case noEligibleCard            // Wallet présent mais aucune carte des réseaux supportés
+        case unavailable               // Cas génériques (région non supportée, etc.)
+
+        var userMessage: String {
+            switch self {
+            case .ready:
+                return ""
+            case .noWalletConfigured:
+                return "Apple Pay n'est pas disponible sur cet appareil. Vous pouvez utiliser le formulaire web de l'AFSR ci-dessous."
+            case .noEligibleCard:
+                return "Aucune carte compatible n'est ajoutée à Wallet. Ajoutez une carte Visa, Mastercard, Amex ou Cartes Bancaires dans l'application Cartes, puis revenez ici."
+            case .unavailable:
+                return "Apple Pay n'est pas activé sur cet appareil. Vous pouvez utiliser le formulaire web de l'AFSR ci-dessous."
+            }
+        }
     }
 
-    /// Vrai si l'appareil supporte Apple Pay au niveau du système (Wallet présente
-    /// même sans carte). Utile pour afficher « Ajouter une carte » au lieu de masquer.
-    static var deviceSupportsApplePay: Bool {
-        PKPaymentAuthorizationController.canMakePayments()
+    /// Diagnostic complet de la disponibilité Apple Pay.
+    static func availability() -> Availability {
+        if !PKPaymentAuthorizationController.canMakePayments() {
+            log.info("canMakePayments() = false → noWalletConfigured")
+            return .noWalletConfigured
+        }
+        if !PKPaymentAuthorizationController.canMakePayments(usingNetworks: supportedNetworks, capabilities: merchantCapabilities) {
+            log.info("canMakePayments(usingNetworks:) = false → noEligibleCard")
+            return .noEligibleCard
+        }
+        return .ready
     }
 
     /// Construit la requête de paiement pour un montant donné.
-    static func makeRequest(amount: Decimal, includeFees: Bool = false) -> PKPaymentRequest {
+    static func makeRequest(amount: Decimal) -> PKPaymentRequest {
         let request = PKPaymentRequest()
         request.merchantIdentifier = merchantId
         request.supportedNetworks = supportedNetworks
@@ -55,16 +80,14 @@ enum DonationService {
         request.countryCode = countryCode
         request.currencyCode = currencyCode
 
-        let label = "Don à l'AFSR"
         request.paymentSummaryItems = [
             PKPaymentSummaryItem(
-                label: label,
+                label: "Don à l'AFSR",
                 amount: NSDecimalNumber(decimal: amount),
                 type: .final
             )
         ]
-        // Pas de billing/shipping address par défaut — un don n'en a pas besoin.
-        // L'utilisateur peut toujours fournir un e-mail si on l'active plus tard.
+        log.info("Request prepared: merchantId=\(merchantId, privacy: .public) amount=\(NSDecimalNumber(decimal: amount).stringValue, privacy: .public) \(currencyCode, privacy: .public)")
         return request
     }
 
