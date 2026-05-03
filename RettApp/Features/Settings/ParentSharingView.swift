@@ -47,13 +47,20 @@ struct ParentSharingView: View {
                 })
             }
         }
-        .confirmationDialog("Arrêter le partage ?", isPresented: $presentStopConfirm) {
-            Button("Arrêter", role: .destructive) {
+        .confirmationDialog(
+            sync.role == .participant ? "Quitter le partage ?" : "Arrêter le partage ?",
+            isPresented: $presentStopConfirm
+        ) {
+            Button(sync.role == .participant ? "Quitter" : "Arrêter", role: .destructive) {
                 Task { await stopSharing() }
             }
             Button("Annuler", role: .cancel) { }
         } message: {
-            Text("L'autre parent ne pourra plus accéder ni modifier les données. Vous pourrez créer une nouvelle invitation à tout moment.")
+            if sync.role == .participant {
+                Text("Vous n'aurez plus accès aux données partagées par l'autre parent. Vous pourrez à nouveau accepter une invitation depuis ce parent à tout moment.")
+            } else {
+                Text("L'autre parent ne pourra plus accéder ni modifier les données. Vous pourrez créer une nouvelle invitation à tout moment.")
+            }
         }
         .alert("Erreur de synchronisation", isPresented: Binding(
             get: { workingError != nil },
@@ -185,7 +192,11 @@ struct ParentSharingView: View {
                     Label("Arrêter le partage", systemImage: "xmark.circle")
                 }
             case .participant:
-                EmptyView()
+                Button(role: .destructive) {
+                    presentStopConfirm = true
+                } label: {
+                    Label("Quitter le partage", systemImage: "rectangle.portrait.and.arrow.forward")
+                }
             }
             Button {
                 Task { await syncNow() }
@@ -250,7 +261,11 @@ struct ParentSharingView: View {
 
     private func stopSharing() async {
         do {
-            try await sync.stopSharing()
+            switch sync.role {
+            case .owner:       try await sync.stopSharing()
+            case .participant: try await sync.leaveShare()
+            case .none:        break
+            }
         } catch {
             workingError = error.localizedDescription
         }

@@ -206,11 +206,29 @@ final class CloudKitSyncService {
     }
 
     /// Le propriétaire arrête le partage (supprime le CKShare).
+    /// Effet : tous les invités perdent l'accès immédiatement.
     func stopSharing() async throws {
         guard role == .owner, let share = currentShare else { return }
         syncState = .syncing
         defer { syncState = .idle }
         try await container.privateCloudDatabase.deleteRecord(withID: share.recordID)
+        currentShare = nil
+        role = .none
+        participantCount = 0
+    }
+
+    /// Un participant (non propriétaire) quitte un partage en cours.
+    /// Effet : la zone partagée est supprimée de sa sharedCloudDatabase, ce qui
+    /// révoque son accès local. Le partage continue d'exister côté propriétaire.
+    func leaveShare() async throws {
+        guard role == .participant else { return }
+        syncState = .syncing
+        defer { syncState = .idle }
+
+        let zones = try await container.sharedCloudDatabase.allRecordZones()
+        for zone in zones {
+            try await container.sharedCloudDatabase.deleteRecordZone(withID: zone.zoneID)
+        }
         currentShare = nil
         role = .none
         participantCount = 0
@@ -286,16 +304,16 @@ final class CloudKitSyncService {
     // MARK: - Pull (CloudKit → SwiftData)
 
     /// Tire tous les changements depuis CloudKit vers SwiftData.
+    /// Utilise `recordZoneChanges` (token-based) plutôt que `CKQuery`, qui exigeait
+    /// que `recordName` soit déclaré « queryable » dans le schema CloudKit Console.
     func pullChanges(into context: ModelContext) async throws {
         try await ensureSignedIn()
         syncState = .syncing
         defer { syncState = .idle }
 
-        // Owner : pull privé. Participant : pull shared.
         let database = appropriateDatabase()
         let scope = appropriateDatabaseScope()
 
-        // Liste des zones à fetcher
         let zoneIDs: [CKRecordZone.ID]
         if scope == .private {
             let zone = try await ensureZone()
@@ -310,31 +328,33 @@ final class CloudKitSyncService {
             return
         }
 
-        // Pull complet par zone (V1 — pas encore d'incrémental token-based).
-        // CloudKit demande un recordType précis par query → on itère sur les 6 types.
         var totalUpserted = 0
+        var totalDeleted = 0
         for zoneID in zoneIDs {
-            for type in CKRecordType.all {
-                let q = CKQuery(recordType: type, predicate: NSPredicate(value: true))
-                let (matchResults, _) = try await database.records(
-                    matching: q, inZoneWith: zoneID,
-                    desiredKeys: nil, resultsLimit: CKQueryOperation.maximumResults
-                )
-                for (_, result) in matchResults {
-                    switch result {
-                    case .success(let record):
-                        upsert(record, in: context)
-                        totalUpserted += 1
-                    case .failure(let err):
-                        Self.log.error("Pull \(type): \(err.localizedDescription)")
-                    }
+            // recordZoneChanges (since: nil) ramène TOUTES les modifications.
+            // Pas besoin que les fields soient queryable — c'est un fetch par token, pas une query.
+            let result = try await database.recordZoneChanges(inZoneWith: zoneID, since: nil)
+
+            for (_, modResult) in result.modificationResultsByID {
+                switch modResult {
+                case .success(let modification):
+                    upsert(modification.record, in: context)
+                    totalUpserted += 1
+                case .failure(let err):
+                    Self.log.error("Pull modif: \(err.localizedDescription)")
                 }
+            }
+
+            // Suppressions distantes : on supprime localement aussi
+            for deletion in result.deletions {
+                deleteLocal(recordID: deletion.recordID, in: context)
+                totalDeleted += 1
             }
         }
 
         try? context.save()
         lastSyncedAt = Date()
-        Self.log.info("pullChanges OK : \(totalUpserted) records upsertés")
+        Self.log.info("pullChanges OK : \(totalUpserted) upsertés, \(totalDeleted) supprimés")
     }
 
     private func upsert(_ record: CKRecord, in context: ModelContext) {
@@ -346,6 +366,32 @@ final class CloudKitSyncService {
         case CKRecordType.mood:             MoodEntry.upsert(from: record, in: context)
         case CKRecordType.dailyObservation: DailyObservation.upsert(from: record, in: context)
         default: break
+        }
+    }
+
+    /// Supprime localement le record correspondant à une suppression CloudKit distante.
+    private func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
+        guard let id = UUID(uuidString: recordID.recordName) else { return }
+
+        // On essaie chacun des 6 types — c'est le moyen le plus simple sans avoir
+        // le recordType (Apple ne le donne pas dans CKDatabase.RecordZoneChange.Deletion).
+        if let p = try? context.fetch(FetchDescriptor<ChildProfile>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(p); return
+        }
+        if let m = try? context.fetch(FetchDescriptor<Medication>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(m); return
+        }
+        if let l = try? context.fetch(FetchDescriptor<MedicationLog>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(l); return
+        }
+        if let s = try? context.fetch(FetchDescriptor<SeizureEvent>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(s); return
+        }
+        if let m = try? context.fetch(FetchDescriptor<MoodEntry>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(m); return
+        }
+        if let o = try? context.fetch(FetchDescriptor<DailyObservation>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(o); return
         }
     }
 
