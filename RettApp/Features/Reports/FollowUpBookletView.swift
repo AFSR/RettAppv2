@@ -27,7 +27,7 @@ struct FollowUpBookletView: View {
                     Label("Configurer le cahier", systemImage: "slider.horizontal.3")
                 }
             } footer: {
-                Text("Sections incluses, prises de médicaments à suivre par horaire, repas, symptômes Rett…")
+                Text("Sections incluses, prises de médicaments à suivre par horaire, repas, symptômes Rett, événements particuliers…")
             }
 
             Section("Libellé de la période") {
@@ -45,7 +45,7 @@ struct FollowUpBookletView: View {
                 }
                 .disabled(generating || !atLeastOneSectionSelected)
             } footer: {
-                Text("Le cahier est imprimé sur une page A4 puis confié à l'équipe encadrante (école, IME, IMP, centre). Vous ressaisissez les informations dans l'app le soir.")
+                Text("Une seule page A4 portrait, 100 % cases à cocher (fréquence, intensité, quantité pré-définies). Imprimé puis confié à l'équipe encadrante (école, IME, IMP, centre).")
             }
 
             if !archived.isEmpty {

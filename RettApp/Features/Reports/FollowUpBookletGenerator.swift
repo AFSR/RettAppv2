@@ -1,16 +1,15 @@
 import Foundation
 import UIKit
 
-/// Génère un PDF **A4 portrait, dense, mono-page** destiné à être imprimé et
-/// confié à l'équipe encadrante (école, IME, IMP, centre).
+/// Génère un PDF **A4 portrait, dense, mono-page, 100 % cases à cocher**
+/// destiné à être imprimé et confié à l'équipe encadrante.
 ///
-/// Contraintes de mise en page :
-///   - Format : A4 portrait (595 × 842 pt)
-///   - Une seule page : on dimensionne tous les éléments en fonction du
-///     contenu activé (sections, nb de prises, nb de symptômes…) pour rester
-///     en deçà de la limite verticale.
-///   - Police compacte (corps 8 pt, en-têtes 9 pt) tout en restant lisible
-///     en impression A4 noir & blanc.
+/// Tous les champs à remplir sont des cases pré-définies (fréquence,
+/// intensité, qualité, quantité). Aucune saisie de texte libre — facilite
+/// le remplissage rapide à la main, la prise de photo et le ré-encodage.
+///
+/// Format : A4 portrait (595 × 842 pt). Police compacte (8-9 pt), hauteurs
+/// de ligne adaptatives via `LayoutPlan` pour rester sur une seule page.
 enum FollowUpBookletGenerator {
 
     struct Options {
@@ -22,12 +21,9 @@ enum FollowUpBookletGenerator {
         var includeMealsGrid: Bool
         var includeSleepGrid: Bool
         var includeSymptomsGrid: Bool
-        var includeFreeNotes: Bool
+        var includeFreeNotes: Bool       // « événements particuliers » sous forme de cases
         var medications: [Medication]
-        /// Si true, toutes les prises planifiées des médicaments actifs sont
-        /// incluses ; sinon on filtre via selectedDoses.
         var allDosesSelected: Bool
-        /// Sous-ensemble (médicament + horaire) à inclure.
         var selectedDoses: Set<DoseKey>
         var selectedMealSlots: Set<MealSlot>
         var selectedSymptoms: Set<RettSymptom>
@@ -36,11 +32,26 @@ enum FollowUpBookletGenerator {
 
     static let bookletDirectoryName = "Booklets"
 
-    // Layout A4 portrait : 595 x 842 pt
     private static let pageWidth: CGFloat = 595
     private static let pageHeight: CGFloat = 842
     private static let margin: CGFloat = 24
     private static let footerReserve: CGFloat = 18
+
+    // Légendes des options pré-définies (codes courts → libellés)
+    private static let mealQualityCodes  = ["R", "P", "M", "B", "T"]
+    private static let mealQualityLegend = "R/P/M/B/T = Refusé · Peu · Moyen · Bien · Très bien"
+    private static let hydrationCodes    = ["F", "M", "B", "E"]
+    private static let hydrationLegend   = "F/M/B/E = Faible · Moyenne · Bonne · Excellente"
+    private static let seizureFreqCodes  = ["0", "1", "2-3", "4+"]
+    private static let seizureFreqLegend = "Nombre de crises observées dans la journée"
+    private static let sleepDurCodes     = ["<6", "6-8", "8-10", ">10"]
+    private static let sleepDurLegend    = "Durée du sommeil de nuit, en heures"
+    private static let sleepQualCodes    = ["B", "M", "D"]
+    private static let sleepQualLegend   = "B/M/D = Bonne · Moyenne · Difficile"
+    private static let napCodes          = ["Non", "<30", "30-60", ">60"]
+    private static let napLegend         = "Sieste, en minutes"
+    private static let nightWakeCodes    = ["0", "1-2", "3+"]
+    private static let nightWakeLegend   = "Nombre de réveils nocturnes"
 
     static func generate(_ options: Options) throws -> URL {
         let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
@@ -60,8 +71,6 @@ enum FollowUpBookletGenerator {
 
             drawHeader(in: context, y: &y, options: options)
 
-            // Calcul des sections + lignes prévues, puis on utilise les
-            // hauteurs adaptatives pour respecter une page unique.
             let plan = layoutPlan(for: options, availableHeight: pageHeight - y - footerReserve)
 
             if options.includeMedicationGrid {
@@ -83,7 +92,7 @@ enum FollowUpBookletGenerator {
                 drawSymptomsGrid(in: context, y: &y, options: options, rowHeight: plan.symptomsRowHeight)
             }
             if options.includeFreeNotes {
-                drawFreeNotes(y: &y, lineCount: plan.freeNotesLines)
+                drawEventsGrid(in: context, y: &y, options: options, rowHeight: plan.eventsRowHeight)
             }
 
             drawFooter()
@@ -94,10 +103,6 @@ enum FollowUpBookletGenerator {
 
     // MARK: - Layout planner (auto-fit single page)
 
-    /// Hauteurs de lignes adaptatives par section, calculées pour que tout
-    /// rentre sur une page A4 portrait. Si le contenu déborde même au minimum,
-    /// on retient les hauteurs minimales (l'utilisateur a alors trop de
-    /// sections — la mise en page reste tassée mais lisible).
     private struct LayoutPlan {
         var medicationRowHeight: CGFloat
         var seizureRowHeight: CGFloat
@@ -105,62 +110,46 @@ enum FollowUpBookletGenerator {
         var mealsRowHeight: CGFloat
         var sleepRowHeight: CGFloat
         var symptomsRowHeight: CGFloat
-        var freeNotesLines: Int
+        var eventsRowHeight: CGFloat
     }
 
     private static func layoutPlan(for options: Options, availableHeight: CGFloat) -> LayoutPlan {
         // Compte des lignes par section
         let medRows = doseRowCount(options: options)
-        let seizureRows = SeizureType.allCases.count + 1
+        let seizureRows = SeizureType.allCases.count
         let moodRows = 5
-        let mealsRows = options.selectedMealSlots.count + 1   // + ligne hydratation
+        let mealsRows = options.selectedMealSlots.count + 1   // + hydratation
         let sleepRows = 5
         let symptomRows = options.selectedSymptoms.count
+        let eventsRows = 6
 
-        // Surcoût fixe par section (titre + en-tête de tableau)
-        let sectionOverhead: CGFloat = 28
+        // Surcoût fixe par section : titre (10) + sous-titre légende (8) + en-tête tableau (12)
+        let sectionOverhead: CGFloat = 32
         var fixedOverhead: CGFloat = 0
         if options.includeMedicationGrid && medRows > 0 { fixedOverhead += sectionOverhead }
         if options.includeSeizureGrid { fixedOverhead += sectionOverhead }
         if options.includeMoodGrid { fixedOverhead += sectionOverhead }
         if options.includeMealsGrid && mealsRows > 1 { fixedOverhead += sectionOverhead }
         if options.includeSleepGrid { fixedOverhead += sectionOverhead }
-        // Symptômes : titre + 2 bandes d'en-tête (jour + M/A)
-        if options.includeSymptomsGrid && symptomRows > 0 { fixedOverhead += sectionOverhead + 12 }
-        // Notes libres : titre seulement
-        if options.includeFreeNotes { fixedOverhead += 16 }
+        if options.includeSymptomsGrid && symptomRows > 0 { fixedOverhead += sectionOverhead + 10 }  // + bandeau M/A
+        if options.includeFreeNotes { fixedOverhead += sectionOverhead }
 
-        // Lignes totales à caser
         let totalRows = (options.includeMedicationGrid ? medRows : 0)
             + (options.includeSeizureGrid ? seizureRows : 0)
             + (options.includeMoodGrid ? moodRows : 0)
             + (options.includeMealsGrid ? mealsRows : 0)
             + (options.includeSleepGrid ? sleepRows : 0)
             + (options.includeSymptomsGrid ? symptomRows : 0)
+            + (options.includeFreeNotes ? eventsRows : 0)
 
-        // Espace restant pour les lignes
         let rowSpace = max(0, availableHeight - fixedOverhead)
-
-        // Espace minimal réservé aux notes libres
-        let freeNotesSpace: CGFloat = options.includeFreeNotes ? 60 : 0
-        let availableForRows = max(0, rowSpace - freeNotesSpace)
-
-        // Hauteur unifiée par ligne : aussi grande que possible (max 18, min 11)
         let perRow: CGFloat
         if totalRows > 0 {
-            let raw = availableForRows / CGFloat(totalRows)
-            perRow = max(11, min(18, raw))
+            let raw = rowSpace / CGFloat(totalRows)
+            perRow = max(11, min(16, raw))
         } else {
-            perRow = 16
+            perRow = 14
         }
-
-        // Notes libres : on calcule combien de lignes on peut tenir dans le
-        // freeNotesSpace + reliquat éventuel.
-        let usedByRows = perRow * CGFloat(totalRows)
-        let leftover = max(0, availableForRows - usedByRows)
-        let notesAvailable = freeNotesSpace + leftover
-        let lineHeight: CGFloat = 14
-        let notesLines = max(2, min(8, Int(notesAvailable / lineHeight)))
 
         return LayoutPlan(
             medicationRowHeight: perRow,
@@ -169,7 +158,7 @@ enum FollowUpBookletGenerator {
             mealsRowHeight: perRow,
             sleepRowHeight: perRow,
             symptomsRowHeight: perRow,
-            freeNotesLines: notesLines
+            eventsRowHeight: perRow
         )
     }
 
@@ -179,9 +168,7 @@ enum FollowUpBookletGenerator {
         for med in actives {
             for h in med.scheduledHours {
                 let key = DoseKey(medicationID: med.id, hour: h.hour, minute: h.minute)
-                if options.allDosesSelected || options.selectedDoses.contains(key) {
-                    count += 1
-                }
+                if options.allDosesSelected || options.selectedDoses.contains(key) { count += 1 }
             }
         }
         return count
@@ -239,7 +226,6 @@ enum FollowUpBookletGenerator {
         "Cahier de suivi quotidien".draw(at: CGPoint(x: margin, y: y), withAttributes: [
             .font: titleFont, .foregroundColor: UIColor.black
         ])
-
         let metaText = "\(options.coverChildName) — \(options.coverPeriodLabel)"
         let metaSize = (metaText as NSString).size(withAttributes: [.font: metaFont])
         (metaText as NSString).draw(
@@ -247,7 +233,6 @@ enum FollowUpBookletGenerator {
             withAttributes: [.font: metaFont, .foregroundColor: UIColor.darkGray]
         )
         y += titleFont.lineHeight + 2
-
         let path = UIBezierPath()
         path.move(to: CGPoint(x: margin, y: y))
         path.addLine(to: CGPoint(x: pageWidth - margin, y: y))
@@ -264,57 +249,73 @@ enum FollowUpBookletGenerator {
 
     private static func drawMedicationGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
         let actives = options.medications.filter { $0.isActive }
-
         var rows: [String] = []
         for med in actives {
             for h in med.scheduledHours {
                 let key = DoseKey(medicationID: med.id, hour: h.hour, minute: h.minute)
-                let included = options.allDosesSelected || options.selectedDoses.contains(key)
-                guard included else { continue }
-                rows.append("\(med.name) — \(med.doseLabel) à \(h.formatted)")
+                if options.allDosesSelected || options.selectedDoses.contains(key) {
+                    rows.append("\(med.name) — \(med.doseLabel) à \(h.formatted)")
+                }
             }
         }
         guard !rows.isEmpty else { return }
 
-        drawSectionTitle("Prises de médicaments (cocher quand donné)", y: &y)
-        drawCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y,
-                      leftColumnWidth: 220, rowHeight: rowHeight)
+        drawSectionTitle("Prises de médicaments", legend: "Cocher quand le médicament a été donné", y: &y)
+        drawSingleCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount),
+                            y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
     }
 
     private static func drawSeizureGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
-        drawSectionTitle("Crises (nb / type / durée totale)", y: &y)
-        let rows = SeizureType.allCases.map { "\($0.label)" } + ["Durée totale (min)"]
-        drawWriteGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y,
-                      leftColumnWidth: 180, rowHeight: rowHeight)
+        drawSectionTitle("Crises d'épilepsie observées", legend: seizureFreqLegend, y: &y)
+        let rows = SeizureType.allCases.map { $0.label }
+        drawMultiCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount),
+                           options: seizureFreqCodes, y: &y, leftColumnWidth: 180, rowHeight: rowHeight)
     }
 
     private static func drawMoodGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
-        drawSectionTitle("Humeur dominante", y: &y)
+        drawSectionTitle("Humeur dominante", legend: "Cocher l'état dominant observé", y: &y)
         let rows = ["😀 Très bien", "🙂 Bien", "😐 Neutre", "😟 Inquiétant / agité", "😢 Très difficile"]
-        drawCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y,
-                      leftColumnWidth: 170, rowHeight: rowHeight)
+        drawSingleCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount),
+                            y: &y, leftColumnWidth: 180, rowHeight: rowHeight)
     }
 
     private static func drawMealsGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
         let chosen = [MealSlot.breakfast, .lunch, .snack, .dinner].filter { options.selectedMealSlots.contains($0) }
-        var rows: [String] = chosen.map { $0.label }
-        rows.append("Hydratation (~ ml)")
-        guard rows.count > 1 else { return }
-        drawSectionTitle("Repas et hydratation (qualité, quantité, refus…)", y: &y)
-        drawWriteGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y,
-                      leftColumnWidth: 150, rowHeight: rowHeight)
+        guard !chosen.isEmpty else { return }
+        drawSectionTitle("Repas — quantité avalée", legend: mealQualityLegend, y: &y)
+        let rows: [String] = chosen.map { $0.label }
+        drawMultiCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount),
+                           options: mealQualityCodes, y: &y, leftColumnWidth: 150, rowHeight: rowHeight)
+
+        // Hydratation : séparée, échelle différente
+        drawSectionTitle("Hydratation", legend: hydrationLegend, y: &y)
+        drawMultiCheckGrid(rows: ["Apport liquidien"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: hydrationCodes, y: &y, leftColumnWidth: 150, rowHeight: rowHeight)
     }
 
     private static func drawSleepGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
-        drawSectionTitle("Sommeil et siestes (durée + qualité)", y: &y)
-        let rows = ["Sommeil de nuit (h)", "Qualité du sommeil", "Sieste matin (min)", "Sieste après-midi (min)", "Réveils nocturnes"]
-        drawWriteGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount), y: &y,
-                      leftColumnWidth: 180, rowHeight: rowHeight)
+        drawSectionTitle("Sommeil", legend: "Voir légendes ci-dessous", y: &y)
+
+        // Durée nuit (4 options)
+        drawMultiCheckGrid(rows: ["Sommeil de nuit (h) — \(sleepDurLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: sleepDurCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
+        // Qualité (3 options)
+        drawMultiCheckGrid(rows: ["Qualité du sommeil — \(sleepQualLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: sleepQualCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
+        // Sieste matin
+        drawMultiCheckGrid(rows: ["Sieste matin — \(napLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: napCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
+        // Sieste après-midi
+        drawMultiCheckGrid(rows: ["Sieste après-midi — \(napLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: napCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
+        // Réveils
+        drawMultiCheckGrid(rows: ["Réveils nocturnes — \(nightWakeLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: nightWakeCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
     }
 
-    /// Symptômes Rett — 2 cases par jour (matin / après-midi).
+    /// Symptômes Rett : 2 cases par jour (matin / après-midi).
     private static func drawSymptomsGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
-        drawSectionTitle("Symptômes Rett (M = matin · A = après-midi)", y: &y)
+        drawSectionTitle("Symptômes Rett", legend: "M = matin · A = après-midi", y: &y)
 
         let symptoms = RettSymptom.allCases.filter { options.selectedSymptoms.contains($0) }
         let days = dayHeaders(count: options.dayCount)
@@ -328,7 +329,6 @@ enum FollowUpBookletGenerator {
         let dayHeaderHeight: CGFloat = 12
         let halfHeaderHeight: CGFloat = 10
 
-        // Bandeau jours
         UIColor(white: 0.92, alpha: 1).setFill()
         UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: dayHeaderHeight)).fill()
         for (i, h) in days.enumerated() {
@@ -339,7 +339,6 @@ enum FollowUpBookletGenerator {
         }
         y += dayHeaderHeight
 
-        // Bandeau M / A
         UIColor(white: 0.96, alpha: 1).setFill()
         UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: halfHeaderHeight)).fill()
         for i in 0..<days.count {
@@ -364,14 +363,13 @@ enum FollowUpBookletGenerator {
             s.label.draw(in: CGRect(x: margin + 3, y: y + max(0, (rowHeight - 9) / 2), width: leftWidth - 6, height: rowHeight),
                          withAttributes: [.font: cellFont, .foregroundColor: UIColor.darkGray])
 
-            let boxSize = min(rowHeight - 4, CGFloat(10))
+            let boxSize = min(rowHeight - 4, CGFloat(9))
             for i in 0..<(days.count * 2) {
                 let x = margin + leftWidth + CGFloat(i) * halfDayWidth + (halfDayWidth - boxSize) / 2
                 let box = CGRect(x: x, y: y + (rowHeight - boxSize) / 2, width: boxSize, height: boxSize)
                 UIColor.black.setStroke()
                 let p = UIBezierPath(rect: box); p.lineWidth = 0.4; p.stroke()
             }
-            // Verticales doubles entre jours
             for i in 0...days.count {
                 let x = margin + leftWidth + CGFloat(i * 2) * halfDayWidth
                 UIColor(white: 0.7, alpha: 1).setStroke()
@@ -386,18 +384,20 @@ enum FollowUpBookletGenerator {
         y += 4
     }
 
-    private static func drawFreeNotes(y: inout CGFloat, lineCount: Int) {
-        drawSectionTitle("Observations libres", y: &y)
-        for _ in 0..<lineCount {
-            let path = UIBezierPath()
-            path.move(to: CGPoint(x: margin, y: y + 12))
-            path.addLine(to: CGPoint(x: pageWidth - margin, y: y + 12))
-            UIColor.lightGray.setStroke()
-            path.lineWidth = 0.3
-            path.stroke()
-            y += 14
-        }
-        y += 2
+    /// Événements particuliers — remplace les notes libres : 1 case par jour
+    /// pour 6 catégories d'événements pré-définies.
+    private static func drawEventsGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
+        drawSectionTitle("Événements particuliers", legend: "Cocher si l'événement s'est produit ce jour-là", y: &y)
+        let rows = [
+            "Pleurs / cris inexpliqués",
+            "Agitation marquée",
+            "Selles inhabituelles",
+            "Vomissements / régurgitations",
+            "Comportement nouveau",
+            "Autre événement notable"
+        ]
+        drawSingleCheckGrid(rows: rows, dayHeaders: dayHeaders(count: options.dayCount),
+                            y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
     }
 
     private static func drawFooter() {
@@ -410,15 +410,24 @@ enum FollowUpBookletGenerator {
 
     // MARK: - Drawing primitives
 
-    private static func drawSectionTitle(_ title: String, y: inout CGFloat) {
-        let font = UIFont.systemFont(ofSize: 9.5, weight: .semibold)
+    private static func drawSectionTitle(_ title: String, legend: String?, y: inout CGFloat) {
+        let titleFont = UIFont.systemFont(ofSize: 9.5, weight: .semibold)
+        let legendFont = UIFont.italicSystemFont(ofSize: 7.5)
         title.draw(at: CGPoint(x: margin, y: y), withAttributes: [
-            .font: font, .foregroundColor: UIColor.black
+            .font: titleFont, .foregroundColor: UIColor.black
         ])
-        y += font.lineHeight + 1
+        if let legend, !legend.isEmpty {
+            let titleSize = (title as NSString).size(withAttributes: [.font: titleFont])
+            (legend as NSString).draw(
+                at: CGPoint(x: margin + titleSize.width + 6, y: y + 2),
+                withAttributes: [.font: legendFont, .foregroundColor: UIColor.darkGray]
+            )
+        }
+        y += titleFont.lineHeight + 1
     }
 
-    private static func drawCheckGrid(rows: [String], dayHeaders: [String], y: inout CGFloat, leftColumnWidth: CGFloat, rowHeight: CGFloat) {
+    /// Une case à cocher par cellule-jour. Utilisé pour Médicaments, Humeur, Événements.
+    private static func drawSingleCheckGrid(rows: [String], dayHeaders: [String], y: inout CGFloat, leftColumnWidth: CGFloat, rowHeight: CGFloat) {
         let totalWidth = pageWidth - 2 * margin
         let dayColumnWidth = (totalWidth - leftColumnWidth) / CGFloat(dayHeaders.count)
         let headerFont = UIFont.systemFont(ofSize: 8.5, weight: .semibold)
@@ -440,13 +449,11 @@ enum FollowUpBookletGenerator {
             let line = UIBezierPath()
             line.move(to: CGPoint(x: margin, y: y + rowHeight))
             line.addLine(to: CGPoint(x: margin + totalWidth, y: y + rowHeight))
-            line.lineWidth = 0.3
-            line.stroke()
+            line.lineWidth = 0.3; line.stroke()
 
-            // Tronque le libellé si trop long pour la colonne (rare en A4)
-            let truncated = truncateForCell(row, width: leftColumnWidth - 6, font: cellFont)
-            truncated.draw(in: CGRect(x: margin + 3, y: y + max(0, (rowHeight - 9) / 2), width: leftColumnWidth - 6, height: rowHeight),
-                           withAttributes: [.font: cellFont, .foregroundColor: UIColor.darkGray])
+            let label = truncateForCell(row, width: leftColumnWidth - 6, font: cellFont)
+            label.draw(in: CGRect(x: margin + 3, y: y + max(0, (rowHeight - 9) / 2), width: leftColumnWidth - 6, height: rowHeight),
+                       withAttributes: [.font: cellFont, .foregroundColor: UIColor.darkGray])
 
             let boxSize: CGFloat = min(rowHeight - 4, 10)
             for i in 0..<dayHeaders.count {
@@ -460,44 +467,79 @@ enum FollowUpBookletGenerator {
         y += 4
     }
 
-    private static func drawWriteGrid(rows: [String], dayHeaders: [String], y: inout CGFloat, leftColumnWidth: CGFloat, rowHeight: CGFloat) {
+    /// Plusieurs cases par cellule-jour, chacune étiquetée par un code court.
+    /// Le code est rappelé dans une bandeau d'en-tête sous le nom du jour.
+    /// Utilisé pour Crises (0/1/2-3/4+), Repas (R/P/M/B/T), Sommeil…
+    private static func drawMultiCheckGrid(rows: [String], dayHeaders: [String], options optionCodes: [String], y: inout CGFloat, leftColumnWidth: CGFloat, rowHeight: CGFloat) {
         let totalWidth = pageWidth - 2 * margin
         let dayColumnWidth = (totalWidth - leftColumnWidth) / CGFloat(dayHeaders.count)
-        let headerFont = UIFont.systemFont(ofSize: 8.5, weight: .semibold)
+        let dayHeaderFont = UIFont.systemFont(ofSize: 8.5, weight: .semibold)
+        let optionLetterFont = UIFont.systemFont(ofSize: 6.5, weight: .regular)
         let cellFont = UIFont.systemFont(ofSize: 8)
 
-        let headerHeight: CGFloat = 12
+        // Bandeau jour
+        let dayHeaderHeight: CGFloat = 11
         UIColor(white: 0.92, alpha: 1).setFill()
-        UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: headerHeight)).fill()
+        UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: dayHeaderHeight)).fill()
         for (i, h) in dayHeaders.enumerated() {
             let x = margin + leftColumnWidth + CGFloat(i) * dayColumnWidth
             let para = NSMutableParagraphStyle(); para.alignment = .center
-            (h as NSString).draw(in: CGRect(x: x, y: y + 1, width: dayColumnWidth, height: headerHeight),
-                                 withAttributes: [.font: headerFont, .foregroundColor: UIColor.black, .paragraphStyle: para])
+            (h as NSString).draw(in: CGRect(x: x, y: y + 1, width: dayColumnWidth, height: dayHeaderHeight),
+                                 withAttributes: [.font: dayHeaderFont, .foregroundColor: UIColor.black, .paragraphStyle: para])
         }
-        y += headerHeight
+        y += dayHeaderHeight
 
+        // Bandeau codes-options (sous chaque jour)
+        let codeHeaderHeight: CGFloat = 9
+        UIColor(white: 0.96, alpha: 1).setFill()
+        UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: codeHeaderHeight)).fill()
+        let optionWidth = dayColumnWidth / CGFloat(optionCodes.count)
+        for i in 0..<dayHeaders.count {
+            for (j, code) in optionCodes.enumerated() {
+                let x = margin + leftColumnWidth + CGFloat(i) * dayColumnWidth + CGFloat(j) * optionWidth
+                let para = NSMutableParagraphStyle(); para.alignment = .center
+                (code as NSString).draw(in: CGRect(x: x, y: y, width: optionWidth, height: codeHeaderHeight),
+                                        withAttributes: [.font: optionLetterFont, .foregroundColor: UIColor.darkGray, .paragraphStyle: para])
+            }
+        }
+        y += codeHeaderHeight
+
+        // Lignes
         for row in rows {
             UIColor(white: 0.85, alpha: 1).setStroke()
             let line = UIBezierPath()
             line.move(to: CGPoint(x: margin, y: y + rowHeight))
             line.addLine(to: CGPoint(x: margin + totalWidth, y: y + rowHeight))
-            line.lineWidth = 0.3
-            line.stroke()
+            line.lineWidth = 0.3; line.stroke()
 
-            let truncated = truncateForCell(row, width: leftColumnWidth - 6, font: cellFont)
-            truncated.draw(in: CGRect(x: margin + 3, y: y + max(0, (rowHeight - 9) / 2), width: leftColumnWidth - 6, height: rowHeight),
-                           withAttributes: [.font: cellFont, .foregroundColor: UIColor.darkGray])
+            let label = truncateForCell(row, width: leftColumnWidth - 6, font: cellFont)
+            label.draw(in: CGRect(x: margin + 3, y: y + max(0, (rowHeight - 9) / 2), width: leftColumnWidth - 6, height: rowHeight),
+                       withAttributes: [.font: cellFont, .foregroundColor: UIColor.darkGray])
 
-            for i in 0...dayHeaders.count {
-                let x = margin + leftColumnWidth + CGFloat(i) * dayColumnWidth
-                UIColor(white: 0.85, alpha: 1).setStroke()
+            let boxSize: CGFloat = min(rowHeight - 4, min(optionWidth - 2, 8))
+            for i in 0..<dayHeaders.count {
+                for j in 0..<optionCodes.count {
+                    let x = margin + leftColumnWidth + CGFloat(i) * dayColumnWidth + CGFloat(j) * optionWidth + (optionWidth - boxSize) / 2
+                    let box = CGRect(x: x, y: y + (rowHeight - boxSize) / 2, width: boxSize, height: boxSize)
+                    UIColor.black.setStroke()
+                    let p = UIBezierPath(rect: box); p.lineWidth = 0.35; p.stroke()
+                }
+                // Verticale de séparation entre jours
+                let xSep = margin + leftColumnWidth + CGFloat(i) * dayColumnWidth
+                UIColor(white: 0.75, alpha: 1).setStroke()
                 let v = UIBezierPath()
-                v.move(to: CGPoint(x: x, y: y))
-                v.addLine(to: CGPoint(x: x, y: y + rowHeight))
-                v.lineWidth = 0.3
-                v.stroke()
+                v.move(to: CGPoint(x: xSep, y: y))
+                v.addLine(to: CGPoint(x: xSep, y: y + rowHeight))
+                v.lineWidth = 0.4; v.stroke()
             }
+            // dernière verticale
+            let xLast = margin + leftColumnWidth + CGFloat(dayHeaders.count) * dayColumnWidth
+            UIColor(white: 0.75, alpha: 1).setStroke()
+            let vLast = UIBezierPath()
+            vLast.move(to: CGPoint(x: xLast, y: y))
+            vLast.addLine(to: CGPoint(x: xLast, y: y + rowHeight))
+            vLast.lineWidth = 0.4; vLast.stroke()
+
             y += rowHeight
         }
         y += 4

@@ -34,7 +34,7 @@ struct BookletConfigurationView: View {
                 Toggle("Repas et hydratation", isOn: $config.includeMealsGrid)
                 Toggle("Sommeil / siestes", isOn: $config.includeSleepGrid)
                 Toggle("Symptômes Rett (matin / après-midi)", isOn: $config.includeSymptomsGrid)
-                Toggle("Observations libres", isOn: $config.includeFreeNotes)
+                Toggle("Événements particuliers", isOn: $config.includeFreeNotes)
             }
 
             if config.includeMedicationGrid && !activeMedications.isEmpty {
