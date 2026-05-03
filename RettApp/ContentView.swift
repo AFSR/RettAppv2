@@ -33,9 +33,6 @@ struct ContentView: View {
                     .tabItem { Label("Bilan", systemImage: "chart.bar.xaxis") }
             }
 
-            NavigationStack { EyeGameView() }
-                .tabItem { Label("Jeu Regard", systemImage: "eye.fill") }
-
             NavigationStack { SettingsView() }
                 .tabItem { Label("Réglages", systemImage: "gear") }
         }

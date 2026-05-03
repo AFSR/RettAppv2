@@ -168,9 +168,6 @@ struct SettingsView: View {
         }
     }
 
-    private var eyeGameSection: some View {
-        EyeGameSettingsSection()
-    }
 
     private var healthSection: some View {
         Section {
