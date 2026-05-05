@@ -7,8 +7,6 @@ struct ProfileSetupView: View {
 
     @State private var firstName: String = ""
     @State private var lastName: String = ""
-    @State private var hasBirthDate: Bool = false
-    @State private var birthDate: Date = Date()
     @State private var hasEpilepsy: Bool = false
     @State private var initialMedications: [DraftMedication] = []
     @State private var step: Step = .intro
@@ -113,24 +111,16 @@ struct ProfileSetupView: View {
     private var childStep: some View {
         Form {
             Section {
-                TextField("Prénom", text: $firstName)
+                TextField("Prénom de l'enfant", text: $firstName)
                     .textContentType(.givenName)
                     .autocorrectionDisabled()
-                TextField("Nom de famille (optionnel)", text: $lastName)
+                TextField("Nom de famille de l'enfant (optionnel)", text: $lastName)
                     .textContentType(.familyName)
                     .autocorrectionDisabled()
             } header: {
                 Text("Identité de l'enfant")
             } footer: {
-                Text("Le nom de famille n'apparaît que dans les documents imprimés (rapport médecin, cahier de suivi). Il reste sur votre appareil.")
-            }
-            Section {
-                Toggle("Renseigner la date de naissance", isOn: $hasBirthDate)
-                if hasBirthDate {
-                    DatePicker("Née le", selection: $birthDate, in: ...Date(), displayedComponents: .date)
-                }
-            } footer: {
-                Text("Utilisé pour calculer l'âge dans les exports.")
+                Text("Seul le prénom de l'enfant est nécessaire pour personnaliser les écrans (« Journal — Léa », etc.). Le nom de famille n'apparaît que dans les documents imprimés. La date de naissance peut être ajoutée plus tard depuis Réglages → Profil si vous souhaitez voir l'âge dans les rapports.")
             }
             Section {
                 AFSRPrimaryButton(title: "Continuer") { step = .epilepsy }
@@ -225,7 +215,7 @@ struct ProfileSetupView: View {
         let profile = ChildProfile(
             firstName: firstName.trimmingCharacters(in: .whitespaces),
             lastName: lastName.trimmingCharacters(in: .whitespaces),
-            birthDate: hasBirthDate ? birthDate : nil,
+            birthDate: nil,
             hasEpilepsy: hasEpilepsy,
             appleUserID: appleID
         )

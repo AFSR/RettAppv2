@@ -44,7 +44,12 @@ struct SignInView: View {
                         .foregroundStyle(.white.opacity(0.95))
 
                     SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.fullName]
+                        // Aucun scope demandé : on n'a pas besoin du nom ni de
+                        // l'e-mail du parent. L'authentification de session
+                        // utilise uniquement le userID opaque fourni par Apple.
+                        // Cela évite tout doublon avec les infos déjà fournies
+                        // par Authentication Services (Guideline 4 SIWA).
+                        request.requestedScopes = []
                     } onCompletion: { result in
                         authManager.handle(result)
                     }
