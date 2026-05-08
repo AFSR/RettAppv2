@@ -39,30 +39,34 @@ struct BookletPixelSampler {
         self.image = cgImage
         self.qrPDFRect = qrPDFRect
         self.qrImageRect = qrImageRect
-        self.scaleX = qrImageRect.width / qrPDFRect.width
-        self.scaleY = qrImageRect.height / qrPDFRect.height
-        self.offsetX = qrImageRect.minX - qrPDFRect.minX * scaleX
-        self.offsetY = qrImageRect.minY - qrPDFRect.minY * scaleY
+        let sx = qrImageRect.width / qrPDFRect.width
+        let sy = qrImageRect.height / qrPDFRect.height
+        let ox = qrImageRect.minX - qrPDFRect.minX * sx
+        let oy = qrImageRect.minY - qrPDFRect.minY * sy
+        self.scaleX = sx
+        self.scaleY = sy
+        self.offsetX = ox
+        self.offsetY = oy
+
         // Calibrage du blanc papier : on échantillonne 4 points dans les
         // marges (entre QR et bord, en bas à gauche, etc.) puis on prend la
         // valeur la plus claire (= la plus représentative du papier vierge).
-        self.paperReference = 0  // placeholder, calculé juste après
         let samples: [CGFloat] = [
             // Coin haut-gauche (avant le bandeau date)
-            BookletPixelSampler.sample(in: cgImage, scaleX: scaleX, scaleY: scaleY,
-                                       offsetX: offsetX, offsetY: offsetY,
+            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
+                                       offsetX: ox, offsetY: oy,
                                        at: CGPoint(x: 8, y: 8), halfPoints: 4),
             // Coin bas-gauche (sous les sections, marges de pied de page)
-            BookletPixelSampler.sample(in: cgImage, scaleX: scaleX, scaleY: scaleY,
-                                       offsetX: offsetX, offsetY: offsetY,
+            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
+                                       offsetX: ox, offsetY: oy,
                                        at: CGPoint(x: 8, y: 830), halfPoints: 4),
             // Coin bas-droite
-            BookletPixelSampler.sample(in: cgImage, scaleX: scaleX, scaleY: scaleY,
-                                       offsetX: offsetX, offsetY: offsetY,
+            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
+                                       offsetX: ox, offsetY: oy,
                                        at: CGPoint(x: 580, y: 830), halfPoints: 4),
             // Au-dessus du QR (entre QR et bord page)
-            BookletPixelSampler.sample(in: cgImage, scaleX: scaleX, scaleY: scaleY,
-                                       offsetX: offsetX, offsetY: offsetY,
+            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
+                                       offsetX: ox, offsetY: oy,
                                        at: CGPoint(x: qrPDFRect.midX, y: 8), halfPoints: 4)
         ]
         // On prend la plus claire (papier blanc), ce qui rejette les
