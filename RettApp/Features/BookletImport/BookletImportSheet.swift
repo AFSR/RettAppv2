@@ -467,16 +467,21 @@ struct BookletImportSheet: View {
             phase = .unsupportedScan
             return
         }
+        log.info("Paper reference luma = \(sampler.paperReference, privacy: .public)")
         let cells = BookletLayoutEngine.cells(for: detection.schema)
         log.info("Layout produced \(cells.count, privacy: .public) cells")
         var checks: [BookletLayoutEngine.Cell: Bool] = [:]
         var checkedCount = 0
+        var minRatio: CGFloat = 1.0
+        var maxRatio: CGFloat = 0.0
         for cell in cells {
-            let checked = sampler.isChecked(atPDFPoint: cell.center)
-            checks[cell] = checked
-            if checked { checkedCount += 1 }
+            let r = sampler.isChecked(atPDFPoint: cell.center)
+            checks[cell] = r.checked
+            if r.checked { checkedCount += 1 }
+            if r.ratio < minRatio { minRatio = r.ratio }
+            if r.ratio > maxRatio { maxRatio = r.ratio }
         }
-        log.info("Sampler detected \(checkedCount, privacy: .public)/\(cells.count, privacy: .public) cells as checked")
+        log.info("Sampler detected \(checkedCount, privacy: .public)/\(cells.count, privacy: .public) cells as checked, ratios=[\(minRatio, privacy: .public)..\(maxRatio, privacy: .public)]")
         scanResult = BookletScanResult(schema: detection.schema, checks: checks)
         selectedDayIndex = 0
         phase = .review

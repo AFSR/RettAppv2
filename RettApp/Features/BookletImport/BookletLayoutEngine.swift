@@ -16,11 +16,20 @@ enum BookletLayoutEngine {
     static let pageWidth: CGFloat = 595
     static let pageHeight: CGFloat = 842
     static let margin: CGFloat = 24
+    static let footerReserve: CGFloat = 18
 
     // Position fixe du QR (haut-droite)
     static let qrSize: CGFloat = 60
     static var qrOrigin: CGPoint {
         CGPoint(x: pageWidth - margin - qrSize, y: margin)
+    }
+
+    /// Position y où commence le contenu (sections), juste après le bloc
+    /// header (QR + bandeau date + trait séparateur). Doit être identique au
+    /// générateur : après drawHeader, y = margin + qrSize + 4 (pour la ligne)
+    /// + 6 (espacement final) = margin + qrSize + 10.
+    static var contentStartY: CGFloat {
+        margin + qrSize + 10
     }
 
     /// Cellule générique : une case à cocher dans le cahier.
@@ -67,9 +76,10 @@ enum BookletLayoutEngine {
             + (included.contains(.symptoms) ? symptomRows : 0)
             + (included.contains(.events) ? eventsRows : 0)
 
-        // y disponible = hauteur - margin (top) - footer reserve - header
-        // Le header prend environ 25 pt (titre + trait), comme dans le générateur.
-        let availableHeight = pageHeight - margin - 18 - 25
+        // y disponible = hauteur totale − contenu déjà occupé par le header
+        // (QR + date + trait) − réserve footer. Doit être strictement
+        // identique au générateur, sinon les hauteurs de ligne ne matchent pas.
+        let availableHeight = pageHeight - contentStartY - footerReserve
         let rowSpace = max(0, availableHeight - fixedOverhead)
         guard totalRows > 0 else { return 14 }
         let raw = rowSpace / CGFloat(totalRows)
@@ -82,7 +92,7 @@ enum BookletLayoutEngine {
     static func cells(for schema: BookletSchema) -> [Cell] {
         var cells: [Cell] = []
         let rowH = rowHeight(for: schema)
-        var y = margin + 25  // après le header (titre + trait)
+        var y = contentStartY  // après le header (QR + date + trait)
 
         let included = schema.includedSections
 
