@@ -1,13 +1,13 @@
 import Foundation
 import SwiftData
+import os.log
 
 /// Convertit un `BookletScanResult` validé par l'utilisateur en records
 /// SwiftData insérés/mis à jour dans le journal.
 ///
 /// Pour chaque jour de la semaine et chaque case cochée :
 ///   - Médicaments → `MedicationLog` marqué pris
-///   - Crises → on n'insère **rien** automatiquement (juste un nombre observé,
-///     trop pauvre en infos cliniques) ; on consigne dans `DailyObservation.generalNotes`
+///   - Crises → noté dans `DailyObservation.generalNotes` (sauf option « 0 »)
 ///   - Humeur → `MoodEntry` à midi du jour concerné
 ///   - Repas → `DailyObservation.{breakfast,lunch,snack,dinner}RatingRaw`
 ///   - Hydratation → `DailyObservation.hydrationRatingRaw`
@@ -16,6 +16,8 @@ import SwiftData
 ///   - Événements → `DailyObservation.generalNotes`
 @MainActor
 enum BookletInsertionService {
+
+    private static let log = Logger(subsystem: "fr.afsr.RettApp", category: "BookletInsert")
 
     static func apply(
         _ result: BookletScanResult,
@@ -27,17 +29,32 @@ enum BookletInsertionService {
         let cal = Calendar.current
         let childId = childProfile?.id
 
+        let totalChecked = result.checks.values.filter { $0 }.count
+        log.info("apply() — \(totalChecked, privacy: .public) cases cochées à insérer ; jour de départ \(result.schema.start, privacy: .public) ; \(result.schema.days, privacy: .public) jours")
+
         // Pré-charge ou crée les DailyObservation par jour
         var observations: [Int: DailyObservation] = [:]
         for d in 0..<result.schema.days {
-            guard let day = result.date(forDay: d, calendar: cal) else { continue }
+            guard let day = result.date(forDay: d, calendar: cal) else {
+                log.error("Jour \(d, privacy: .public) — impossible de calculer la date")
+                continue
+            }
             let dayStart = cal.startOfDay(for: day)
             let descriptor = FetchDescriptor<DailyObservation>(
-                predicate: #Predicate { $0.dayStart == dayStart }
+                predicate: #Predicate<DailyObservation> { $0.dayStart == dayStart }
             )
-            if let existing = try? context.fetch(descriptor).first {
-                observations[d] = existing
-            } else {
+            do {
+                if let existing = try context.fetch(descriptor).first {
+                    observations[d] = existing
+                    log.info("Jour \(d, privacy: .public) (\(dayStart.ISO8601Format(), privacy: .public)) — DailyObservation existante réutilisée")
+                } else {
+                    let obs = DailyObservation(dayStart: dayStart, childProfileId: childId)
+                    context.insert(obs)
+                    observations[d] = obs
+                    log.info("Jour \(d, privacy: .public) (\(dayStart.ISO8601Format(), privacy: .public)) — DailyObservation nouvelle créée")
+                }
+            } catch {
+                log.error("Fetch DailyObservation échoué : \(error.localizedDescription, privacy: .public)")
                 let obs = DailyObservation(dayStart: dayStart, childProfileId: childId)
                 context.insert(obs)
                 observations[d] = obs
@@ -52,82 +69,101 @@ enum BookletInsertionService {
             case .medication:
                 guard cell.rowIndex < result.schema.meds.count else { continue }
                 let label = result.schema.meds[cell.rowIndex]
-                applyMedicationCheck(label: label, on: dayStart,
-                                     existingMedications: existingMedications,
-                                     childId: childId, in: context)
-                summary.medicationsTaken += 1
+                if applyMedicationCheck(label: label, on: dayStart,
+                                        existingMedications: existingMedications,
+                                        childId: childId, in: context) {
+                    summary.medicationsTaken += 1
+                }
 
             case .seizure:
-                // Note dans les observations du jour
+                // optionIndex 0 = « 0 crise », on n'ajoute rien (pas pertinent)
+                guard cell.optionIndex > 0 else { continue }
                 let typeIdx = cell.rowIndex
                 let optIdx = cell.optionIndex
                 let typeLabel = SeizureType.allCases[safe: typeIdx]?.label ?? "Crise"
                 let countLabel = ["0", "1", "2-3", "4+"][safe: optIdx] ?? "?"
                 if let obs = observations[cell.dayIndex] {
                     appendNote(to: obs, "\(typeLabel) : \(countLabel)")
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Crise notée : \(typeLabel, privacy: .public) \(countLabel, privacy: .public)")
+                    summary.seizuresNoted += 1
                 }
-                summary.seizuresNoted += 1
 
             case .mood:
-                // Mood 0 = très bien (😀, top of list), 4 = très difficile
                 let level: MoodLevel = [.veryGood, .good, .neutral, .worried, .veryDifficult][safe: cell.rowIndex] ?? .neutral
                 let timestamp = cal.date(byAdding: .hour, value: 12, to: dayStart) ?? dayStart
                 let entry = MoodEntry(timestamp: timestamp, level: level, childProfileId: childId)
                 context.insert(entry)
+                log.info("Jour \(cell.dayIndex, privacy: .public) — Humeur \(level.label, privacy: .public) (raw \(level.rawValue, privacy: .public))")
                 summary.moodEntries += 1
 
             case .meals:
                 guard let obs = observations[cell.dayIndex] else { continue }
-                // optionIndex 0..4 = R/P/M/B/T → rating 1..5
-                let rating = cell.optionIndex + 1
-                // rowIndex = ordre dans schema.mealSlots
-                let mealLetters = Array(result.schema.mealSlots)
+                let rating = cell.optionIndex + 1  // R/P/M/B/T → 1/2/3/4/5
+                // Conversion Character → String pour éviter toute ambiguïté
+                let mealLetters = result.schema.mealSlots.map { String($0) }
                 guard cell.rowIndex < mealLetters.count else { continue }
                 let slot = mealLetters[cell.rowIndex]
                 switch slot {
-                case "B": obs.breakfastRatingRaw = rating
-                case "L": obs.lunchRatingRaw = rating
-                case "S": obs.snackRatingRaw = rating
-                case "D": obs.dinnerRatingRaw = rating
-                default: break
+                case "B":
+                    obs.breakfastRatingRaw = rating
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Petit-déjeuner = \(rating, privacy: .public)/5")
+                case "L":
+                    obs.lunchRatingRaw = rating
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Déjeuner = \(rating, privacy: .public)/5")
+                case "S":
+                    obs.snackRatingRaw = rating
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Goûter = \(rating, privacy: .public)/5")
+                case "D":
+                    obs.dinnerRatingRaw = rating
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Dîner = \(rating, privacy: .public)/5")
+                default:
+                    log.error("Slot repas inconnu : \(slot, privacy: .public)")
                 }
                 summary.mealEntries += 1
 
             case .hydration:
                 guard let obs = observations[cell.dayIndex] else { continue }
-                // F/M/B/E → 1/2/4/5
-                let mapping = [1, 2, 4, 5]
+                // F/M/B/E → 2/3/4/5 (mappé sur QualityRating 1-5, on garde Faible=2 plutôt que veryPoor=1
+                // pour réserver veryPoor à un cas pathologique)
+                let mapping = [2, 3, 4, 5]
                 if let rating = mapping[safe: cell.optionIndex] {
                     obs.hydrationRatingRaw = rating
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Hydratation = \(rating, privacy: .public)/5")
                 }
 
             case .sleep:
                 guard let obs = observations[cell.dayIndex] else { continue }
-                // rowIndex définit la sous-ligne du sommeil :
-                //   0 = durée nuit (4 options : <6/6-8/8-10/>10 → minutes)
-                //   1 = qualité (3 options : B/M/D → 4/3/2)
-                //   2 = sieste matin (4 options : Non/<30/30-60/>60 → minutes)
-                //   3 = sieste après-midi (4 options : idem)
-                //   4 = réveils nocturnes (3 options : 0/1-2/3+) — texte note
                 switch cell.rowIndex {
                 case 0:
+                    // Durée nuit : <6/6-8/8-10/>10 → 300/420/540/660 minutes
                     let mapping = [300, 420, 540, 660]
-                    if let m = mapping[safe: cell.optionIndex] { obs.nightSleepDurationMinutes = m }
+                    if let m = mapping[safe: cell.optionIndex] {
+                        obs.nightSleepDurationMinutes = m
+                        log.info("Jour \(cell.dayIndex, privacy: .public) — Sommeil nuit = \(m, privacy: .public) min")
+                    }
                 case 1:
+                    // Qualité : B/M/D → 4/3/2
                     let mapping = [4, 3, 2]
-                    if let r = mapping[safe: cell.optionIndex] { obs.nightSleepRatingRaw = r }
+                    if let r = mapping[safe: cell.optionIndex] {
+                        obs.nightSleepRatingRaw = r
+                        log.info("Jour \(cell.dayIndex, privacy: .public) — Qualité sommeil = \(r, privacy: .public)/5")
+                    }
                 case 2, 3:
+                    // Sieste matin/aprem : Non/<30/30-60/>60 → 0/20/45/75 min
                     let mapping = [0, 20, 45, 75]
                     if let m = mapping[safe: cell.optionIndex] {
-                        // On additionne matin + aprem dans napDurationMinutes (modèle le permet)
+                        // Additionne matin + après-midi pour éviter d'écraser
                         obs.napDurationMinutes = max(obs.napDurationMinutes, 0) + m
+                        log.info("Jour \(cell.dayIndex, privacy: .public) — Sieste +\(m, privacy: .public) min (cumul=\(obs.napDurationMinutes, privacy: .public))")
                     }
                 case 4:
                     let labels = ["0 réveil", "1-2 réveils", "3+ réveils"]
                     if let lbl = labels[safe: cell.optionIndex] {
                         appendNote(to: obs, "Nuit : \(lbl)")
+                        log.info("Jour \(cell.dayIndex, privacy: .public) — Réveils : \(lbl, privacy: .public)")
                     }
-                default: break
+                default:
+                    log.error("Ligne sommeil inconnue : \(cell.rowIndex, privacy: .public)")
                 }
 
             case .symptoms:
@@ -142,6 +178,7 @@ enum BookletInsertionService {
                     childProfileId: childId
                 )
                 context.insert(event)
+                log.info("Jour \(cell.dayIndex, privacy: .public) — Symptôme \(symptom.label, privacy: .public) à \(hour, privacy: .public)h")
                 summary.symptomEvents += 1
 
             case .events:
@@ -156,40 +193,57 @@ enum BookletInsertionService {
                 ]
                 if let lbl = labels[safe: cell.rowIndex] {
                     appendNote(to: obs, lbl)
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Événement : \(lbl, privacy: .public)")
+                    summary.eventsNoted += 1
                 }
-                summary.eventsNoted += 1
             }
         }
 
-        try? context.save()
+        // Sauvegarde explicite avec logging d'erreur — try? cachait les échecs
+        do {
+            try context.save()
+            log.info("Sauvegarde réussie. Total : \(summary.summaryText, privacy: .public)")
+        } catch {
+            log.error("ÉCHEC sauvegarde SwiftData : \(error.localizedDescription, privacy: .public)")
+        }
         return summary
     }
 
     // MARK: - Helpers
 
+    /// Renvoie `true` si la prise a été marquée (médicament trouvé et log
+    /// inséré ou mis à jour), `false` sinon (médicament introuvable, etc.)
     private static func applyMedicationCheck(
         label: String, on dayStart: Date,
         existingMedications: [Medication], childId: UUID?,
         in context: ModelContext
-    ) {
-        // Cherche le médicament correspondant au libellé QR « Nom dose @ HH:MM »
-        guard let atRange = label.range(of: " @ ") else { return }
+    ) -> Bool {
+        guard let atRange = label.range(of: " @ ") else {
+            log.error("Libellé médicament malformé (pas de '@') : \(label, privacy: .public)")
+            return false
+        }
         let timeStr = String(label[atRange.upperBound...])
         let parts = timeStr.split(separator: ":").compactMap { Int($0) }
-        guard parts.count == 2 else { return }
+        guard parts.count == 2 else {
+            log.error("Heure médicament malformée : \(timeStr, privacy: .public)")
+            return false
+        }
         let nameDosePart = String(label[..<atRange.lowerBound])
 
-        // Trouve le médicament par nom (premier mot)
-        guard let med = existingMedications.first(where: { nameDosePart.hasPrefix($0.name) }) else { return }
+        // Cherche par préfixe du nom (ex. "Keppra 250 mg" matche "Keppra")
+        guard let med = existingMedications
+            .filter({ $0.isActive })
+            .first(where: { nameDosePart.hasPrefix($0.name) })
+        else {
+            log.error("Médicament introuvable : \(nameDosePart, privacy: .public)")
+            return false
+        }
 
         let cal = Calendar.current
         var comps = cal.dateComponents([.year, .month, .day], from: dayStart)
         comps.hour = parts[0]; comps.minute = parts[1]
-        guard let scheduledTime = cal.date(from: comps) else { return }
+        guard let scheduledTime = cal.date(from: comps) else { return false }
 
-        // Vérifie si un log existe déjà pour ce médicament à ce moment précis.
-        // SwiftData #Predicate accepte mal les conjonctions avec deux variables
-        // capturées — on fetch par medicationId puis on filtre côté Swift.
         let medId = med.id
         let descriptor = FetchDescriptor<MedicationLog>(
             predicate: #Predicate<MedicationLog> { $0.medicationId == medId }
@@ -198,8 +252,9 @@ enum BookletInsertionService {
         if let existing = logsForMed.first(where: { $0.scheduledTime == scheduledTime }) {
             existing.taken = true
             existing.takenTime = existing.takenTime ?? scheduledTime
+            log.info("Médicament \(med.name, privacy: .public) à \(timeStr, privacy: .public) — log existant marqué pris (\(scheduledTime.ISO8601Format(), privacy: .public))")
         } else {
-            let log = MedicationLog(
+            let logEntry = MedicationLog(
                 medicationId: med.id,
                 medicationName: med.name,
                 scheduledTime: scheduledTime,
@@ -209,8 +264,10 @@ enum BookletInsertionService {
                 doseUnit: med.doseUnit,
                 childProfileId: childId
             )
-            context.insert(log)
+            context.insert(logEntry)
+            log.info("Médicament \(med.name, privacy: .public) à \(timeStr, privacy: .public) — nouveau log inséré (\(scheduledTime.ISO8601Format(), privacy: .public))")
         }
+        return true
     }
 
     private static func appendNote(to obs: DailyObservation, _ text: String) {
