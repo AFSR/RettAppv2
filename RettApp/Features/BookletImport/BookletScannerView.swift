@@ -31,23 +31,33 @@ struct BookletScannerView: UIViewControllerRepresentable {
         let onCompletion: (Result) -> Void
         init(onCompletion: @escaping (Result) -> Void) { self.onCompletion = onCompletion }
 
+        // IMPORTANT : on appelle onCompletion DANS le completion handler de
+        // dismiss, pas avant. Sinon le callback déclenche un changement d'état
+        // SwiftUI pendant que UIKit anime encore la fermeture du
+        // VNDocumentCameraViewController — race condition qui faisait
+        // « clignoter » la review (la sheet parente était parfois fermée par
+        // SwiftUI au milieu de l'animation).
+
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
             var images: [UIImage] = []
             for i in 0..<scan.pageCount {
                 images.append(scan.imageOfPage(at: i))
             }
-            controller.dismiss(animated: true)
-            onCompletion(.success(images: images))
+            controller.dismiss(animated: true) { [onCompletion] in
+                onCompletion(.success(images: images))
+            }
         }
 
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
-            controller.dismiss(animated: true)
-            onCompletion(.cancelled)
+            controller.dismiss(animated: true) { [onCompletion] in
+                onCompletion(.cancelled)
+            }
         }
 
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) {
-            controller.dismiss(animated: true)
-            onCompletion(.failed(error))
+            controller.dismiss(animated: true) { [onCompletion] in
+                onCompletion(.failed(error))
+            }
         }
     }
 }

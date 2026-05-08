@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import os.log
 
 /// Workflow d'import du cahier de suivi.
 ///
@@ -38,6 +39,8 @@ struct BookletImportSheet: View {
     @State private var insertionSummary: BookletInsertionService.Summary?
     @State private var selectedDayIndex: Int = 0
 
+    private let log = Logger(subsystem: "fr.afsr.RettApp", category: "BookletScan")
+
     var body: some View {
         NavigationStack {
             content
@@ -47,10 +50,10 @@ struct BookletImportSheet: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Annuler") { dismiss() }
                     }
-                    if phase == .review {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Insérer") { saveAndDismiss() }.bold()
-                        }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Insérer") { saveAndDismiss() }
+                            .bold()
+                            .disabled(phase != .review || scanResult == nil)
                     }
                 }
         }
@@ -205,7 +208,6 @@ struct BookletImportSheet: View {
 
     private var reviewView: some View {
         VStack(spacing: 0) {
-            // Bandeau date détectée par le QR
             if let result = scanResult {
                 detectedDateBanner(result: result)
                 daySelector(result: result)
@@ -227,8 +229,50 @@ struct BookletImportSheet: View {
                         Spacer(minLength: 20)
                     }
                     .padding(.top, 12)
+                    .padding(.bottom, 80)  // place pour la barre d'action en bas
                 }
+                // Barre d'action fixe en bas — fallback robuste si le bouton
+                // toolbar n'est pas visible.
+                actionBar(result: result)
+            } else {
+                Text("Scan vide — recommencez la prise de photo.")
+                    .foregroundStyle(.secondary)
+                    .padding()
             }
+        }
+    }
+
+    private func actionBar(result: BookletScanResult) -> some View {
+        let totalChecked = result.checks.values.filter { $0 }.count
+        return VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                Button {
+                    showScanner = true
+                    phase = .intro
+                } label: {
+                    Label("Reprendre la photo", systemImage: "camera.rotate")
+                        .font(AFSRFont.caption())
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(.afsrPurpleAdaptive)
+
+                Button {
+                    saveAndDismiss()
+                } label: {
+                    Label("Insérer dans le journal (\(totalChecked))",
+                          systemImage: "checkmark.circle.fill")
+                        .font(AFSRFont.headline(14))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.afsrPurpleAdaptive)
+                .disabled(totalChecked == 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.bar)
         }
     }
 
@@ -380,7 +424,9 @@ struct BookletImportSheet: View {
     private func handleScanResult(_ result: BookletScannerView.Result) {
         switch result {
         case .success(let images):
+            log.info("Scanner returned \(images.count, privacy: .public) page(s)")
             guard let image = images.first else {
+                log.error("No image in scan result")
                 phase = .intro; return
             }
             scannedImage = image
@@ -388,8 +434,10 @@ struct BookletImportSheet: View {
             progress = "Recherche du QR code…"
             Task { await runPipeline(image: image) }
         case .cancelled:
+            log.info("Scanner cancelled")
             phase = .intro
         case .failed(let err):
+            log.error("Scanner failed: \(err.localizedDescription, privacy: .public)")
             scanError = err.localizedDescription
             phase = .intro
         }
@@ -397,11 +445,15 @@ struct BookletImportSheet: View {
 
     @MainActor
     private func runPipeline(image: UIImage) async {
+        log.info("Pipeline start — image size = \(image.size.width, privacy: .public)x\(image.size.height, privacy: .public)")
         guard let detection = await BookletQR.detect(in: image) else {
+            log.error("QR detection FAILED — no readable QR in the image")
             phase = .unsupportedScan
             return
         }
+        log.info("QR detected — schema days=\(detection.schema.days, privacy: .public) sections=\(detection.schema.incl, privacy: .public) meds=\(detection.schema.meds.count, privacy: .public)")
         progress = "Analyse des cases à cocher…"
+
         let qrPDFRect = CGRect(x: BookletLayoutEngine.qrOrigin.x,
                                 y: BookletLayoutEngine.qrOrigin.y,
                                 width: BookletLayoutEngine.qrSize,
@@ -411,18 +463,24 @@ struct BookletImportSheet: View {
             qrPDFRect: qrPDFRect,
             qrImageRect: detection.pixelBounds
         ) else {
+            log.error("BookletPixelSampler init failed")
             phase = .unsupportedScan
             return
         }
         let cells = BookletLayoutEngine.cells(for: detection.schema)
+        log.info("Layout produced \(cells.count, privacy: .public) cells")
         var checks: [BookletLayoutEngine.Cell: Bool] = [:]
+        var checkedCount = 0
         for cell in cells {
             let checked = sampler.isChecked(atPDFPoint: cell.center)
             checks[cell] = checked
+            if checked { checkedCount += 1 }
         }
+        log.info("Sampler detected \(checkedCount, privacy: .public)/\(cells.count, privacy: .public) cells as checked")
         scanResult = BookletScanResult(schema: detection.schema, checks: checks)
         selectedDayIndex = 0
         phase = .review
+        log.info("Phase = .review, scanResult set")
     }
 
     private func toggle(_ cell: BookletLayoutEngine.Cell) {
@@ -432,12 +490,16 @@ struct BookletImportSheet: View {
     }
 
     private func saveAndDismiss() {
-        guard let result = scanResult else { return }
+        guard let result = scanResult else {
+            log.error("saveAndDismiss called with nil scanResult")
+            return
+        }
         let summary = BookletInsertionService.apply(
             result, in: modelContext,
             childProfile: profiles.first,
             existingMedications: medications
         )
+        log.info("Inserted: \(summary.summaryText, privacy: .public) — total \(summary.totalChecks, privacy: .public) checks")
         insertionSummary = summary
         dismiss()
     }
