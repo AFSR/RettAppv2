@@ -187,13 +187,15 @@ enum BookletInsertionService {
         comps.hour = parts[0]; comps.minute = parts[1]
         guard let scheduledTime = cal.date(from: comps) else { return }
 
-        // Vérifie si un log existe déjà
+        // Vérifie si un log existe déjà pour ce médicament à ce moment précis.
+        // SwiftData #Predicate accepte mal les conjonctions avec deux variables
+        // capturées — on fetch par medicationId puis on filtre côté Swift.
+        let medId = med.id
         let descriptor = FetchDescriptor<MedicationLog>(
-            predicate: #Predicate {
-                $0.medicationId == med.id && $0.scheduledTime == scheduledTime
-            }
+            predicate: #Predicate<MedicationLog> { $0.medicationId == medId }
         )
-        if let existing = try? context.fetch(descriptor).first {
+        let logsForMed = (try? context.fetch(descriptor)) ?? []
+        if let existing = logsForMed.first(where: { $0.scheduledTime == scheduledTime }) {
             existing.taken = true
             existing.takenTime = existing.takenTime ?? scheduledTime
         } else {
