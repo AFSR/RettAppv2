@@ -93,16 +93,21 @@ struct FollowUpBookletView: View {
     }
 
     private func defaultPeriodLabel() -> String {
+        let monday = currentMonday()
         let cal = Calendar.current
-        let today = Date()
-        let weekday = cal.component(.weekday, from: today)
-        let daysToMonday = (weekday + 5) % 7
-        let monday = cal.date(byAdding: .day, value: -daysToMonday, to: today) ?? today
-        let endDay = cal.date(byAdding: .day, value: BookletConfigStore.shared.dayCount - 1, to: monday) ?? today
+        let endDay = cal.date(byAdding: .day, value: BookletConfigStore.shared.dayCount - 1, to: monday) ?? monday
         let f = DateFormatter()
         f.locale = Locale(identifier: "fr_FR")
         f.dateFormat = "d MMMM"
         return "Semaine du \(f.string(from: monday)) au \(f.string(from: endDay))"
+    }
+
+    private func currentMonday() -> Date {
+        let cal = Calendar.current
+        let today = Date()
+        let weekday = cal.component(.weekday, from: today)
+        let daysToMonday = (weekday + 5) % 7
+        return cal.date(byAdding: .day, value: -daysToMonday, to: today) ?? today
     }
 
     private func generate() async {
@@ -112,6 +117,7 @@ struct FollowUpBookletView: View {
         let opts = FollowUpBookletGenerator.Options(
             coverChildName: profiles.first?.fullName ?? "Enfant",
             coverPeriodLabel: periodLabel.isEmpty ? defaultPeriodLabel() : periodLabel,
+            weekStart: currentMonday(),
             includeMedicationGrid: config.includeMedicationGrid,
             includeSeizureGrid: config.includeSeizureGrid,
             includeMoodGrid: config.includeMoodGrid,

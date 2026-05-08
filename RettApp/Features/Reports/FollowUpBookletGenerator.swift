@@ -15,6 +15,9 @@ enum FollowUpBookletGenerator {
     struct Options {
         var coverChildName: String
         var coverPeriodLabel: String
+        /// Date du lundi de la semaine couverte (utilisée pour générer le QR
+        /// d'ancrage du scan + le bandeau date prominent).
+        var weekStart: Date
         var includeMedicationGrid: Bool
         var includeSeizureGrid: Bool
         var includeMoodGrid: Bool
@@ -220,19 +223,51 @@ enum FollowUpBookletGenerator {
     // MARK: - Header (1 ligne dense)
 
     private static func drawHeader(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options) {
-        let titleFont = UIFont.systemFont(ofSize: 13, weight: .bold)
+        // QR code en haut à droite (sert d'ancrage au scan + transporte le schéma)
+        let schema = BookletSchema.from(options: options, weekStart: options.weekStart)
+        let qrSize: CGFloat = BookletLayoutEngine.qrSize
+        let qrOrigin = BookletLayoutEngine.qrOrigin
+        if let qrImage = BookletQR.image(for: schema, sizeInPoints: qrSize) {
+            qrImage.draw(in: CGRect(x: qrOrigin.x, y: qrOrigin.y,
+                                    width: qrSize, height: qrSize))
+        }
+
+        // Bloc date prominent juste à gauche du QR
+        let dateBlockX = margin
+        let dateBlockY = qrOrigin.y
+        let dateBlockWidth = qrOrigin.x - dateBlockX - 12
+        let dateBlockHeight: CGFloat = qrSize
+
+        // Fond léger pourpre pour bien matérialiser la date
+        UIColor.systemPurple.withAlphaComponent(0.10).setFill()
+        UIBezierPath(roundedRect: CGRect(x: dateBlockX, y: dateBlockY,
+                                          width: dateBlockWidth, height: dateBlockHeight),
+                     cornerRadius: 6).fill()
+
+        let titleFont = UIFont.systemFont(ofSize: 11, weight: .semibold)
+        let dateFont = UIFont.systemFont(ofSize: 18, weight: .bold)
         let metaFont = UIFont.systemFont(ofSize: 9, weight: .regular)
 
-        "Cahier de suivi quotidien".draw(at: CGPoint(x: margin, y: y), withAttributes: [
-            .font: titleFont, .foregroundColor: UIColor.black
-        ])
-        let metaText = "\(options.coverChildName) — \(options.coverPeriodLabel)"
-        let metaSize = (metaText as NSString).size(withAttributes: [.font: metaFont])
-        (metaText as NSString).draw(
-            at: CGPoint(x: pageWidth - margin - metaSize.width, y: y + 3),
+        // Ligne 1 : "Cahier de suivi quotidien"
+        "Cahier de suivi quotidien".draw(
+            at: CGPoint(x: dateBlockX + 8, y: dateBlockY + 6),
+            withAttributes: [.font: titleFont, .foregroundColor: UIColor.black]
+        )
+
+        // Ligne 2 : période en grand pour bien matérialiser la date
+        options.coverPeriodLabel.draw(
+            at: CGPoint(x: dateBlockX + 8, y: dateBlockY + 22),
+            withAttributes: [.font: dateFont, .foregroundColor: UIColor.systemPurple]
+        )
+
+        // Ligne 3 : nom de l'enfant
+        ("Enfant : " + options.coverChildName).draw(
+            at: CGPoint(x: dateBlockX + 8, y: dateBlockY + 46),
             withAttributes: [.font: metaFont, .foregroundColor: UIColor.darkGray]
         )
-        y += titleFont.lineHeight + 2
+
+        // Avance le curseur y sous l'en-tête
+        y = dateBlockY + dateBlockHeight + 4
         let path = UIBezierPath()
         path.move(to: CGPoint(x: margin, y: y))
         path.addLine(to: CGPoint(x: pageWidth - margin, y: y))
