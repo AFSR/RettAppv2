@@ -58,7 +58,7 @@ extension ChildProfile {
             let new = ChildProfile(
                 id: id, firstName: firstName, lastName: lastName,
                 birthDate: birthDate, hasEpilepsy: hasEpilepsy,
-                appleUserID: nil, createdAt: createdAt
+                createdAt: createdAt
             )
             context.insert(new)
         }

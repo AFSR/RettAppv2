@@ -12,7 +12,6 @@ final class ChildProfile {
     var birthDate: Date?
     var hasEpilepsy: Bool
     var createdAt: Date
-    var appleUserID: String?
 
     @Relationship(deleteRule: .cascade, inverse: \Medication.childProfile)
     var medications: [Medication] = []
@@ -23,7 +22,6 @@ final class ChildProfile {
         lastName: String = "",
         birthDate: Date? = nil,
         hasEpilepsy: Bool = false,
-        appleUserID: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -31,7 +29,6 @@ final class ChildProfile {
         self.lastName = lastName
         self.birthDate = birthDate
         self.hasEpilepsy = hasEpilepsy
-        self.appleUserID = appleUserID
         self.createdAt = createdAt
     }
 

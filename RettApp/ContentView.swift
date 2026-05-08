@@ -42,5 +42,4 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .modelContainer(PreviewData.container)
-        .environment(AuthManager.previewSignedIn())
 }

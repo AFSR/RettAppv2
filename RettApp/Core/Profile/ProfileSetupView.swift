@@ -3,7 +3,6 @@ import SwiftData
 
 struct ProfileSetupView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(AuthManager.self) private var authManager
 
     @State private var firstName: String = ""
     @State private var lastName: String = ""
@@ -207,17 +206,11 @@ struct ProfileSetupView: View {
     // MARK: - Save
 
     private func save() {
-        let appleID: String? = {
-            if case .signedIn(let id) = authManager.state { return id }
-            return nil
-        }()
-
         let profile = ChildProfile(
             firstName: firstName.trimmingCharacters(in: .whitespaces),
             lastName: lastName.trimmingCharacters(in: .whitespaces),
             birthDate: nil,
-            hasEpilepsy: hasEpilepsy,
-            appleUserID: appleID
+            hasEpilepsy: hasEpilepsy
         )
         modelContext.insert(profile)
 
@@ -325,5 +318,4 @@ struct DraftMedicationEditor: View {
 #Preview {
     ProfileSetupView()
         .modelContainer(PreviewData.emptyContainer)
-        .environment(AuthManager.previewSignedIn())
 }

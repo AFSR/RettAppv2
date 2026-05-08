@@ -5,7 +5,6 @@ import HealthKit
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(AuthManager.self) private var authManager
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
     @Query(sort: \SeizureEvent.startTime) private var seizures: [SeizureEvent]
@@ -107,9 +106,6 @@ struct SettingsView: View {
             } header: {
                 Text("Légal")
             }
-
-            // ── COMPTE
-            accountSection
         }
         .navigationTitle("Réglages")
         .task { await refreshAuthorizations() }
@@ -400,18 +396,6 @@ struct SettingsView: View {
         }
     }
 
-    private var accountSection: some View {
-        Section {
-            Button(role: .destructive) {
-                authManager.signOut()
-            } label: {
-                Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
-            }
-        } footer: {
-            Text("Vos données locales ne sont pas supprimées à la déconnexion.")
-        }
-    }
-
     // MARK: - Helpers
 
     private var appVersion: String {
@@ -605,5 +589,4 @@ struct ChildProfileEditor: View {
 #Preview {
     NavigationStack { SettingsView() }
         .modelContainer(PreviewData.container)
-        .environment(AuthManager.previewSignedIn())
 }

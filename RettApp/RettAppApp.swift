@@ -5,7 +5,6 @@ import CloudKit
 @main
 struct RettAppApp: App {
     @UIApplicationDelegateAdaptor(RettAppDelegate.self) private var appDelegate
-    @State private var authManager = AuthManager()
     @State private var syncService = CloudKitSyncService()
 
     var sharedModelContainer: ModelContainer = {
@@ -21,7 +20,7 @@ struct RettAppApp: App {
 
         // On utilise un nom de fichier versionné — ça évite tout résidu d'un store
         // antérieur dont le schéma serait incompatible (lightweight migration absente).
-        let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v5.store")
+        let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v6.store")
         // IMPORTANT : `cloudKitDatabase: .none` désactive la sync auto SwiftData ↔ CloudKit.
         // Sans cela, comme on a déclaré l'entitlement iCloud (pour le partage entre parents),
         // SwiftData tenterait d'activer son intégration CloudKit native — qui exige que
@@ -96,7 +95,6 @@ struct RettAppApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environment(authManager)
                 .environment(syncService)
                 .tint(.afsrPurpleAdaptive)
                 .task {
@@ -133,26 +131,19 @@ private func logSwiftDataError(_ stage: String, _ error: Error) {
     }
 }
 
+/// Vue racine : montre l'onboarding tant qu'aucun profil enfant n'existe,
+/// puis l'écran principal. Aucune authentification utilisateur — toutes les
+/// données restent locales (SwiftData) ou dans l'iCloud personnel de
+/// l'utilisateur (CloudKit Sharing). Le compte iCloud du device sert
+/// d'identité ; pas besoin de Sign in with Apple.
 struct RootView: View {
-    @Environment(AuthManager.self) private var authManager
     @Query private var profiles: [ChildProfile]
 
     var body: some View {
-        Group {
-            switch authManager.state {
-            case .signedOut:
-                SignInView()
-            case .signedIn:
-                if profiles.isEmpty {
-                    ProfileSetupView()
-                } else {
-                    ContentView()
-                }
-            case .checking:
-                ProgressView("Chargement…")
-                    .controlSize(.large)
-            }
+        if profiles.isEmpty {
+            ProfileSetupView()
+        } else {
+            ContentView()
         }
-        .task { await authManager.restoreSession() }
     }
 }
