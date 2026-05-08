@@ -16,7 +16,6 @@ final class RettAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        StripeBootstrap.configure()
         return true
     }
 

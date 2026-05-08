@@ -46,6 +46,7 @@ struct HealthDataView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                healthKitBadge
                 introCard
                 if roleStore.role == .child {
                     childSelectionCard
@@ -103,6 +104,47 @@ struct HealthDataView: View {
     }
 
     // MARK: - Intro
+
+    /// Bandeau prominent indiquant clairement que cette fonctionnalité utilise
+    /// l'API HealthKit d'Apple. Exigé par la Guideline 2.5.1 d'Apple : les
+    /// fonctionnalités utilisant HealthKit doivent être identifiées de façon
+    /// claire et transparente dans l'UI.
+    private var healthKitBadge: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "heart.text.square.fill")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(10)
+                .background(
+                    LinearGradient(
+                        colors: [Color(red: 1.0, green: 0.36, blue: 0.36),
+                                 Color(red: 0.95, green: 0.21, blue: 0.45)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Utilise l'app Santé d'Apple")
+                    .font(AFSRFont.headline(15))
+                Text("via le framework HealthKit — données lues localement sur votre appareil")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button {
+                if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
+            } label: {
+                Image(systemName: "arrow.up.forward.app")
+                    .foregroundStyle(.afsrPurpleAdaptive)
+            }
+            .accessibilityLabel("Ouvrir l'app Santé")
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
 
     private var introCard: some View {
         SectionCard(

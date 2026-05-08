@@ -70,10 +70,12 @@ struct SettingsView: View {
                     NavigationLink {
                         HealthDataView()
                     } label: {
-                        Label("Données Apple Santé", systemImage: "heart.text.square")
+                        Label("App Santé d'Apple (HealthKit)", systemImage: "heart.text.square")
                     }
+                } header: {
+                    Text("Apple Santé")
                 } footer: {
-                    Text("Choisissez les types de données (sommeil, hydratation, repas, etc.) à lire depuis l'iPhone de l'enfant et à transmettre aux parents.")
+                    Text("RettApp utilise l'API HealthKit d'Apple pour lire les données Santé de cet iPhone (sommeil, hydratation, repas, etc.) et les transmettre aux parents partagés. Choix des types et permissions au prochain écran.")
                 }
             }
 
