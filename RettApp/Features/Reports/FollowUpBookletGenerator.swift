@@ -361,8 +361,9 @@ enum FollowUpBookletGenerator {
         let dayHeaderFont = UIFont.systemFont(ofSize: 8.5, weight: .semibold)
         let halfHeaderFont = UIFont.systemFont(ofSize: 7, weight: .regular)
         let cellFont = UIFont.systemFont(ofSize: 8)
-        let dayHeaderHeight: CGFloat = 12
-        let halfHeaderHeight: CGFloat = 10
+        // Constantes alignées sur le scanner via BookletLayoutEngine
+        let dayHeaderHeight = BookletLayoutEngine.symptomDayHeaderHeight
+        let halfHeaderHeight = BookletLayoutEngine.symptomHalfHeaderHeight
 
         UIColor(white: 0.92, alpha: 1).setFill()
         UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: dayHeaderHeight)).fill()
@@ -416,7 +417,7 @@ enum FollowUpBookletGenerator {
             }
             y += rowHeight
         }
-        y += 4
+        y += BookletLayoutEngine.sectionGap
     }
 
     /// Événements particuliers — remplace les notes libres : 1 case par jour
@@ -458,7 +459,8 @@ enum FollowUpBookletGenerator {
                 withAttributes: [.font: legendFont, .foregroundColor: UIColor.darkGray]
             )
         }
-        y += titleFont.lineHeight + 1
+        // Avance forfaitaire identique côté scanner (pas de dépendance lineHeight)
+        y += BookletLayoutEngine.sectionTitleAdvance
     }
 
     /// Une case à cocher par cellule-jour. Utilisé pour Médicaments, Humeur, Événements.
@@ -468,7 +470,7 @@ enum FollowUpBookletGenerator {
         let headerFont = UIFont.systemFont(ofSize: 8.5, weight: .semibold)
         let cellFont = UIFont.systemFont(ofSize: 8)
 
-        let headerHeight: CGFloat = 12
+        let headerHeight = BookletLayoutEngine.singleCheckHeaderHeight
         UIColor(white: 0.92, alpha: 1).setFill()
         UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: headerHeight)).fill()
         for (i, h) in dayHeaders.enumerated() {
@@ -499,7 +501,7 @@ enum FollowUpBookletGenerator {
             }
             y += rowHeight
         }
-        y += 4
+        y += BookletLayoutEngine.sectionGap
     }
 
     /// Plusieurs cases par cellule-jour, chacune étiquetée par un code court.
@@ -513,7 +515,7 @@ enum FollowUpBookletGenerator {
         let cellFont = UIFont.systemFont(ofSize: 8)
 
         // Bandeau jour
-        let dayHeaderHeight: CGFloat = 11
+        let dayHeaderHeight = BookletLayoutEngine.multiDayHeaderHeight
         UIColor(white: 0.92, alpha: 1).setFill()
         UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: dayHeaderHeight)).fill()
         for (i, h) in dayHeaders.enumerated() {
@@ -525,7 +527,7 @@ enum FollowUpBookletGenerator {
         y += dayHeaderHeight
 
         // Bandeau codes-options (sous chaque jour)
-        let codeHeaderHeight: CGFloat = 9
+        let codeHeaderHeight = BookletLayoutEngine.multiCodeHeaderHeight
         UIColor(white: 0.96, alpha: 1).setFill()
         UIBezierPath(rect: CGRect(x: margin, y: y, width: totalWidth, height: codeHeaderHeight)).fill()
         let optionWidth = dayColumnWidth / CGFloat(optionCodes.count)
@@ -577,7 +579,7 @@ enum FollowUpBookletGenerator {
 
             y += rowHeight
         }
-        y += 4
+        y += BookletLayoutEngine.sectionGap
     }
 
     private static func truncateForCell(_ s: String, width: CGFloat, font: UIFont) -> String {

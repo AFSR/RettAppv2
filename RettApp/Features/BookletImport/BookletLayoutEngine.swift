@@ -170,8 +170,10 @@ enum BookletLayoutEngine {
         }
 
         // ── Symptômes Rett : 2 cases (M/A) par jour
+        // Note : le bandeau jour des symptômes fait 12 pt (pas 11 comme les
+        // autres multi-options) — c'est la valeur du générateur.
         if included.contains(.symptoms), !schema.symptoms.isEmpty {
-            y += sectionTitleHeight + dayHeaderHeight + halfDayHeaderHeight
+            y += sectionTitleAdvance + symptomDayHeaderHeight + symptomHalfHeaderHeight
             cells.append(contentsOf: symptomCells(
                 schema: schema, rowHeight: rowH, yStart: &y
             ))
@@ -190,14 +192,47 @@ enum BookletLayoutEngine {
         return cells
     }
 
-    // MARK: - Constantes de layout (alignées sur le générateur)
+    // MARK: - Constantes de layout (source unique partagée avec le générateur)
+    //
+    // CRITIQUE : ces constantes doivent être strictement identiques aux
+    // valeurs utilisées par FollowUpBookletGenerator pour que le sampler
+    // tombe exactement sur les cases dessinées. Les hauteurs sont des
+    // **forfaits fixes** — pas de calculs basés sur UIFont.lineHeight, qui
+    // varient au runtime selon le système et provoquent des dérives de
+    // ~0.5 pt par titre × N sections = plusieurs points cumulés.
 
-    private static let sectionTitleHeight: CGFloat = 12
-    private static let headerRowHeight: CGFloat = 12        // bandeau jour seul
-    private static let dayHeaderHeight: CGFloat = 11        // bandeau jour pour multi-check
-    private static let codeHeaderHeight: CGFloat = 9        // bandeau codes
-    private static let halfDayHeaderHeight: CGFloat = 10    // bandeau M/A
-    private static let sectionGap: CGFloat = 4
+    /// Avance verticale après le titre d'une section (forfait, ≥ lineHeight de
+    /// SF Pro 9.5 semibold ~11.5 + marge de respiration).
+    static let sectionTitleAdvance: CGFloat = 13
+
+    /// Hauteur du bandeau jour pour les grilles à case unique
+    /// (médication / humeur / événements).
+    static let singleCheckHeaderHeight: CGFloat = 12
+
+    /// Hauteur du bandeau jour pour les grilles multi-options
+    /// (crises / repas / hydratation / sommeil).
+    static let multiDayHeaderHeight: CGFloat = 11
+
+    /// Hauteur du bandeau de codes-options sous le bandeau jour
+    /// (R/P/M/B/T pour repas, 0/1/2-3/4+ pour crises, etc.).
+    static let multiCodeHeaderHeight: CGFloat = 9
+
+    /// Hauteur du bandeau jour pour les symptômes Rett (différent du
+    /// multi-options : 12 pt au lieu de 11 dans le générateur).
+    static let symptomDayHeaderHeight: CGFloat = 12
+
+    /// Hauteur du bandeau Matin/Après-midi sous les jours (symptômes).
+    static let symptomHalfHeaderHeight: CGFloat = 10
+
+    /// Espacement vertical après chaque grille avant la section suivante.
+    static let sectionGap: CGFloat = 4
+
+    // Alias pour rétrocompat / lisibilité — utilisés dans cells(for:).
+    private static var sectionTitleHeight: CGFloat { sectionTitleAdvance }
+    private static var headerRowHeight: CGFloat { singleCheckHeaderHeight }
+    private static var dayHeaderHeight: CGFloat { multiDayHeaderHeight }
+    private static var codeHeaderHeight: CGFloat { multiCodeHeaderHeight }
+    private static var halfDayHeaderHeight: CGFloat { symptomHalfHeaderHeight }
 
     // MARK: - Générateurs de cellules par type de grille
 
