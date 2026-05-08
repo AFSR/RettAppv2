@@ -472,16 +472,28 @@ struct BookletImportSheet: View {
         log.info("Layout produced \(cells.count, privacy: .public) cells")
         var checks: [BookletLayoutEngine.Cell: Bool] = [:]
         var checkedCount = 0
-        var minRatio: CGFloat = 1.0
-        var maxRatio: CGFloat = 0.0
+        // Histogramme des ratios par bucket — permet de voir si la
+        // distribution est bien bimodale (cases cochées <0.5, cases vides
+        // >0.9) ou floue (continuité entre 0.6 et 0.9 → seuil mal calibré).
+        var bucket_lt50 = 0   // ratio < 0.50  (très clair-encrage)
+        var bucket_50_72 = 0  // 0.50 ≤ ratio < 0.72 (cochées mais légères)
+        var bucket_72_85 = 0  // 0.72 ≤ ratio < 0.85 (zone d'incertitude)
+        var bucket_85_95 = 0  // 0.85 ≤ ratio < 0.95 (probable papier)
+        var bucket_ge95 = 0   // ratio ≥ 0.95 (papier blanc)
         for cell in cells {
             let r = sampler.isChecked(atPDFPoint: cell.center)
             checks[cell] = r.checked
             if r.checked { checkedCount += 1 }
-            if r.ratio < minRatio { minRatio = r.ratio }
-            if r.ratio > maxRatio { maxRatio = r.ratio }
+            switch r.ratio {
+            case ..<0.50:    bucket_lt50 += 1
+            case ..<0.72:    bucket_50_72 += 1
+            case ..<0.85:    bucket_72_85 += 1
+            case ..<0.95:    bucket_85_95 += 1
+            default:         bucket_ge95 += 1
+            }
         }
-        log.info("Sampler detected \(checkedCount, privacy: .public)/\(cells.count, privacy: .public) cells as checked, ratios=[\(minRatio, privacy: .public)..\(maxRatio, privacy: .public)]")
+        log.info("Sampler: \(checkedCount, privacy: .public)/\(cells.count, privacy: .public) cells checked")
+        log.info("Histogramme ratios — <50%: \(bucket_lt50, privacy: .public) · 50-72%: \(bucket_50_72, privacy: .public) · 72-85%: \(bucket_72_85, privacy: .public) · 85-95%: \(bucket_85_95, privacy: .public) · ≥95%: \(bucket_ge95, privacy: .public)")
         scanResult = BookletScanResult(schema: detection.schema, checks: checks)
         selectedDayIndex = 0
         phase = .review

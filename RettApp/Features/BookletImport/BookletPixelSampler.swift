@@ -48,30 +48,30 @@ struct BookletPixelSampler {
         self.offsetX = ox
         self.offsetY = oy
 
-        // Calibrage du blanc papier : on échantillonne 4 points dans les
-        // marges (entre QR et bord, en bas à gauche, etc.) puis on prend la
-        // valeur la plus claire (= la plus représentative du papier vierge).
-        let samples: [CGFloat] = [
-            // Coin haut-gauche (avant le bandeau date)
-            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
-                                       offsetX: ox, offsetY: oy,
-                                       at: CGPoint(x: 8, y: 8), halfPoints: 4),
-            // Coin bas-gauche (sous les sections, marges de pied de page)
-            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
-                                       offsetX: ox, offsetY: oy,
-                                       at: CGPoint(x: 8, y: 830), halfPoints: 4),
-            // Coin bas-droite
-            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
-                                       offsetX: ox, offsetY: oy,
-                                       at: CGPoint(x: 580, y: 830), halfPoints: 4),
-            // Au-dessus du QR (entre QR et bord page)
-            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
-                                       offsetX: ox, offsetY: oy,
-                                       at: CGPoint(x: qrPDFRect.midX, y: 8), halfPoints: 4)
+        // Calibrage du blanc papier : on échantillonne 8 points dans les
+        // marges et on prend la médiane. Plus robuste que max() :
+        //   - max ignore les outliers sombres mais peut surestimer si une
+        //     zone est anormalement claire (reflet)
+        //   - median = papier représentatif de la photo (rejette les ombres
+        //     ET les reflets ponctuels)
+        let pointsForPaper: [CGPoint] = [
+            CGPoint(x: 8, y: 8),                       // coin haut-gauche
+            CGPoint(x: 8, y: 100),                     // marge gauche haute
+            CGPoint(x: 8, y: 400),                     // marge gauche centrale
+            CGPoint(x: 8, y: 800),                     // marge gauche basse
+            CGPoint(x: 587, y: 100),                   // marge droite haute
+            CGPoint(x: 587, y: 400),                   // marge droite centrale
+            CGPoint(x: 587, y: 800),                   // marge droite basse
+            CGPoint(x: qrPDFRect.midX, y: 8)           // au-dessus du QR
         ]
-        // On prend la plus claire (papier blanc), ce qui rejette les
-        // échantillons accidentellement tombés sur de l'encre.
-        self.paperReference = samples.max() ?? 0.95
+        let samples: [CGFloat] = pointsForPaper.map {
+            BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,
+                                       offsetX: ox, offsetY: oy,
+                                       at: $0, halfPoints: 4)
+        }
+        let sorted = samples.sorted()
+        // Médiane — robuste aux ombres et reflets ponctuels.
+        self.paperReference = sorted[sorted.count / 2]
     }
 
     /// Convertit une position PDF (pt) en position image (px).
@@ -137,18 +137,30 @@ struct BookletPixelSampler {
 
     /// Détermine si une case est cochée.
     ///
-    /// Approche : on échantillonne **très près du centre** de la case
-    /// (halfSize = 1.5 pt) pour ne pas attraper le cadre noir de la case.
-    /// On compare ensuite à `paperReference` : si la zone interne est
-    /// significativement plus sombre que le papier (ratio < 0.80), c'est
-    /// qu'il y a de l'encre dedans → cochée.
+    /// Approche : on échantillonne **5 sous-points** dans le cœur de la case
+    /// (centre + 4 points autour, à 1 pt de distance) avec une fenêtre très
+    /// fine (0.8 pt) pour rester strictement à l'intérieur du cadre. On
+    /// retient la luma la **plus sombre** des 5 points.
     ///
-    /// Seuil 0.80 = on considère qu'une case est cochée dès qu'elle est ~20 %
-    /// plus sombre que le papier. Permet de détecter même un simple « . » ou
-    /// « / » au stylo bille fin, sans déclencher sur les ombres légères.
+    /// Avantage par rapport à une simple moyenne au centre : un trait de
+    /// stylo qui ne passe pas pile au centre (typique d'un X tracé à la
+    /// main) est quand même capté par l'un des 4 points périphériques.
+    ///
+    /// On compare ensuite à `paperReference` : si la zone interne la plus
+    /// sombre est significativement plus sombre que le papier
+    /// (ratio < 0.72), la case est cochée. Seuil un peu plus permissif que
+    /// 0.80 (avec moyenne) car le min capte plus facilement les traits fins.
     func isChecked(atPDFPoint center: CGPoint) -> (checked: Bool, luma: CGFloat, ratio: CGFloat) {
-        let inner = averageIntensity(atPDFPoint: center, halfSizePoints: 1.5)
-        let ratio = paperReference > 0 ? inner / paperReference : 1.0
-        return (ratio < 0.80, inner, ratio)
+        let offsets: [(CGFloat, CGFloat)] = [
+            (0, 0), (-1, -1), (1, -1), (-1, 1), (1, 1)
+        ]
+        var minLuma: CGFloat = 1.0
+        for (dx, dy) in offsets {
+            let pt = CGPoint(x: center.x + dx, y: center.y + dy)
+            let v = averageIntensity(atPDFPoint: pt, halfSizePoints: 0.8)
+            if v < minLuma { minLuma = v }
+        }
+        let ratio = paperReference > 0 ? minLuma / paperReference : 1.0
+        return (ratio < 0.72, minLuma, ratio)
     }
 }
