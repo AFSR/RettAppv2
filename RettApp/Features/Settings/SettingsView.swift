@@ -62,20 +62,23 @@ struct SettingsView: View {
                 Text("Documents médicaux")
             }
 
-            // ── DONNÉES APPLE SANTÉ
-            //    Toujours visible (quel que soit le rôle de l'appareil) pour
-            //    qu'Apple App Review puisse trouver l'entrée d'activation.
-            //    L'écran lui-même adapte son contenu au mode courant.
-            Section {
-                NavigationLink {
-                    HealthDataView()
-                } label: {
-                    Label("App Santé d'Apple (HealthKit)", systemImage: "heart.text.square")
+            // ── DONNÉES APPLE SANTÉ — uniquement en mode enfant.
+            //    Apple Santé n'a de sens que sur l'iPhone effectivement
+            //    utilisé par l'enfant. Pour activer l'intégration, il faut
+            //    basculer cet iPhone en mode enfant via la section
+            //    « Cet iPhone est utilisé par » plus haut.
+            if DeviceRoleStore.shared.role == .child {
+                Section {
+                    NavigationLink {
+                        HealthDataView()
+                    } label: {
+                        Label("App Santé d'Apple (HealthKit)", systemImage: "heart.text.square")
+                    }
+                } header: {
+                    Text("Apple Santé")
+                } footer: {
+                    Text("RettApp utilise l'API HealthKit d'Apple pour lire les données Santé de cet iPhone (sommeil, hydratation, repas, rythme cardiaque, activité). L'autorisation est demandée à l'ouverture de l'écran.")
                 }
-            } header: {
-                Text("Apple Santé")
-            } footer: {
-                Text("RettApp utilise l'API HealthKit d'Apple pour lire les données de santé partagées par l'iPhone de l'enfant (sommeil, hydratation, repas, rythme cardiaque, activité). L'autorisation est demandée à l'ouverture de l'écran.")
             }
 
             // ── DONNÉES (sous-page hiérarchique)
@@ -183,7 +186,7 @@ struct SettingsView: View {
             } label: {
                 Label(
                     DeviceRoleStore.shared.role == .parent
-                        ? "Basculer en mode enfant…"
+                        ? "Basculer en mode enfant pour activer Apple Santé…"
                         : "Basculer en mode parent…",
                     systemImage: "arrow.triangle.2.circlepath"
                 )
@@ -191,7 +194,16 @@ struct SettingsView: View {
         } header: {
             Text("Configuration de l'appareil")
         } footer: {
-            Text(DeviceRoleStore.shared.role.detailedLabel)
+            // Footer explicite sur ce que chaque mode débloque, en
+            // particulier l'intégration Apple Santé (HealthKit) qui n'est
+            // utilisée que sur l'iPhone de l'enfant. Ce libellé permet à
+            // un nouvel utilisateur (et au reviewer Apple) de comprendre
+            // pourquoi l'entrée Apple Santé apparaît ou non dans Réglages.
+            if DeviceRoleStore.shared.role == .parent {
+                Text("Mode parent (par défaut). L'intégration Apple Santé (HealthKit) est inactive sur cet appareil — elle n'est utilisée que sur l'iPhone de l'enfant. Basculez en mode enfant pour activer la lecture Apple Santé sur cet iPhone.")
+            } else {
+                Text(DeviceRoleStore.shared.role.detailedLabel)
+            }
         }
     }
 
