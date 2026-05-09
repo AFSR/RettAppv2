@@ -62,21 +62,20 @@ struct SettingsView: View {
                 Text("Documents médicaux")
             }
 
-            // ── DONNÉES APPLE SANTÉ — uniquement en mode enfant (sinon
-            //    confusant : Apple Santé du parent n'a pas vocation à être
-            //    affichée dans une app de suivi de l'enfant).
-            if DeviceRoleStore.shared.role == .child {
-                Section {
-                    NavigationLink {
-                        HealthDataView()
-                    } label: {
-                        Label("App Santé d'Apple (HealthKit)", systemImage: "heart.text.square")
-                    }
-                } header: {
-                    Text("Apple Santé")
-                } footer: {
-                    Text("RettApp utilise l'API HealthKit d'Apple pour lire les données Santé de cet iPhone (sommeil, hydratation, repas, etc.) et les transmettre aux parents partagés. Choix des types et permissions au prochain écran.")
+            // ── DONNÉES APPLE SANTÉ
+            //    Toujours visible (quel que soit le rôle de l'appareil) pour
+            //    qu'Apple App Review puisse trouver l'entrée d'activation.
+            //    L'écran lui-même adapte son contenu au mode courant.
+            Section {
+                NavigationLink {
+                    HealthDataView()
+                } label: {
+                    Label("App Santé d'Apple (HealthKit)", systemImage: "heart.text.square")
                 }
+            } header: {
+                Text("Apple Santé")
+            } footer: {
+                Text("RettApp utilise l'API HealthKit d'Apple pour lire les données de santé partagées par l'iPhone de l'enfant (sommeil, hydratation, repas, rythme cardiaque, activité). L'autorisation est demandée à l'ouverture de l'écran.")
             }
 
             // ── DONNÉES (sous-page hiérarchique)
