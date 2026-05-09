@@ -57,29 +57,28 @@ struct ConfigurationSubView: View {
                 Text("Notifications")
             }
 
-            // Section Apple Santé uniquement quand l'app est configurée pour
-            // l'enfant — la lecture de Santé n'a aucun sens sur l'iPhone
-            // d'un parent (qui aurait sa propre Santé d'adulte, sans rapport).
-            if DeviceRoleStore.shared.role == .child {
-                Section {
-                    HStack {
-                        Label("Apple Santé", systemImage: "heart.fill")
-                            .foregroundStyle(.pink)
-                        Spacer()
-                        Text(healthKitStatusLabel)
-                            .font(AFSRFont.caption())
-                            .foregroundStyle(.secondary)
-                    }
-                    Button {
-                        if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
-                    } label: {
-                        Label("Gérer les permissions", systemImage: "gear")
-                    }
-                } header: {
-                    Text("Santé")
-                } footer: {
-                    Text("Choix des types de données dans Réglages → Données Apple Santé.")
+            // Section Apple Santé — toujours visible pour permettre à
+            // l'utilisateur (et au reviewer Apple) de trouver le point
+            // d'activation. L'écran HealthDataView adapte son contenu selon
+            // que l'appareil soit configuré en mode parent ou enfant.
+            Section {
+                HStack {
+                    Label("Apple Santé", systemImage: "heart.fill")
+                        .foregroundStyle(.pink)
+                    Spacer()
+                    Text(healthKitStatusLabel)
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
                 }
+                Button {
+                    if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
+                } label: {
+                    Label("Ouvrir l'app Santé", systemImage: "arrow.up.forward.app")
+                }
+            } header: {
+                Text("Santé")
+            } footer: {
+                Text("Choix des types de données et activation depuis Réglages → Données Apple Santé.")
             }
         }
         .navigationTitle("Configuration")

@@ -48,15 +48,27 @@ struct HealthDataView: View {
             VStack(alignment: .leading, spacing: 16) {
                 healthKitBadge
                 introCard
+                // Bouton d'activation TOUJOURS visible si la permission n'a
+                // pas encore été demandée — quel que soit le mode (parent
+                // ou enfant). Apple App Review exige un point d'activation
+                // évident pour les apps qui déclarent HealthKit.
+                if HealthKitManager.shared.isAvailable && !hasRequestedPermission {
+                    activationCard
+                }
                 if roleStore.role == .child {
                     childSelectionCard
+                } else {
+                    parentModeNoticeCard
                 }
                 periodPicker
 
                 if !HealthKitManager.shared.isAvailable {
                     unavailableCard
                 } else if !hasRequestedPermission {
-                    permissionPromptCard
+                    // L'activationCard plus haut sert déjà de prompt — pas
+                    // besoin d'en remettre un. On affiche juste un placeholder
+                    // discret.
+                    emptyBeforeActivationCard
                 } else if loading {
                     ProgressView("Chargement…")
                         .frame(maxWidth: .infinity, minHeight: 120)
@@ -259,6 +271,51 @@ struct HealthDataView: View {
         .pickerStyle(.segmented)
     }
 
+    // MARK: - Activation / permission cards
+
+    /// Carte d'activation prominent en HAUT de l'écran, visible quel que
+    /// soit le mode (parent ou enfant), tant que la permission Apple Santé
+    /// n'a pas encore été demandée. Permet à n'importe quel utilisateur
+    /// (et au reviewer Apple) d'activer la fonctionnalité en un seul tap.
+    private var activationCard: some View {
+        SectionCard(title: "Activer Apple Santé", systemImage: "heart.text.square.fill", accent: .afsrEmergency) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Touchez le bouton ci-dessous pour autoriser RettApp à lire les données de l'app Santé d'Apple. Vous pourrez ensuite choisir précisément quels types autoriser dans la feuille système.")
+                    .font(AFSRFont.body(13))
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    Task { await requestPermissionAndLoad() }
+                } label: {
+                    Label("Autoriser l'accès à Apple Santé", systemImage: "checkmark.shield.fill")
+                        .font(AFSRFont.headline(15))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.afsrEmergency)
+            }
+        }
+    }
+
+    /// Notice affichée en mode parent à la place du sélecteur de types
+    /// (qui n'est utile qu'en mode enfant). Explique ce que fait
+    /// l'intégration HealthKit dans ce mode.
+    private var parentModeNoticeCard: some View {
+        SectionCard(title: "Mode parent / aidant", systemImage: "person.fill", accent: .afsrPurpleAdaptive) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Cette installation est configurée comme étant celle d'un parent ou aidant.")
+                    .font(AFSRFont.body(13))
+                Text("RettApp lit alors les données Apple Santé partagées par l'iPhone ou l'Apple Watch de votre enfant via le partage familial iCloud (Réglages iOS → Famille → Santé).")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Pour qu'un type de données apparaisse ici, il doit avoir été partagé depuis l'iPhone de l'enfant.")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     // MARK: - Empty / permission states
 
     private var unavailableCard: some View {
@@ -269,21 +326,13 @@ struct HealthDataView: View {
         }
     }
 
-    private var permissionPromptCard: some View {
-        SectionCard(title: "Autoriser la lecture", systemImage: "lock.shield", accent: .afsrPurpleAdaptive) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("RettApp a besoin de votre permission pour lire les données Santé. Apple affichera une feuille listant chaque type — vous pouvez en autoriser une partie ou la totalité.")
-                    .font(AFSRFont.body(13))
-                    .fixedSize(horizontal: false, vertical: true)
-                Button {
-                    Task { await requestPermissionAndLoad() }
-                } label: {
-                    Label("Demander l'accès", systemImage: "checkmark.shield")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.afsrPurpleAdaptive)
-            }
+    /// Placeholder discret affiché tant que l'activation n'a pas eu lieu.
+    /// Le vrai bouton d'activation est dans `activationCard` en haut.
+    private var emptyBeforeActivationCard: some View {
+        SectionCard(title: "En attente de l'autorisation", systemImage: "hourglass", accent: .secondary) {
+            Text("Une fois la permission Apple Santé accordée, les graphiques apparaîtront ici.")
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
         }
     }
 
