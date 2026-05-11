@@ -567,9 +567,25 @@ struct ChildProfileEditor: View {
                 Text("Le nom de famille n'est utilisé que dans les documents imprimés (rapport médecin, cahier de suivi).")
             }
             Section {
+                Picker("Sexe", selection: Binding(
+                    get: { profile.sex },
+                    set: { profile.sex = $0 }
+                )) {
+                    ForEach(ChildSex.allCases) { s in
+                        Text(s.label).tag(s)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Sexe")
+            } footer: {
+                Text("Utilisé uniquement pour adapter les libellés affichés dans l'app (« née » / « né »).")
+            }
+            Section {
                 Toggle("Date de naissance", isOn: $hasBirthDate)
                 if hasBirthDate {
-                    DatePicker("Née le", selection: $birthDate, in: ...Date(), displayedComponents: .date)
+                    let dobLabel = profile.sex == .boy ? "Né le" : (profile.sex == .girl ? "Née le" : "Né(e) le")
+                    DatePicker(dobLabel, selection: $birthDate, in: ...Date(), displayedComponents: .date)
                 }
             }
             Section {

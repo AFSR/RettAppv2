@@ -35,6 +35,12 @@ struct MedicationPlanView: View {
                                         .foregroundStyle(.afsrPurpleAdaptive)
                                 }
                                 Spacer()
+                                if med.kind == .regular && !med.notifyEnabled {
+                                    Image(systemName: "bell.slash.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                        .accessibilityLabel("Notifications désactivées")
+                                }
                                 if !med.isActive {
                                     Text("Inactif")
                                         .font(AFSRFont.caption())
@@ -92,8 +98,8 @@ struct MedicationPlanView: View {
         }
         .sheet(isPresented: $showEditor) {
             NavigationStack {
-                MedicationEditor(medication: editing) { name, dose, unit, hours, kind, active in
-                    Task { await save(name: name, dose: dose, unit: unit, hours: hours, kind: kind, active: active) }
+                MedicationEditor(medication: editing) { name, dose, unit, hours, kind, active, notifyEnabled in
+                    Task { await save(name: name, dose: dose, unit: unit, hours: hours, kind: kind, active: active, notifyEnabled: notifyEnabled) }
                 }
             }
         }
@@ -137,7 +143,7 @@ struct MedicationPlanView: View {
         }
     }
 
-    private func save(name: String, dose: Double, unit: DoseUnit, hours: [HourMinute], kind: MedicationKind, active: Bool) async {
+    private func save(name: String, dose: Double, unit: DoseUnit, hours: [HourMinute], kind: MedicationKind, active: Bool, notifyEnabled: Bool) async {
         if let editing {
             editing.name = name
             editing.doseAmount = dose
@@ -145,8 +151,9 @@ struct MedicationPlanView: View {
             editing.scheduledHours = hours
             editing.kind = kind
             editing.isActive = active
+            editing.notifyEnabled = notifyEnabled
         } else {
-            let med = Medication(name: name, doseAmount: dose, doseUnit: unit, scheduledHours: hours, kind: kind, isActive: active)
+            let med = Medication(name: name, doseAmount: dose, doseUnit: unit, scheduledHours: hours, kind: kind, isActive: active, notifyEnabled: notifyEnabled)
             med.childProfile = profile
             modelContext.insert(med)
         }
@@ -162,7 +169,7 @@ struct MedicationPlanView: View {
 struct MedicationEditor: View {
     @Environment(\.dismiss) private var dismiss
     let medication: Medication?
-    let onSave: (String, Double, DoseUnit, [HourMinute], MedicationKind, Bool) -> Void
+    let onSave: (String, Double, DoseUnit, [HourMinute], MedicationKind, Bool, Bool) -> Void
 
     @State private var name: String = ""
     @State private var dose: String = ""
@@ -170,11 +177,7 @@ struct MedicationEditor: View {
     @State private var times: [HourMinute] = [HourMinute(hour: 8, minute: 0)]
     @State private var kind: MedicationKind = .regular
     @State private var active: Bool = true
-
-    private static let commonNames = [
-        "Dépakine", "Keppra", "Lamictal", "Rivotril", "Valium", "Urbanyl",
-        "Sabril", "Topamax", "Tegretol", "Diacomit", "Ospolot"
-    ]
+    @State private var notifyEnabled: Bool = true
 
     var body: some View {
         Form {
@@ -190,13 +193,26 @@ struct MedicationEditor: View {
             }
 
             Section("Nom") {
-                TextField("Ex. Keppra", text: $name)
+                TextField("Ex. Keppra, Doliprane, Mélatonine…", text: $name)
                     .autocorrectionDisabled()
                 if !name.isEmpty {
-                    ForEach(Self.commonNames.filter {
-                        $0.localizedCaseInsensitiveContains(name) && $0.lowercased() != name.lowercased()
-                    }, id: \.self) { suggestion in
-                        Button(suggestion) { name = suggestion }
+                    ForEach(CommonFrenchMedications.suggestions(matching: name, limit: 6), id: \.self) { suggestion in
+                        Button {
+                            if let parenIdx = suggestion.firstIndex(of: "(") {
+                                name = String(suggestion[..<parenIdx]).trimmingCharacters(in: .whitespaces)
+                            } else {
+                                name = suggestion
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "pills.fill")
+                                    .foregroundStyle(.afsrPurpleAdaptive)
+                                    .font(.system(size: 13))
+                                Text(suggestion)
+                                    .font(AFSRFont.body(14))
+                                Spacer()
+                            }
+                        }
                     }
                 }
             }
@@ -236,6 +252,16 @@ struct MedicationEditor: View {
             } footer: {
                 Text("Un médicament inactif n'apparaît plus dans la vue du jour et n'envoie plus de notifications.")
             }
+
+            if kind == .regular {
+                Section {
+                    Toggle(isOn: $notifyEnabled) {
+                        Label("Notifier ce médicament", systemImage: "bell.badge")
+                    }
+                } footer: {
+                    Text("Désactivez si la prise est gérée par un tiers (école, centre, autre parent) et que vous ne voulez pas recevoir de rappel sur cet appareil.")
+                }
+            }
         }
         .navigationTitle(medication == nil ? "Nouveau médicament" : "Modifier")
         .navigationBarTitleDisplayMode(.inline)
@@ -245,7 +271,7 @@ struct MedicationEditor: View {
                 Button("Enregistrer") {
                     let amount = Double(dose.replacingOccurrences(of: ",", with: ".")) ?? 0
                     let finalTimes = kind == .regular ? times : []
-                    onSave(name.trimmingCharacters(in: .whitespaces), amount, unit, finalTimes, kind, active)
+                    onSave(name.trimmingCharacters(in: .whitespaces), amount, unit, finalTimes, kind, active, notifyEnabled)
                     dismiss()
                 }
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -264,6 +290,7 @@ struct MedicationEditor: View {
                 times = medication.scheduledHours
                 kind = medication.kind
                 active = medication.isActive
+                notifyEnabled = medication.notifyEnabled
             }
         }
     }

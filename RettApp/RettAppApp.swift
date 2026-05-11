@@ -20,7 +20,7 @@ struct RettAppApp: App {
 
         // On utilise un nom de fichier versionné — ça évite tout résidu d'un store
         // antérieur dont le schéma serait incompatible (lightweight migration absente).
-        let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v6.store")
+        let storeURL = URL.applicationSupportDirectory.appending(path: "rettapp_v7.store")
         // IMPORTANT : `cloudKitDatabase: .none` désactive la sync auto SwiftData ↔ CloudKit.
         // Sans cela, comme on a déclaré l'entitlement iCloud (pour le partage entre parents),
         // SwiftData tenterait d'activer son intégration CloudKit native — qui exige que

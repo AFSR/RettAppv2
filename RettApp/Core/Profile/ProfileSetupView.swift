@@ -1,34 +1,44 @@
 import SwiftUI
 import SwiftData
 
+/// Onboarding du profil enfant.
+///
+/// Flux : intro → identité (prénom, nom, sexe) → épilepsie → médicaments → done.
+/// Chaque étape (sauf intro et done) a un bouton « Précédent » qui permet
+/// de revenir corriger les informations saisies. Tous les libellés sont
+/// personnalisés avec le prénom et le genre de l'enfant pour rendre
+/// l'expérience plus naturelle (« Léa a-t-elle de l'épilepsie ? » au lieu
+/// du générique « L'enfant a de l'épilepsie »).
 struct ProfileSetupView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var firstName: String = ""
     @State private var lastName: String = ""
+    @State private var sex: ChildSex = .unspecified
     @State private var hasEpilepsy: Bool = false
     @State private var initialMedications: [DraftMedication] = []
     @State private var step: Step = .intro
     @State private var disclaimerAcknowledged: Bool = false
 
-    enum Step { case intro, child, epilepsy, medications, done }
+    enum Step: Int, CaseIterable { case intro, child, epilepsy, medications, done }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.afsrBackground.ignoresSafeArea()
-                VStack {
+                VStack(spacing: 0) {
                     ProgressView(value: progress)
                         .tint(.afsrPurple)
                         .padding(.horizontal)
+                        .padding(.top, 8)
 
                     Group {
                         switch step {
-                        case .intro: introStep
-                        case .child: childStep
-                        case .epilepsy: epilepsyStep
-                        case .medications: medicationsStep
-                        case .done: doneStep
+                        case .intro:        introStep
+                        case .child:        childStep
+                        case .epilepsy:     epilepsyStep
+                        case .medications:  medicationsStep
+                        case .done:         doneStep
                         }
                     }
                     .animation(.easeInOut, value: step)
@@ -41,15 +51,22 @@ struct ProfileSetupView: View {
 
     private var progress: Double {
         switch step {
-        case .intro: return 0.1
-        case .child: return 0.3
-        case .epilepsy: return 0.55
+        case .intro:       return 0.1
+        case .child:       return 0.3
+        case .epilepsy:    return 0.55
         case .medications: return 0.8
-        case .done: return 1.0
+        case .done:        return 1.0
         }
     }
 
-    // MARK: - Steps
+    /// Prénom à afficher dans les libellés. Garde « votre enfant » par défaut
+    /// si l'utilisateur revient en arrière sans avoir encore saisi le prénom.
+    private var childName: String {
+        let trimmed = firstName.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? "votre enfant" : trimmed
+    }
+
+    // MARK: - Intro step
 
     private var introStep: some View {
         ScrollView {
@@ -107,6 +124,8 @@ struct ProfileSetupView: View {
         .padding(.horizontal)
     }
 
+    // MARK: - Child step
+
     private var childStep: some View {
         Form {
             Section {
@@ -119,72 +138,105 @@ struct ProfileSetupView: View {
             } header: {
                 Text("Identité de l'enfant")
             } footer: {
-                Text("Seul le prénom de l'enfant est nécessaire pour personnaliser les écrans (« Journal — Léa », etc.). Le nom de famille n'apparaît que dans les documents imprimés. La date de naissance peut être ajoutée plus tard depuis Réglages → Profil si vous souhaitez voir l'âge dans les rapports.")
+                Text("Le nom de famille n'apparaît que dans les documents imprimés. La date de naissance peut être ajoutée plus tard depuis Réglages → Profil.")
             }
+
             Section {
-                AFSRPrimaryButton(title: "Continuer") { step = .epilepsy }
-                    .disabled(firstName.trimmingCharacters(in: .whitespaces).isEmpty)
+                Picker("Sexe", selection: $sex) {
+                    ForEach(ChildSex.allCases) { s in
+                        Text(s.label).tag(s)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Sexe")
+            } footer: {
+                Text("Utilisé uniquement pour adapter les libellés affichés dans l'app (« née » / « né »). Vous pouvez choisir « Non précisé » pour rester neutre.")
             }
+
+            stepNavigationFooter(
+                back: { step = .intro },
+                next: { step = .epilepsy },
+                nextDisabled: firstName.trimmingCharacters(in: .whitespaces).isEmpty
+            )
         }
         .scrollContentBackground(.hidden)
     }
+
+    // MARK: - Epilepsy step
 
     private var epilepsyStep: some View {
         Form {
             Section {
                 Toggle(isOn: $hasEpilepsy) {
-                    Label("L'enfant a de l'épilepsie", systemImage: "waveform.path.ecg")
+                    Label("\(childName) a de l'épilepsie", systemImage: "waveform.path.ecg")
                 }
+            } header: {
+                Text("Épilepsie")
             } footer: {
-                Text("Active le module de suivi des crises dans l'application.")
+                Text("Active le module de suivi des crises dans l'application. Vous pouvez modifier ce réglage à tout moment depuis Réglages → Profil.")
             }
+
+            stepNavigationFooter(
+                back: { step = .child },
+                next: { step = .medications }
+            )
+        }
+        .scrollContentBackground(.hidden)
+    }
+
+    // MARK: - Medications step
+
+    private var medicationsStep: some View {
+        Form {
             Section {
-                AFSRPrimaryButton(title: "Continuer") { step = .medications }
+                ForEach($initialMedications) { $med in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(med.name).font(AFSRFont.headline(16))
+                            Text("\(med.doseAmount.formatted()) \(med.doseUnit.label)")
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                }
+                .onDelete { idx in initialMedications.remove(atOffsets: idx) }
+
+                NavigationLink {
+                    DraftMedicationEditor { new in
+                        initialMedications.append(new)
+                    }
+                } label: {
+                    Label("Ajouter un médicament", systemImage: "plus.circle.fill")
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                }
+            } header: {
+                Text("Médicaments en cours")
+            } footer: {
+                Text("Vous pourrez modifier cette liste à tout moment.")
+            }
+
+            Section {
+                Button {
+                    step = .epilepsy
+                } label: {
+                    Label("Précédent", systemImage: "chevron.left")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.afsrPurpleAdaptive)
+
+                AFSRPrimaryButton(title: "Terminer la configuration") {
+                    save()
+                    step = .done
+                }
             }
         }
         .scrollContentBackground(.hidden)
     }
 
-    private var medicationsStep: some View {
-        VStack {
-            Form {
-                Section {
-                    ForEach($initialMedications) { $med in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(med.name).font(AFSRFont.headline(16))
-                                Text("\(med.doseAmount.formatted()) \(med.doseUnit.label)")
-                                    .font(AFSRFont.caption())
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                    }
-                    .onDelete { idx in initialMedications.remove(atOffsets: idx) }
-
-                    NavigationLink {
-                        DraftMedicationEditor { new in
-                            initialMedications.append(new)
-                        }
-                    } label: {
-                        Label("Ajouter un médicament", systemImage: "plus.circle.fill")
-                            .foregroundStyle(.afsrPurpleAdaptive)
-                    }
-                } header: {
-                    Text("Médicaments en cours")
-                } footer: {
-                    Text("Vous pourrez modifier cette liste à tout moment.")
-                }
-            }
-            .scrollContentBackground(.hidden)
-
-            AFSRPrimaryButton(title: "Terminer la configuration") {
-                save()
-                step = .done
-            }
-            .padding()
-        }
-    }
+    // MARK: - Done step
 
     private var doneStep: some View {
         VStack(spacing: 24) {
@@ -203,6 +255,37 @@ struct ProfileSetupView: View {
         .padding()
     }
 
+    // MARK: - Navigation footer
+
+    @ViewBuilder
+    private func stepNavigationFooter(
+        back: @escaping () -> Void,
+        next: @escaping () -> Void,
+        nextDisabled: Bool = false
+    ) -> some View {
+        Section {
+            HStack(spacing: 12) {
+                Button(action: back) {
+                    Label("Précédent", systemImage: "chevron.left")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.afsrPurpleAdaptive)
+
+                Button(action: next) {
+                    HStack {
+                        Text("Continuer")
+                        Image(systemName: "chevron.right")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.afsrPurpleAdaptive)
+                .disabled(nextDisabled)
+            }
+        }
+    }
+
     // MARK: - Save
 
     private func save() {
@@ -210,7 +293,8 @@ struct ProfileSetupView: View {
             firstName: firstName.trimmingCharacters(in: .whitespaces),
             lastName: lastName.trimmingCharacters(in: .whitespaces),
             birthDate: nil,
-            hasEpilepsy: hasEpilepsy
+            hasEpilepsy: hasEpilepsy,
+            sex: sex
         )
         modelContext.insert(profile)
 
@@ -249,19 +333,31 @@ struct DraftMedicationEditor: View {
     @State private var unit: DoseUnit = .mg
     @State private var times: [HourMinute] = [HourMinute(hour: 8, minute: 0)]
 
-    private static let commonNames = [
-        "Dépakine", "Keppra", "Lamictal", "Rivotril", "Valium", "Urbanyl",
-        "Sabril", "Topamax", "Tegretol", "Diacomit", "Ospolot"
-    ]
-
     var body: some View {
         Form {
             Section("Nom du médicament") {
-                TextField("Ex. Keppra", text: $name)
+                TextField("Ex. Keppra, Doliprane, Mélatonine…", text: $name)
                     .autocorrectionDisabled()
                 if !name.isEmpty {
-                    ForEach(Self.commonNames.filter { $0.localizedCaseInsensitiveContains(name) && $0.lowercased() != name.lowercased() }, id: \.self) { suggestion in
-                        Button(suggestion) { name = suggestion }
+                    let suggestions = CommonFrenchMedications.suggestions(matching: name, limit: 6)
+                    ForEach(suggestions, id: \.self) { suggestion in
+                        Button {
+                            // Strip DCI parenthetical (e.g., "Doliprane (paracétamol)" → "Doliprane")
+                            if let parenIdx = suggestion.firstIndex(of: "(") {
+                                name = String(suggestion[..<parenIdx]).trimmingCharacters(in: .whitespaces)
+                            } else {
+                                name = suggestion
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "pills.fill")
+                                    .foregroundStyle(.afsrPurpleAdaptive)
+                                    .font(.system(size: 13))
+                                Text(suggestion)
+                                    .font(AFSRFont.body(14))
+                                Spacer()
+                            }
+                        }
                     }
                 }
             }

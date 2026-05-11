@@ -153,6 +153,16 @@ struct DataSubView: View {
     var body: some View {
         Form {
             Section {
+                NavigationLink {
+                    HistoricalDataImportView()
+                } label: {
+                    Label("Importer un historique (CSV)", systemImage: "tray.and.arrow.down")
+                }
+            } footer: {
+                Text("Pré-remplit l'app à partir d'un suivi externe (tableur, ancien outil). Modèles CSV téléchargeables pour chaque type de données.")
+            }
+
+            Section {
                 Button {
                     exportAllCSV()
                 } label: {
