@@ -33,6 +33,7 @@ extension ChildProfile {
         r["lastName"] = lastName as CKRecordValue
         if let birthDate { r["birthDate"] = birthDate as CKRecordValue }
         r["hasEpilepsy"] = (hasEpilepsy ? 1 : 0) as CKRecordValue
+        r["sexRaw"] = sexRaw as CKRecordValue
         r["createdAt"] = createdAt as CKRecordValue
         return r
     }
@@ -47,6 +48,7 @@ extension ChildProfile {
         let lastName = record["lastName"] as? String ?? ""
         let birthDate = record["birthDate"] as? Date
         let hasEpilepsy = (record["hasEpilepsy"] as? Int ?? 0) == 1
+        let sexRaw = record["sexRaw"] as? String ?? ChildSex.unspecified.rawValue
         let createdAt = record["createdAt"] as? Date ?? Date()
 
         if let existing {
@@ -54,10 +56,12 @@ extension ChildProfile {
             existing.lastName = lastName
             existing.birthDate = birthDate
             existing.hasEpilepsy = hasEpilepsy
+            existing.sexRaw = sexRaw
         } else {
             let new = ChildProfile(
                 id: id, firstName: firstName, lastName: lastName,
                 birthDate: birthDate, hasEpilepsy: hasEpilepsy,
+                sex: ChildSex(rawValue: sexRaw) ?? .unspecified,
                 createdAt: createdAt
             )
             context.insert(new)
@@ -76,6 +80,7 @@ extension Medication {
         r["doseUnitRaw"] = doseUnitRaw as CKRecordValue
         r["kindRaw"] = kindRaw as CKRecordValue
         r["isActive"] = (isActive ? 1 : 0) as CKRecordValue
+        r["notifyEnabled"] = (notifyEnabled ? 1 : 0) as CKRecordValue
         r["createdAt"] = createdAt as CKRecordValue
         // Heures planifiées encodées en JSON
         if let data = try? JSONEncoder().encode(scheduledHours),
@@ -99,6 +104,7 @@ extension Medication {
         let doseUnitRaw = record["doseUnitRaw"] as? String ?? DoseUnit.mg.rawValue
         let kindRaw = record["kindRaw"] as? String ?? MedicationKind.regular.rawValue
         let isActive = (record["isActive"] as? Int ?? 1) == 1
+        let notifyEnabled = (record["notifyEnabled"] as? Int ?? 1) == 1
         let createdAt = record["createdAt"] as? Date ?? Date()
 
         var hours: [HourMinute] = []
@@ -124,6 +130,7 @@ extension Medication {
             existing.doseUnit = unit
             existing.kind = kind
             existing.isActive = isActive
+            existing.notifyEnabled = notifyEnabled
             existing.scheduledHours = hours
             existing.childProfile = child
         } else {
@@ -131,7 +138,7 @@ extension Medication {
                 id: id, name: name,
                 doseAmount: doseAmount, doseUnit: unit,
                 scheduledHours: hours, kind: kind,
-                isActive: isActive, createdAt: createdAt
+                isActive: isActive, notifyEnabled: notifyEnabled, createdAt: createdAt
             )
             new.childProfile = child
             context.insert(new)

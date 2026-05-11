@@ -44,6 +44,12 @@ final class Medication {
     /// pour préserver le comportement des médicaments existants.
     var kindRaw: String = MedicationKind.regular.rawValue
 
+    /// Active ou désactive les notifications pour ce médicament. Utile quand
+    /// la prise est gérée par un tiers (école, centre, autre parent) et que
+    /// le parent local ne veut pas être notifié.
+    /// Default true pour préserver le comportement des médicaments existants.
+    var notifyEnabled: Bool = true
+
     var doseUnit: DoseUnit {
         get { DoseUnit(rawValue: doseUnitRaw) ?? .mg }
         set { doseUnitRaw = newValue.rawValue }
@@ -67,6 +73,7 @@ final class Medication {
         scheduledHours: [HourMinute],
         kind: MedicationKind = .regular,
         isActive: Bool = true,
+        notifyEnabled: Bool = true,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -76,6 +83,7 @@ final class Medication {
         self.scheduledHoursData = (try? JSONEncoder().encode(scheduledHours)) ?? Data()
         self.kindRaw = kind.rawValue
         self.isActive = isActive
+        self.notifyEnabled = notifyEnabled
         self.createdAt = createdAt
     }
 

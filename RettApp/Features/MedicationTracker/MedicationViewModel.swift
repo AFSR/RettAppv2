@@ -79,7 +79,10 @@ final class MedicationViewModel {
         center.removePendingNotificationRequests(withIdentifiers: ids)
 
         var scheduled = 0
-        for med in medications where med.isActive && med.kind == .regular {
+        // Filtre supplémentaire : `notifyEnabled` permet à l'utilisateur de
+        // désactiver les notifications pour un médicament spécifique (ex.
+        // celui géré uniquement par l'école / le centre / l'autre parent).
+        for med in medications where med.isActive && med.kind == .regular && med.notifyEnabled {
             for slot in med.scheduledHours {
                 let identifier = "afsr.med.\(med.id.uuidString).\(slot.hour).\(slot.minute)"
                 let content = UNMutableNotificationContent()
