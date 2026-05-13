@@ -98,8 +98,8 @@ struct MedicationPlanView: View {
         }
         .sheet(isPresented: $showEditor) {
             NavigationStack {
-                MedicationEditor(medication: editing) { name, dose, unit, hours, kind, active, notifyEnabled in
-                    Task { await save(name: name, dose: dose, unit: unit, hours: hours, kind: kind, active: active, notifyEnabled: notifyEnabled) }
+                MedicationEditor(medication: editing) { result in
+                    Task { await save(result) }
                 }
             }
         }
@@ -125,8 +125,22 @@ struct MedicationPlanView: View {
         case .adhoc:
             return "\(med.doseLabel) · à la demande"
         case .regular:
-            let hours = med.scheduledHours.map(\.formatted).joined(separator: ", ")
-            return hours.isEmpty ? med.doseLabel : "\(med.doseLabel) — \(hours)"
+            let intakes = med.intakes
+            if intakes.isEmpty { return med.doseLabel }
+            let uniformDose = Set(intakes.map(\.dose)).count == 1
+            let uniformDays = Set(intakes.map(\.weekdaysRaw)).count == 1
+            if uniformDose && uniformDays {
+                let suffix = intakes.first?.isEveryDay == false
+                    ? " · \(intakes.first?.weekdaySummary ?? "")"
+                    : ""
+                let times = intakes.map(\.formattedTime).joined(separator: ", ")
+                return "\(med.doseLabel) — \(times)\(suffix)"
+            }
+            // Plan plus complexe : résume chaque prise
+            return intakes.map { intake in
+                let dose = MedicationIntake.doseLabel(intake.dose, unit: med.doseUnit)
+                return "\(intake.formattedTime) \(dose) (\(intake.weekdaySummary))"
+            }.joined(separator: " · ")
         }
     }
 
@@ -143,17 +157,29 @@ struct MedicationPlanView: View {
         }
     }
 
-    private func save(name: String, dose: Double, unit: DoseUnit, hours: [HourMinute], kind: MedicationKind, active: Bool, notifyEnabled: Bool) async {
+    private func save(_ r: MedicationEditor.SaveResult) async {
+        let hours = r.intakes.map { HourMinute(hour: $0.hour, minute: $0.minute) }
         if let editing {
-            editing.name = name
-            editing.doseAmount = dose
-            editing.doseUnit = unit
-            editing.scheduledHours = hours
-            editing.kind = kind
-            editing.isActive = active
-            editing.notifyEnabled = notifyEnabled
+            editing.name = r.name
+            editing.doseAmount = r.defaultDose
+            editing.doseUnit = r.unit
+            editing.kind = r.kind
+            editing.isActive = r.active
+            editing.notifyEnabled = r.notifyEnabled
+            // Important : on écrit `intakes` après les autres champs car le
+            // setter synchronise `scheduledHours` à partir de la liste finale.
+            editing.intakes = r.intakes
         } else {
-            let med = Medication(name: name, doseAmount: dose, doseUnit: unit, scheduledHours: hours, kind: kind, isActive: active, notifyEnabled: notifyEnabled)
+            let med = Medication(
+                name: r.name,
+                doseAmount: r.defaultDose,
+                doseUnit: r.unit,
+                scheduledHours: hours,
+                kind: r.kind,
+                isActive: r.active,
+                notifyEnabled: r.notifyEnabled,
+                intakes: r.intakes
+            )
             med.childProfile = profile
             modelContext.insert(med)
         }
@@ -169,15 +195,27 @@ struct MedicationPlanView: View {
 struct MedicationEditor: View {
     @Environment(\.dismiss) private var dismiss
     let medication: Medication?
-    let onSave: (String, Double, DoseUnit, [HourMinute], MedicationKind, Bool, Bool) -> Void
+    let onSave: (SaveResult) -> Void
 
     @State private var name: String = ""
-    @State private var dose: String = ""
+    @State private var defaultDoseText: String = ""
     @State private var unit: DoseUnit = .mg
-    @State private var times: [HourMinute] = [HourMinute(hour: 8, minute: 0)]
+    @State private var intakes: [MedicationIntake] = [
+        MedicationIntake(hour: 8, minute: 0, dose: 0)
+    ]
     @State private var kind: MedicationKind = .regular
     @State private var active: Bool = true
     @State private var notifyEnabled: Bool = true
+
+    struct SaveResult {
+        let name: String
+        let defaultDose: Double
+        let unit: DoseUnit
+        let intakes: [MedicationIntake]
+        let kind: MedicationKind
+        let active: Bool
+        let notifyEnabled: Bool
+    }
 
     var body: some View {
         Form {
@@ -219,7 +257,7 @@ struct MedicationEditor: View {
 
             Section("Dose habituelle") {
                 HStack {
-                    TextField("Quantité", text: $dose)
+                    TextField("Quantité", text: $defaultDoseText)
                         .keyboardType(.decimalPad)
                     Picker("Unité", selection: $unit) {
                         ForEach(DoseUnit.allCases) { u in
@@ -228,22 +266,32 @@ struct MedicationEditor: View {
                     }
                     .pickerStyle(.segmented)
                 }
+            } footer: {
+                Text(kind == .regular
+                     ? "Dose utilisée par défaut quand vous ajoutez une nouvelle prise. Chaque prise peut ensuite être ajustée individuellement."
+                     : "Dose habituelle pour ce médicament ponctuel.")
             }
 
             if kind == .regular {
-                Section("Heures de prise") {
-                    ForEach($times) { $t in
-                        DatePicker("Heure", selection: Binding(
-                            get: { t.asDate },
-                            set: { t = HourMinute(date: $0) }
-                        ), displayedComponents: .hourAndMinute)
+                Section("Prises") {
+                    ForEach($intakes) { $intake in
+                        NavigationLink {
+                            MedicationIntakeEditorView(intake: $intake, unit: unit)
+                        } label: {
+                            intakeRow(intake)
+                        }
                     }
-                    .onDelete { idx in times.remove(atOffsets: idx) }
+                    .onDelete { offsets in
+                        if intakes.count > offsets.count { intakes.remove(atOffsets: offsets) }
+                    }
+
                     Button {
-                        times.append(HourMinute(hour: 12, minute: 0))
+                        addIntake()
                     } label: {
-                        Label("Ajouter une heure", systemImage: "plus")
+                        Label("Ajouter une prise", systemImage: "plus")
                     }
+                } footer: {
+                    Text("Chaque prise a sa propre heure, sa dose, ses jours actifs et son rappel. Créez deux prises pour différencier semaine et week-end, par exemple.")
                 }
             }
 
@@ -259,7 +307,7 @@ struct MedicationEditor: View {
                         Label("Notifier ce médicament", systemImage: "bell.badge")
                     }
                 } footer: {
-                    Text("Désactivez si la prise est gérée par un tiers (école, centre, autre parent) et que vous ne voulez pas recevoir de rappel sur cet appareil.")
+                    Text("Interrupteur principal. Vous pouvez aussi désactiver individuellement chaque prise (utile pour les jours pris en charge par l'école ou l'autre parent).")
                 }
             }
         }
@@ -269,30 +317,82 @@ struct MedicationEditor: View {
             ToolbarItem(placement: .cancellationAction) { Button("Annuler") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Enregistrer") {
-                    let amount = Double(dose.replacingOccurrences(of: ",", with: ".")) ?? 0
-                    let finalTimes = kind == .regular ? times : []
-                    onSave(name.trimmingCharacters(in: .whitespaces), amount, unit, finalTimes, kind, active, notifyEnabled)
+                    let amount = Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) ?? 0
+                    let finalIntakes = kind == .regular ? intakes : []
+                    onSave(SaveResult(
+                        name: name.trimmingCharacters(in: .whitespaces),
+                        defaultDose: amount,
+                        unit: unit,
+                        intakes: finalIntakes,
+                        kind: kind,
+                        active: active,
+                        notifyEnabled: notifyEnabled
+                    ))
                     dismiss()
                 }
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty
-                          || Double(dose.replacingOccurrences(of: ",", with: ".")) == nil
-                          || (kind == .regular && times.isEmpty))
+                          || Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) == nil
+                          || (kind == .regular && intakes.isEmpty))
                 .bold()
             }
         }
-        .onAppear {
-            if let medication {
-                name = medication.name
-                dose = medication.doseAmount.truncatingRemainder(dividingBy: 1) == 0
-                    ? String(Int(medication.doseAmount))
-                    : String(medication.doseAmount)
-                unit = medication.doseUnit
-                times = medication.scheduledHours
-                kind = medication.kind
-                active = medication.isActive
-                notifyEnabled = medication.notifyEnabled
+        .onAppear { loadFromMedication() }
+    }
+
+    @ViewBuilder
+    private func intakeRow(_ intake: MedicationIntake) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "clock")
+                .foregroundStyle(.afsrPurpleAdaptive)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(intake.formattedTime)
+                        .font(AFSRFont.headline(15))
+                    Text("·")
+                        .foregroundStyle(.secondary)
+                    Text(MedicationIntake.doseLabel(intake.dose, unit: unit))
+                        .font(AFSRFont.body(14))
+                        .foregroundStyle(.secondary)
+                    if !intake.notifyEnabled {
+                        Image(systemName: "bell.slash.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(intake.weekdaySummary)
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func addIntake() {
+        let amount = Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) ?? 0
+        let last = intakes.last
+        let new = MedicationIntake(
+            hour: last?.hour ?? 12,
+            minute: last?.minute ?? 0,
+            dose: last?.dose ?? amount,
+            weekdays: last?.weekdays ?? MedicationIntake.allWeekdays,
+            notifyEnabled: true
+        )
+        intakes.append(new)
+    }
+
+    private func loadFromMedication() {
+        guard let medication else { return }
+        name = medication.name
+        unit = medication.doseUnit
+        defaultDoseText = medication.doseAmount.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(medication.doseAmount))
+            : String(medication.doseAmount)
+        kind = medication.kind
+        active = medication.isActive
+        notifyEnabled = medication.notifyEnabled
+        let existing = medication.intakes
+        intakes = existing.isEmpty
+            ? [MedicationIntake(hour: 8, minute: 0, dose: medication.doseAmount)]
+            : existing
     }
 }
 

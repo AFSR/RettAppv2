@@ -85,13 +85,14 @@ struct BookletConfigurationView: View {
 
     @ViewBuilder
     private func medicationDoseGroup(med: Medication) -> some View {
-        if med.scheduledHours.isEmpty {
+        let intakes = med.intakes
+        if intakes.isEmpty {
             HStack {
                 Image(systemName: "pills.fill")
                     .foregroundStyle(.secondary)
                 Text(med.name).font(AFSRFont.body(14))
                 Spacer()
-                Text("Aucune heure planifiée").font(AFSRFont.caption()).foregroundStyle(.secondary)
+                Text("Aucune prise planifiée").font(AFSRFont.caption()).foregroundStyle(.secondary)
             }
         } else {
             VStack(alignment: .leading, spacing: 6) {
@@ -99,19 +100,23 @@ struct BookletConfigurationView: View {
                     Image(systemName: "pills.fill")
                         .foregroundStyle(.afsrPurpleAdaptive)
                     Text(med.name).font(AFSRFont.headline(14))
-                    Text("· \(med.doseLabel)").font(AFSRFont.caption()).foregroundStyle(.secondary)
                 }
-                ForEach(med.scheduledHours) { slot in
-                    let key = DoseKey(medicationID: med.id, hour: slot.hour, minute: slot.minute)
+                ForEach(intakes) { intake in
+                    let key = DoseKey(medicationID: med.id, hour: intake.hour, minute: intake.minute)
                     Toggle(isOn: doseBinding(key)) {
                         HStack(spacing: 8) {
                             Image(systemName: "clock")
                                 .foregroundStyle(.secondary)
                                 .font(.system(size: 13))
-                            Text("Prise de \(slot.formatted)")
+                            Text("Prise de \(intake.formattedTime)")
                                 .font(AFSRFont.body(13))
+                            Text("·")
+                                .foregroundStyle(.secondary)
+                            Text(MedicationIntake.doseLabel(intake.dose, unit: med.doseUnit))
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
                             Spacer()
-                            Text(slot.period.label)
+                            Text(intake.weekdaySummary)
                                 .font(AFSRFont.caption())
                                 .foregroundStyle(.secondary)
                         }
@@ -136,8 +141,8 @@ struct BookletConfigurationView: View {
     private func allDoseKeys() -> Set<DoseKey> {
         var out: Set<DoseKey> = []
         for med in activeMedications {
-            for h in med.scheduledHours {
-                out.insert(DoseKey(medicationID: med.id, hour: h.hour, minute: h.minute))
+            for intake in med.intakes {
+                out.insert(DoseKey(medicationID: med.id, hour: intake.hour, minute: intake.minute))
             }
         }
         return out

@@ -145,10 +145,11 @@ struct BookletSchema: Codable, Equatable {
         let actives = options.medications.filter { $0.isActive }
         var medsList: [String] = []
         for med in actives {
-            for h in med.scheduledHours {
-                let key = DoseKey(medicationID: med.id, hour: h.hour, minute: h.minute)
+            for intake in med.intakes {
+                let key = DoseKey(medicationID: med.id, hour: intake.hour, minute: intake.minute)
                 if options.allDosesSelected || options.selectedDoses.contains(key) {
-                    medsList.append("\(med.name) \(med.doseLabel) @ \(h.formatted)")
+                    let doseLabel = MedicationIntake.doseLabel(intake.dose, unit: med.doseUnit)
+                    medsList.append("\(med.name) \(doseLabel) @ \(intake.formattedTime)")
                 }
             }
         }

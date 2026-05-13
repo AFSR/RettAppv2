@@ -356,7 +356,16 @@ enum MedicalReportGenerator {
         let rows: [[String]] = analysis.perMedication.map { p in
             let m = p.medication
             let pct = Int((p.adherence * 100).rounded())
-            let hours = m.scheduledHours.map(\.formatted).joined(separator: " ")
+            let hours = m.intakes
+                .map { intake -> String in
+                    let dose = MedicationIntake.doseLabel(intake.dose, unit: m.doseUnit)
+                    if intake.isEveryDay {
+                        return "\(intake.formattedTime) (\(dose))"
+                    } else {
+                        return "\(intake.formattedTime) \(dose) [\(intake.weekdaySummary)]"
+                    }
+                }
+                .joined(separator: " · ")
             let std = formatStdDev(p.timingStdDevSec)
             return [
                 m.name,

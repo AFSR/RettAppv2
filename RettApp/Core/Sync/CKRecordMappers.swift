@@ -87,6 +87,13 @@ extension Medication {
            let str = String(data: data, encoding: .utf8) {
             r["scheduledHours"] = str as CKRecordValue
         }
+        // Prises détaillées (heure + dose + jours + notif). Champ optionnel
+        // ajouté en V1.6.0 — les anciennes versions de l'app continueront à
+        // utiliser `scheduledHours` et reconstruiront les intakes côté lecture.
+        if let data = try? JSONEncoder().encode(intakes),
+           let str = String(data: data, encoding: .utf8) {
+            r["intakes"] = str as CKRecordValue
+        }
         if let childID = childProfile?.id {
             r["childProfileId"] = childID.uuidString as CKRecordValue
         }
@@ -114,6 +121,13 @@ extension Medication {
             hours = decoded
         }
 
+        var intakes: [MedicationIntake] = []
+        if let str = record["intakes"] as? String,
+           let data = str.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([MedicationIntake].self, from: data) {
+            intakes = decoded
+        }
+
         let unit = DoseUnit(rawValue: doseUnitRaw) ?? .mg
         let kind = MedicationKind(rawValue: kindRaw) ?? .regular
 
@@ -132,13 +146,17 @@ extension Medication {
             existing.isActive = isActive
             existing.notifyEnabled = notifyEnabled
             existing.scheduledHours = hours
+            // Important : si intakes est non-vide on l'écrit après hours pour
+            // que le setter de `intakes` resynchronise `scheduledHours`.
+            if !intakes.isEmpty { existing.intakes = intakes }
             existing.childProfile = child
         } else {
             let new = Medication(
                 id: id, name: name,
                 doseAmount: doseAmount, doseUnit: unit,
                 scheduledHours: hours, kind: kind,
-                isActive: isActive, notifyEnabled: notifyEnabled, createdAt: createdAt
+                isActive: isActive, notifyEnabled: notifyEnabled, createdAt: createdAt,
+                intakes: intakes.isEmpty ? nil : intakes
             )
             new.childProfile = child
             context.insert(new)

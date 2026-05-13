@@ -485,7 +485,7 @@ struct SettingsView: View {
                 csvEscape(m.name),
                 "\(m.doseAmount)",
                 m.doseUnit.rawValue,
-                m.scheduledHours.map(\.formatted).joined(separator: "|"),
+                m.intakes.map { $0.encode(defaultDose: m.doseAmount) }.joined(separator: "|"),
                 m.isActive ? "1" : "0"
             ].joined(separator: ","))
         }
