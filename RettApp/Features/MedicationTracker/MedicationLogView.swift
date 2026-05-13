@@ -276,9 +276,9 @@ struct MedicationEditor: View {
 
             if kind == .regular {
                 Section {
-                    ForEach($intakes) { $intake in
+                    ForEach(intakes) { intake in
                         NavigationLink {
-                            MedicationIntakeEditorView(intake: $intake, unit: unit)
+                            MedicationIntakeEditorView(intakeId: intake.id, intakes: $intakes, unit: unit)
                         } label: {
                             intakeRow(intake)
                         }
