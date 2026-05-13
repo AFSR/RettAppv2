@@ -8,8 +8,9 @@ final class MedicationViewModel {
     var selectedDate: Date = Calendar.current.startOfDay(for: Date())
 
     func ensureLogsExist(for date: Date, medications: [Medication], profile: ChildProfile?, in context: ModelContext) {
-        let day = Calendar.current.startOfDay(for: date)
-        let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: date)
+        let nextDay = cal.date(byAdding: .day, value: 1, to: day) ?? day
 
         let childId = profile?.id
         let descriptor = FetchDescriptor<MedicationLog>(
@@ -21,15 +22,18 @@ final class MedicationViewModel {
         let existingKeys = Set(existing.map { "\($0.medicationId)|\(Int($0.scheduledTime.timeIntervalSince1970))" })
 
         for med in medications where med.isActive && med.kind == .regular {
-            for slot in med.scheduledHours {
-                let scheduled = slot.date(on: day)
+            for intake in med.intakes where intake.applies(to: day, calendar: cal) {
+                var comps = cal.dateComponents([.year, .month, .day], from: day)
+                comps.hour = intake.hour
+                comps.minute = intake.minute
+                guard let scheduled = cal.date(from: comps) else { continue }
                 let key = "\(med.id)|\(Int(scheduled.timeIntervalSince1970))"
                 if !existingKeys.contains(key) {
                     let log = MedicationLog(
                         medicationId: med.id,
                         medicationName: med.name,
                         scheduledTime: scheduled,
-                        dose: med.doseAmount,
+                        dose: intake.dose,
                         doseUnit: med.doseUnit,
                         childProfileId: childId
                     )
@@ -79,30 +83,35 @@ final class MedicationViewModel {
         center.removePendingNotificationRequests(withIdentifiers: ids)
 
         var scheduled = 0
-        // Filtre supplémentaire : `notifyEnabled` permet à l'utilisateur de
-        // désactiver les notifications pour un médicament spécifique (ex.
-        // celui géré uniquement par l'école / le centre / l'autre parent).
+        // Filtre supplémentaire : `med.notifyEnabled` est l'interrupteur
+        // principal du médicament (par ex. désactivé en vacances) ; chaque
+        // prise affine ensuite via `intake.notifyEnabled` et `intake.weekdays`
+        // pour gérer les jours pris en charge par un tiers (école, centre,
+        // autre parent…).
+        let name = childFirstName.isEmpty ? "votre enfant" : childFirstName
         for med in medications where med.isActive && med.kind == .regular && med.notifyEnabled {
-            for slot in med.scheduledHours {
-                let identifier = "afsr.med.\(med.id.uuidString).\(slot.hour).\(slot.minute)"
-                let content = UNMutableNotificationContent()
-                content.title = "💊 \(med.name)"
-                let doseLabel = med.doseLabel
-                let name = childFirstName.isEmpty ? "votre enfant" : childFirstName
-                content.body = "Heure de donner \(doseLabel) à \(name)."
-                content.sound = .default
-                content.categoryIdentifier = "afsr.medication"
+            for intake in med.intakes where intake.notifyEnabled {
+                let doseLabel = MedicationIntake.doseLabel(intake.dose, unit: med.doseUnit)
+                for weekday in intake.weekdays.sorted() {
+                    let identifier = "afsr.med.\(med.id.uuidString).\(weekday).\(intake.hour).\(intake.minute)"
+                    let content = UNMutableNotificationContent()
+                    content.title = "💊 \(med.name)"
+                    content.body = "Heure de donner \(doseLabel) à \(name)."
+                    content.sound = .default
+                    content.categoryIdentifier = "afsr.medication"
 
-                var comps = DateComponents()
-                comps.hour = slot.hour
-                comps.minute = slot.minute
-                let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-                let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
-                do {
-                    try await center.add(request)
-                    scheduled += 1
-                } catch {
-                    print("⚠️ Échec planning notif \(identifier) : \(error.localizedDescription)")
+                    var comps = DateComponents()
+                    comps.weekday = weekday
+                    comps.hour = intake.hour
+                    comps.minute = intake.minute
+                    let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+                    let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+                    do {
+                        try await center.add(request)
+                        scheduled += 1
+                    } catch {
+                        print("⚠️ Échec planning notif \(identifier) : \(error.localizedDescription)")
+                    }
                 }
             }
         }

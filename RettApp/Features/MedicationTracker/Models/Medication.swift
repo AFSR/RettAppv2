@@ -34,7 +34,14 @@ final class Medication {
     var doseUnitRaw: String
 
     /// Heures planifiées (encodées en JSON pour éviter un model SwiftData imbriqué).
+    /// Conservé pour compatibilité ascendante : chaque écriture sur `intakes`
+    /// synchronise ce champ avec la liste des heures.
     private var scheduledHoursData: Data
+
+    /// Prises planifiées détaillées (heure + dose + jours + notifications).
+    /// Ajouté en V1.6.0. Si vide pour un médicament créé avant cette version,
+    /// le getter `intakes` reconstruit la liste à partir de `scheduledHours`.
+    private var intakesData: Data = Data()
 
     var isActive: Bool
     @Relationship var childProfile: ChildProfile?
@@ -44,10 +51,10 @@ final class Medication {
     /// pour préserver le comportement des médicaments existants.
     var kindRaw: String = MedicationKind.regular.rawValue
 
-    /// Active ou désactive les notifications pour ce médicament. Utile quand
-    /// la prise est gérée par un tiers (école, centre, autre parent) et que
-    /// le parent local ne veut pas être notifié.
-    /// Default true pour préserver le comportement des médicaments existants.
+    /// Interrupteur principal de notifications pour ce médicament. Quand il
+    /// est désactivé, aucun rappel n'est planifié quels que soient les
+    /// réglages individuels des prises. Quand il est activé, chaque prise
+    /// peut affiner via `intake.notifyEnabled`.
     var notifyEnabled: Bool = true
 
     var doseUnit: DoseUnit {
@@ -65,6 +72,35 @@ final class Medication {
         set { scheduledHoursData = (try? JSONEncoder().encode(newValue)) ?? Data() }
     }
 
+    /// Prises planifiées : autoritaire pour le calcul des logs et notifications.
+    /// Pour un médicament créé avant V1.6.0, le getter reconstruit la liste à
+    /// partir de `scheduledHours` (tous les jours, dose = `doseAmount`,
+    /// notifications = `notifyEnabled`).
+    var intakes: [MedicationIntake] {
+        get {
+            if let decoded = try? JSONDecoder().decode([MedicationIntake].self, from: intakesData),
+               !decoded.isEmpty {
+                return decoded.sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+            }
+            return scheduledHours.map { hm in
+                MedicationIntake(
+                    hour: hm.hour,
+                    minute: hm.minute,
+                    dose: doseAmount,
+                    weekdays: MedicationIntake.allWeekdays,
+                    notifyEnabled: true
+                )
+            }
+        }
+        set {
+            let sorted = newValue.sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+            intakesData = (try? JSONEncoder().encode(sorted)) ?? Data()
+            // Garde `scheduledHours` en miroir pour les vues / exports qui
+            // n'ont pas encore migré vers `intakes`.
+            scheduledHours = sorted.map { HourMinute(hour: $0.hour, minute: $0.minute) }
+        }
+    }
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -74,17 +110,28 @@ final class Medication {
         kind: MedicationKind = .regular,
         isActive: Bool = true,
         notifyEnabled: Bool = true,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        intakes: [MedicationIntake]? = nil
     ) {
         self.id = id
         self.name = name
         self.doseAmount = doseAmount
         self.doseUnitRaw = doseUnit.rawValue
-        self.scheduledHoursData = (try? JSONEncoder().encode(scheduledHours)) ?? Data()
+        let resolvedHours = scheduledHours
+        self.scheduledHoursData = (try? JSONEncoder().encode(resolvedHours)) ?? Data()
         self.kindRaw = kind.rawValue
         self.isActive = isActive
         self.notifyEnabled = notifyEnabled
         self.createdAt = createdAt
+        let resolvedIntakes = intakes ?? resolvedHours.map { hm in
+            MedicationIntake(
+                hour: hm.hour, minute: hm.minute,
+                dose: doseAmount, weekdays: MedicationIntake.allWeekdays,
+                notifyEnabled: true
+            )
+        }
+        let sortedIntakes = resolvedIntakes.sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+        self.intakesData = (try? JSONEncoder().encode(sortedIntakes)) ?? Data()
     }
 
     var doseLabel: String {

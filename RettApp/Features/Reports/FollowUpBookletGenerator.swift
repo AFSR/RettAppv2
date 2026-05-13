@@ -169,8 +169,8 @@ enum FollowUpBookletGenerator {
         let actives = options.medications.filter { $0.isActive }
         var count = 0
         for med in actives {
-            for h in med.scheduledHours {
-                let key = DoseKey(medicationID: med.id, hour: h.hour, minute: h.minute)
+            for intake in med.intakes {
+                let key = DoseKey(medicationID: med.id, hour: intake.hour, minute: intake.minute)
                 if options.allDosesSelected || options.selectedDoses.contains(key) { count += 1 }
             }
         }
@@ -286,10 +286,12 @@ enum FollowUpBookletGenerator {
         let actives = options.medications.filter { $0.isActive }
         var rows: [String] = []
         for med in actives {
-            for h in med.scheduledHours {
-                let key = DoseKey(medicationID: med.id, hour: h.hour, minute: h.minute)
+            for intake in med.intakes {
+                let key = DoseKey(medicationID: med.id, hour: intake.hour, minute: intake.minute)
                 if options.allDosesSelected || options.selectedDoses.contains(key) {
-                    rows.append("\(med.name) — \(med.doseLabel) à \(h.formatted)")
+                    let doseLabel = MedicationIntake.doseLabel(intake.dose, unit: med.doseUnit)
+                    let suffix = intake.isEveryDay ? "" : " (\(intake.weekdaySummary))"
+                    rows.append("\(med.name) — \(doseLabel) à \(intake.formattedTime)\(suffix)")
                 }
             }
         }
