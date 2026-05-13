@@ -9,7 +9,7 @@ struct MedicationIntakeEditorView: View {
 
     @State private var doseString: String = ""
 
-    private enum WeekdayPreset: String, CaseIterable, Identifiable {
+    enum WeekdayPreset: String, CaseIterable, Identifiable, Hashable {
         case everyDay, weekdaysOnly, weekendOnly, custom
         var id: String { rawValue }
         var label: String {
@@ -24,59 +24,88 @@ struct MedicationIntakeEditorView: View {
 
     var body: some View {
         Form {
-            Section("Heure") {
-                DatePicker(
-                    "Heure de prise",
-                    selection: timeBinding,
-                    displayedComponents: .hourAndMinute
-                )
-            }
-
-            Section("Dose") {
-                HStack {
-                    TextField("Quantité", text: $doseString)
-                        .keyboardType(.decimalPad)
-                        .onChange(of: doseString) { _, newValue in
-                            if let v = Double(newValue.replacingOccurrences(of: ",", with: ".")) {
-                                intake.dose = v
-                            }
-                        }
-                    Text(unit.label).foregroundStyle(.secondary)
-                }
-            } footer: {
-                Text("Permet d'adapter la dose à chaque prise (ex. 5 mg le matin, 10 mg le soir).")
-            }
-
-            Section("Jours actifs") {
-                Picker("Préréglage", selection: presetBinding) {
-                    ForEach(WeekdayPreset.allCases) { preset in
-                        Text(preset.label).tag(preset)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                WeekdayChipPicker(selection: weekdaysBinding)
-                    .padding(.vertical, 4)
-            } footer: {
-                Text("Sélectionnez les jours où cette prise doit être effectuée. Pour une dose différente le week-end, créez une seconde prise.")
-            }
-
-            Section {
-                Toggle(isOn: $intake.notifyEnabled) {
-                    Label("Rappeler cette prise", systemImage: "bell.badge")
-                }
-            } footer: {
-                Text("Désactivez si cette prise est gérée par un tiers (école, centre, autre parent) et que vous ne voulez pas être notifié sur cet appareil ces jours-là.")
-            }
+            timeSection
+            doseSection
+            weekdaysSection
+            notifySection
         }
         .navigationTitle("Prise de \(intake.formattedTime)")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if intake.dose.truncatingRemainder(dividingBy: 1) == 0 {
-                doseString = String(Int(intake.dose))
-            } else {
-                doseString = String(intake.dose)
+        .onAppear(perform: syncDoseString)
+    }
+
+    // MARK: - Sections
+
+    @ViewBuilder
+    private var timeSection: some View {
+        Section {
+            DatePicker(
+                "Heure de prise",
+                selection: timeBinding,
+                displayedComponents: .hourAndMinute
+            )
+        } header: {
+            Text("Heure")
+        }
+    }
+
+    @ViewBuilder
+    private var doseSection: some View {
+        Section {
+            HStack {
+                TextField("Quantité", text: $doseString)
+                    .keyboardType(.decimalPad)
+                    .onChange(of: doseString) { _, newValue in
+                        if let v = Double(newValue.replacingOccurrences(of: ",", with: ".")) {
+                            intake.dose = v
+                        }
+                    }
+                Text(unit.label).foregroundStyle(.secondary)
             }
+        } header: {
+            Text("Dose")
+        } footer: {
+            Text("Permet d'adapter la dose à chaque prise (ex. 5 mg le matin, 10 mg le soir).")
+        }
+    }
+
+    @ViewBuilder
+    private var weekdaysSection: some View {
+        Section {
+            Picker("Préréglage", selection: presetBinding) {
+                ForEach(WeekdayPreset.allCases) { preset in
+                    Text(preset.label).tag(preset)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            WeekdayChipPicker(selection: weekdaysBinding)
+                .padding(.vertical, 4)
+        } header: {
+            Text("Jours actifs")
+        } footer: {
+            Text("Sélectionnez les jours où cette prise doit être effectuée. Pour une dose différente le week-end, créez une seconde prise.")
+        }
+    }
+
+    @ViewBuilder
+    private var notifySection: some View {
+        Section {
+            Toggle(isOn: $intake.notifyEnabled) {
+                Label("Rappeler cette prise", systemImage: "bell.badge")
+            }
+        } footer: {
+            Text("Désactivez si cette prise est gérée par un tiers (école, centre, autre parent) et que vous ne voulez pas être notifié sur cet appareil ces jours-là.")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func syncDoseString() {
+        if intake.dose.truncatingRemainder(dividingBy: 1) == 0 {
+            doseString = String(Int(intake.dose))
+        } else {
+            doseString = String(intake.dose)
         }
     }
 
@@ -116,14 +145,14 @@ struct MedicationIntakeEditorView: View {
                 case .everyDay:     intake.weekdays = MedicationIntake.allWeekdays
                 case .weekdaysOnly: intake.weekdays = MedicationIntake.weekdaysOnly
                 case .weekendOnly:  intake.weekdays = MedicationIntake.weekendOnly
-                case .custom:       break // laisse l'utilisateur cocher
+                case .custom:       break
                 }
             }
         )
     }
 }
 
-/// Sélecteur compact M T M T V S D (lundi → dimanche).
+/// Sélecteur compact L M M J V S D (lundi → dimanche).
 struct WeekdayChipPicker: View {
     @Binding var selection: Set<Int>
 
@@ -134,28 +163,37 @@ struct WeekdayChipPicker: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(order, id: \.weekday) { item in
-                let isSelected = selection.contains(item.weekday)
-                Button {
-                    if isSelected {
-                        if selection.count > 1 { selection.remove(item.weekday) }
-                    } else {
-                        selection.insert(item.weekday)
-                    }
-                } label: {
-                    Text(item.label)
-                        .font(AFSRFont.headline(13))
-                        .frame(width: 34, height: 34)
-                        .background(
-                            Circle().fill(isSelected ? Color.afsrPurpleAdaptive : Color(uiColor: .systemGray5))
-                        )
-                        .foregroundStyle(isSelected ? Color.white : Color.primary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(weekdayName(item.weekday))
-                .accessibilityValue(isSelected ? "actif" : "inactif")
+                chip(for: item)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func chip(for item: (weekday: Int, label: String)) -> some View {
+        let isSelected = selection.contains(item.weekday)
+        Button {
+            toggle(weekday: item.weekday, isSelected: isSelected)
+        } label: {
+            Text(item.label)
+                .font(AFSRFont.headline(13))
+                .frame(width: 34, height: 34)
+                .background(
+                    Circle().fill(isSelected ? Color.afsrPurpleAdaptive : Color(uiColor: .systemGray5))
+                )
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(weekdayName(item.weekday))
+        .accessibilityValue(isSelected ? "actif" : "inactif")
+    }
+
+    private func toggle(weekday: Int, isSelected: Bool) {
+        if isSelected {
+            if selection.count > 1 { selection.remove(weekday) }
+        } else {
+            selection.insert(weekday)
+        }
     }
 
     private func weekdayName(_ weekday: Int) -> String {
