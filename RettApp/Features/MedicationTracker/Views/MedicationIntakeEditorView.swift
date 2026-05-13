@@ -4,8 +4,22 @@ import SwiftUI
 /// notifications). Présentée via NavigationLink depuis `MedicationEditor`.
 struct MedicationIntakeEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var intake: MedicationIntake
+    /// Identifiant de la prise éditée dans le tableau parent. On ne stocke
+    /// pas un `Binding<MedicationIntake>` directement parce qu'avec
+    /// `ForEach($array)`, le binding renvoyé par SwiftUI référence un index
+    /// qui peut être invalidé pendant un diff (ajout/suppression dans le
+    /// tableau parent ou rebuild SwiftData), ce qui provoque un
+    /// `Index out of range` au runtime.
+    let intakeId: UUID
+    @Binding var intakes: [MedicationIntake]
     let unit: DoseUnit
+
+    /// Snapshot stable de la prise (jamais nil tant que la vue est à
+    /// l'écran : on n'arrive pas ici sans une prise existante).
+    private var intake: MedicationIntake {
+        intakes.first(where: { $0.id == intakeId })
+            ?? MedicationIntake(hour: 8, minute: 0, dose: 0)
+    }
 
     @State private var doseString: String = ""
 
@@ -57,7 +71,7 @@ struct MedicationIntakeEditorView: View {
                     .keyboardType(.decimalPad)
                     .onChange(of: doseString) { _, newValue in
                         if let v = Double(newValue.replacingOccurrences(of: ",", with: ".")) {
-                            intake.dose = v
+                            mutate { $0.dose = v }
                         }
                     }
                 Text(unit.label).foregroundStyle(.secondary)
@@ -91,7 +105,7 @@ struct MedicationIntakeEditorView: View {
     @ViewBuilder
     private var notifySection: some View {
         Section {
-            Toggle(isOn: $intake.notifyEnabled) {
+            Toggle(isOn: notifyBinding) {
                 Label("Rappeler cette prise", systemImage: "bell.badge")
             }
         } footer: {
@@ -109,6 +123,20 @@ struct MedicationIntakeEditorView: View {
         }
     }
 
+    private func mutate(_ block: (inout MedicationIntake) -> Void) {
+        guard let idx = intakes.firstIndex(where: { $0.id == intakeId }) else { return }
+        var copy = intakes[idx]
+        block(&copy)
+        intakes[idx] = copy
+    }
+
+    private var notifyBinding: Binding<Bool> {
+        Binding(
+            get: { intake.notifyEnabled },
+            set: { newValue in mutate { $0.notifyEnabled = newValue } }
+        )
+    }
+
     private var timeBinding: Binding<Date> {
         Binding(
             get: {
@@ -119,8 +147,10 @@ struct MedicationIntakeEditorView: View {
             },
             set: { newDate in
                 let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
-                intake.hour = comps.hour ?? intake.hour
-                intake.minute = comps.minute ?? intake.minute
+                mutate {
+                    $0.hour = comps.hour ?? $0.hour
+                    $0.minute = comps.minute ?? $0.minute
+                }
             }
         )
     }
@@ -128,7 +158,7 @@ struct MedicationIntakeEditorView: View {
     private var weekdaysBinding: Binding<Set<Int>> {
         Binding(
             get: { intake.weekdays },
-            set: { intake.weekdays = $0 }
+            set: { newValue in mutate { $0.weekdays = newValue } }
         )
     }
 
@@ -142,9 +172,9 @@ struct MedicationIntakeEditorView: View {
             },
             set: { preset in
                 switch preset {
-                case .everyDay:     intake.weekdays = MedicationIntake.allWeekdays
-                case .weekdaysOnly: intake.weekdays = MedicationIntake.weekdaysOnly
-                case .weekendOnly:  intake.weekdays = MedicationIntake.weekendOnly
+                case .everyDay:     mutate { $0.weekdays = MedicationIntake.allWeekdays }
+                case .weekdaysOnly: mutate { $0.weekdays = MedicationIntake.weekdaysOnly }
+                case .weekendOnly:  mutate { $0.weekdays = MedicationIntake.weekendOnly }
                 case .custom:       break
                 }
             }
@@ -198,6 +228,8 @@ struct WeekdayChipPicker: View {
 
     private func weekdayName(_ weekday: Int) -> String {
         let symbols = Calendar.current.weekdaySymbols
-        return symbols[weekday - 1]
+        let idx = weekday - 1
+        guard symbols.indices.contains(idx) else { return "" }
+        return symbols[idx]
     }
 }

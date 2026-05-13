@@ -73,11 +73,13 @@ struct MedicationIntake: Codable, Hashable, Identifiable {
         if isEveryDay { return "tous les jours" }
         if isWeekdaysOnly { return "semaine" }
         if isWeekendOnly { return "week-end" }
-        let cal = Calendar(identifier: .gregorian)
-        let symbols = cal.shortWeekdaySymbols // dim., lun., mar., …
-        let ordered = [2, 3, 4, 5, 6, 7, 1]   // Mon..Sun
-        let labels = ordered.compactMap { d in
-            weekdays.contains(d) ? symbols[d - 1] : nil
+        let symbols = Calendar(identifier: .gregorian).shortWeekdaySymbols
+        guard symbols.count >= 7 else { return "" }
+        let ordered = [2, 3, 4, 5, 6, 7, 1] // Mon..Sun en convention Calendar (1 = Dim)
+        let labels = ordered.compactMap { d -> String? in
+            let idx = d - 1
+            guard weekdays.contains(d), symbols.indices.contains(idx) else { return nil }
+            return symbols[idx]
         }
         return labels.joined(separator: ", ")
     }
