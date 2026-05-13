@@ -25,20 +25,11 @@ struct MedicationIntakeEditorView: View {
     var body: some View {
         Form {
             Section("Heure") {
-                DatePicker("Heure de prise",
-                           selection: Binding(
-                            get: {
-                                var c = DateComponents()
-                                c.hour = intake.hour
-                                c.minute = intake.minute
-                                return Calendar.current.date(from: c) ?? Date()
-                            },
-                            set: { newDate in
-                                let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
-                                intake.hour = comps.hour ?? intake.hour
-                                intake.minute = comps.minute ?? intake.minute
-                            }),
-                           displayedComponents: .hourAndMinute)
+                DatePicker(
+                    "Heure de prise",
+                    selection: timeBinding,
+                    displayedComponents: .hourAndMinute
+                )
             }
 
             Section("Dose") {
@@ -87,6 +78,22 @@ struct MedicationIntakeEditorView: View {
                 doseString = String(intake.dose)
             }
         }
+    }
+
+    private var timeBinding: Binding<Date> {
+        Binding(
+            get: {
+                var c = DateComponents()
+                c.hour = intake.hour
+                c.minute = intake.minute
+                return Calendar.current.date(from: c) ?? Date()
+            },
+            set: { newDate in
+                let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
+                intake.hour = comps.hour ?? intake.hour
+                intake.minute = comps.minute ?? intake.minute
+            }
+        )
     }
 
     private var weekdaysBinding: Binding<Set<Int>> {
@@ -139,10 +146,9 @@ struct WeekdayChipPicker: View {
                         .font(AFSRFont.headline(13))
                         .frame(width: 34, height: 34)
                         .background(
-                            isSelected ? Color.afsrPurpleAdaptive : Color(.systemGray5),
-                            in: Circle()
+                            Circle().fill(isSelected ? Color.afsrPurpleAdaptive : Color(uiColor: .systemGray5))
                         )
-                        .foregroundStyle(isSelected ? .white : .primary)
+                        .foregroundStyle(isSelected ? Color.white : Color.primary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(weekdayName(item.weekday))
