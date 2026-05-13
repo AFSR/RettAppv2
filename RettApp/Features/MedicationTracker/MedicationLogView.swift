@@ -255,7 +255,7 @@ struct MedicationEditor: View {
                 }
             }
 
-            Section("Dose habituelle") {
+            Section {
                 HStack {
                     TextField("Quantité", text: $defaultDoseText)
                         .keyboardType(.decimalPad)
@@ -266,6 +266,8 @@ struct MedicationEditor: View {
                     }
                     .pickerStyle(.segmented)
                 }
+            } header: {
+                Text("Dose habituelle")
             } footer: {
                 Text(kind == .regular
                      ? "Dose utilisée par défaut quand vous ajoutez une nouvelle prise. Chaque prise peut ensuite être ajustée individuellement."
@@ -273,7 +275,7 @@ struct MedicationEditor: View {
             }
 
             if kind == .regular {
-                Section("Prises") {
+                Section {
                     ForEach($intakes) { $intake in
                         NavigationLink {
                             MedicationIntakeEditorView(intake: $intake, unit: unit)
@@ -290,6 +292,8 @@ struct MedicationEditor: View {
                     } label: {
                         Label("Ajouter une prise", systemImage: "plus")
                     }
+                } header: {
+                    Text("Prises")
                 } footer: {
                     Text("Chaque prise a sa propre heure, sa dose, ses jours actifs et son rappel. Créez deux prises pour différencier semaine et week-end, par exemple.")
                 }
