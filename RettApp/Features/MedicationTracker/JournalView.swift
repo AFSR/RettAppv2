@@ -275,6 +275,7 @@ struct JournalView: View {
 // MARK: - Contenu du journal
 
 private struct JournalContent: View {
+    @Environment(CloudKitSyncService.self) private var sync
     let selectedDate: Date
     let medications: [Medication]
     let profile: ChildProfile?
@@ -381,7 +382,8 @@ private struct JournalContent: View {
 
     private func delete(_ log: MedicationLog) {
         modelContext.delete(log)
-        try? modelContext.save()
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext, priority: .urgent)
     }
 
     private var summaryHeader: some View {
@@ -500,7 +502,8 @@ private struct JournalContent: View {
     private func toggle(_ log: MedicationLog) {
         log.taken.toggle()
         log.takenTime = log.taken ? Date() : nil
-        try? modelContext.save()
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext, priority: .urgent)
     }
 }
 

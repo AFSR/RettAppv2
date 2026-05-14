@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct SeizureHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(CloudKitSyncService.self) private var sync
     @Query(sort: \SeizureEvent.startTime, order: .reverse) private var seizures: [SeizureEvent]
     @Query private var profiles: [ChildProfile]
 
@@ -87,7 +88,8 @@ struct SeizureHistoryView: View {
         ) { event in
             Button("Supprimer", role: .destructive) {
                 modelContext.delete(event)
-                try? modelContext.save()
+                try? modelContext.saveTouching()
+                sync.scheduleSync(context: modelContext, priority: .urgent)
                 toDelete = nil
             }
             Button("Annuler", role: .cancel) { toDelete = nil }

@@ -7,6 +7,7 @@ import SwiftData
 struct ManualSeizureEntrySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
 
     @State private var startDate: Date = {
@@ -150,7 +151,8 @@ struct ManualSeizureEntrySheet: View {
             childProfileId: profiles.first?.id
         )
         modelContext.insert(event)
-        try? modelContext.save()
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext, priority: .urgent)
         dismiss()
     }
 

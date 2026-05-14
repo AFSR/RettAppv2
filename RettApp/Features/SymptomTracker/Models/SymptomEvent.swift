@@ -119,6 +119,8 @@ final class SymptomEvent {
     var durationMinutes: Int
     var notes: String
     var childProfileId: UUID?
+    /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+    var lastModifiedAt: Date = Date()
 
     var symptomType: RettSymptom {
         get { RettSymptom(rawValue: symptomTypeRaw) ?? .other }
@@ -143,3 +145,5 @@ final class SymptomEvent {
         self.childProfileId = childProfileId
     }
 }
+
+extension SymptomEvent: SyncTimestamped {}

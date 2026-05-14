@@ -6,6 +6,7 @@ import SwiftData
 struct DailyObservationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
 
     let dayStart: Date
@@ -176,7 +177,8 @@ struct DailyObservationSheet: View {
             )
             modelContext.insert(obs)
         }
-        try? modelContext.save()
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext)
         dismiss()
     }
 }

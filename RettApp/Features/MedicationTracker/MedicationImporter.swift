@@ -99,7 +99,7 @@ enum MedicationImporter {
         }
 
         do {
-            try context.save()
+            try context.saveTouching()
         } catch {
             errors.append("Erreur SwiftData : \(error.localizedDescription)")
         }

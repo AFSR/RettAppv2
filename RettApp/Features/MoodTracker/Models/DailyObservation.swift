@@ -91,6 +91,8 @@ final class DailyObservation {
     var generalNotes: String = ""
 
     var childProfileId: UUID?
+    /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+    var lastModifiedAt: Date = Date()
 
     init(
         id: UUID = UUID(),
@@ -205,3 +207,5 @@ final class DailyObservation {
             || !snackNotes.isEmpty || !dinnerNotes.isEmpty
     }
 }
+
+extension DailyObservation: SyncTimestamped {}

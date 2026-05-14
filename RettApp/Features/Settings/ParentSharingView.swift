@@ -10,18 +10,25 @@ struct ParentSharingView: View {
     @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
 
-    @State private var sharingURL: URL?
-    @State private var presentInviteCard = false
+    @State private var presentShareSheet = false
     @State private var presentStopConfirm = false
     @State private var participantToRemove: ParticipantInfo?
     @State private var workingError: String?
+    @State private var presentResetConfirm = false
+    @State private var isResetting = false
 
     var body: some View {
         Form {
             accountSection
             shareStatusSection
             participantsSection
+            if !sync.recentRemoteActivity.isEmpty {
+                activityTimelineSection
+            }
             actionsSection
+            if sync.role != .none {
+                troubleshootSection
+            }
             infoSection
         }
         .navigationTitle("Partage entre parents")
@@ -33,22 +40,31 @@ struct ParentSharingView: View {
             await sync.requestParticipantsDiscoverability()
             await sync.refreshShareStatus()
         }
-        .sheet(isPresented: $presentInviteCard) {
-            if let url = sharingURL {
-                InvitationCardView(
-                    url: url,
-                    childName: profiles.first?.fullName ?? "votre enfant",
-                    onAirDrop: {
-                        // Présenté directement sur la window racine (cf.
-                        // ProximityShare.present) — un .sheet SwiftUI imbriqué
-                        // dans un autre sheet ne s'affichait jamais.
-                        ProximityShare.present(url: url) {
-                            Task { await sync.refreshShareStatus() }
-                        }
+        .sheet(isPresented: $presentShareSheet) {
+            CloudShareSheet(
+                prepareShare: {
+                    do {
+                        let result = try await sync.prepareShareForController(
+                            childProfile: profiles.first,
+                            context: modelContext
+                        )
+                        return .success(result)
+                    } catch {
+                        return .failure(error)
                     }
-                )
-                .presentationDetents([.medium, .large])
-            }
+                },
+                title: "Suivi RettApp — \(profiles.first?.fullName ?? "enfant")",
+                onSaved: { _ in
+                    Task { await sync.refreshShareStatus() }
+                },
+                onStopped: {
+                    Task { await sync.refreshShareStatus() }
+                },
+                onFailed: { error in
+                    workingError = error.localizedDescription
+                }
+            )
+            .ignoresSafeArea()
         }
         .confirmationDialog(
             sync.role == .participant ? "Quitter le partage ?" : "Arrêter le partage ?",
@@ -171,20 +187,33 @@ struct ParentSharingView: View {
     }
     private var roleTitle: String {
         switch sync.role {
-        case .none: return "Aucun partage actif"
+        case .none:
+            return "Aucun partage actif"
         case .owner:
-            if sync.participantCount > 0 {
-                return "Partagé avec \(sync.participantCount) parent\(sync.participantCount > 1 ? "s" : "")"
+            let accepted = sync.participants.filter { !$0.isOwner && $0.acceptanceStatus == .accepted }.count
+            let pending = sync.participants.filter { !$0.isOwner && $0.acceptanceStatus == .pending }.count
+            if accepted > 0 {
+                return "Partagé avec \(accepted) parent\(accepted > 1 ? "s" : "")"
+            }
+            if pending > 0 {
+                return "Invitation envoyée — en attente d'acceptation"
             }
             return "Invitation prête à envoyer"
-        case .participant: return "Vous avez accepté l'invitation d'un autre parent"
+        case .participant:
+            if let name = sync.ownerDisplayNameFromShare, !name.isEmpty {
+                return "Partagé par \(name)"
+            }
+            return "Vous avez accepté l'invitation d'un autre parent"
         }
     }
     private var roleSubtitle: String {
         switch sync.role {
-        case .none: return "Créez une invitation pour synchroniser le suivi avec un autre parent."
-        case .owner: return "Vous êtes le propriétaire des données partagées."
-        case .participant: return "Les modifications sont visibles des deux côtés."
+        case .none:
+            return "Créez une invitation pour synchroniser le suivi avec un autre parent."
+        case .owner:
+            return "Vous êtes le propriétaire des données partagées."
+        case .participant:
+            return "Les modifications faites par les deux parents sont automatiquement synchronisées."
         }
     }
 
@@ -229,16 +258,16 @@ struct ParentSharingView: View {
             switch sync.role {
             case .none:
                 Button {
-                    Task { await createInvite() }
+                    presentShareSheet = true
                 } label: {
-                    Label("Créer une invitation (AirDrop)", systemImage: "dot.radiowaves.left.and.right")
+                    Label("Inviter un autre parent", systemImage: "person.crop.circle.badge.plus")
                 }
                 .disabled(sync.accountStatus != .available || sync.syncState == .syncing)
             case .owner:
                 Button {
-                    Task { await regenerateInviteSheet() }
+                    presentShareSheet = true
                 } label: {
-                    Label("Réenvoyer l'invitation par AirDrop", systemImage: "dot.radiowaves.left.and.right")
+                    Label("Gérer le partage / inviter un autre parent", systemImage: "person.2.badge.gearshape")
                 }
                 Button(role: .destructive) {
                     presentStopConfirm = true
@@ -265,7 +294,70 @@ struct ParentSharingView: View {
         } header: {
             Text("Actions")
         } footer: {
-            Text("La synchronisation pousse vos données locales puis tire les changements de l'autre parent. À déclencher après chaque session importante de saisie.")
+            Text("L'invitation utilise la feuille de partage iOS native : AirDrop apparaît automatiquement quand les deux iPhones sont à proximité, et le destinataire reçoit une notification d'acceptation. La synchronisation se fait automatiquement à l'ouverture de l'app et après chaque saisie importante.")
+        }
+    }
+
+    private var activityTimelineSection: some View {
+        Section {
+            ForEach(sync.recentRemoteActivity.prefix(10)) { activity in
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: activity.entity.icon)
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(activityLabel(activity))
+                            .font(AFSRFont.body(14))
+                        Text(activity.timestamp, format: .relative(presentation: .numeric))
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("Activité distante récente")
+        } footer: {
+            Text("Changements rapatriés depuis l'autre parent lors des dernières synchronisations.")
+        }
+    }
+
+    private func activityLabel(_ activity: RemoteActivity) -> String {
+        let owner = sync.ownerDisplayNameFromShare?.isEmpty == false
+            ? sync.ownerDisplayNameFromShare!
+            : "L'autre parent"
+        let entityLabel = activity.count > 1 ? activity.entity.pluralLabel : activity.entity.label
+        let verb = activity.count > 1 ? "a ajouté" : "a ajouté"
+        return "\(owner) \(verb) \(activity.count) \(entityLabel)"
+    }
+
+    private var troubleshootSection: some View {
+        Section {
+            Button(role: .destructive) {
+                presentResetConfirm = true
+            } label: {
+                HStack {
+                    if isResetting { ProgressView().controlSize(.small) }
+                    Label(isResetting ? "Réinitialisation…" : "Réinitialiser la synchronisation",
+                          systemImage: "arrow.counterclockwise.circle")
+                }
+            }
+            .disabled(isResetting || sync.syncState == .syncing)
+        } header: {
+            Text("Dépannage")
+        } footer: {
+            Text("À utiliser uniquement si la synchronisation semble bloquée. Cette action efface les marqueurs internes côté appareil (tokens de changement, abonnements push) puis pousse vos données locales et retire l'intégralité du contenu partagé depuis iCloud. Vos données restent intactes ; le partage et l'autre parent ne sont pas affectés.")
+        }
+        .confirmationDialog(
+            "Réinitialiser la synchronisation ?",
+            isPresented: $presentResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Réinitialiser", role: .destructive) {
+                Task { await resetSync() }
+            }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("L'opération peut prendre quelques dizaines de secondes selon le volume de données.")
         }
     }
 
@@ -289,29 +381,6 @@ struct ParentSharingView: View {
     }
 
     // MARK: - Actions
-
-    private func createInvite() async {
-        do {
-            // 1. Pousse l'existant pour que l'invité voie tout au moment d'accepter
-            try await sync.replicateAll(from: modelContext)
-            // 2. Crée le CKShare et obtient l'URL
-            let url = try await sync.setupSharing(childProfile: profiles.first)
-            sharingURL = url
-            presentInviteCard = true
-        } catch {
-            workingError = error.localizedDescription
-        }
-    }
-
-    private func regenerateInviteSheet() async {
-        if let url = sync.currentShare?.url {
-            sharingURL = url
-            presentInviteCard = true
-        } else {
-            // pas de share local → en récupérer un
-            await createInvite()
-        }
-    }
 
     private func stopSharing() async {
         do {
@@ -342,73 +411,14 @@ struct ParentSharingView: View {
             workingError = error.localizedDescription
         }
     }
-}
 
-// MARK: - Carte d'invitation (rappel proximité)
-
-private struct InvitationCardView: View {
-    @Environment(\.dismiss) private var dismiss
-    let url: URL
-    let childName: String
-    let onAirDrop: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    Image(systemName: "person.2.wave.2.fill")
-                        .font(.system(size: 64, weight: .light))
-                        .foregroundStyle(.afsrPurpleAdaptive)
-                        .padding(.top, 16)
-
-                    VStack(spacing: 8) {
-                        Text("Invitation prête")
-                            .font(AFSRFont.title(24))
-                        Text("Pour le suivi de \(childName)")
-                            .font(AFSRFont.body(15))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        StepRow(number: "1", text: "Approchez les deux iPhones (à moins de 10 m).")
-                        StepRow(number: "2", text: "Sur l'autre iPhone, AirDrop doit être activé (Centre de contrôle → AirDrop → Tout le monde 10 min ou Mes contacts).")
-                        StepRow(number: "3", text: "Touchez « Envoyer par AirDrop » ci-dessous.")
-                        StepRow(number: "4", text: "Sélectionnez l'autre iPhone dans la liste AirDrop qui s'affiche.")
-                        StepRow(number: "5", text: "L'autre parent accepte l'invitation, l'appli RettApp s'ouvre et synchronise.")
-                    }
-                    .padding()
-                    .background(Color.afsrPurpleAdaptive.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal)
-
-                    Button {
-                        onAirDrop()
-                    } label: {
-                        Label("Envoyer par AirDrop", systemImage: "dot.radiowaves.left.and.right")
-                            .font(AFSRFont.headline(17))
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: AFSRTokens.minTapTarget)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.afsrPurpleAdaptive)
-                    .padding(.horizontal)
-
-                    VStack(spacing: 4) {
-                        Text("Pour des raisons de sécurité, l'invitation ne peut pas être envoyée par Messages, Mail ou un autre canal à distance.")
-                            .font(AFSRFont.caption())
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
-                    Spacer(minLength: 16)
-                }
-            }
-            .navigationTitle("Invitation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Fermer") { dismiss() }
-                }
-            }
+    private func resetSync() async {
+        isResetting = true
+        defer { isResetting = false }
+        do {
+            try await sync.resetSyncState(context: modelContext)
+        } catch {
+            workingError = error.localizedDescription
         }
     }
 }
@@ -457,20 +467,3 @@ private struct ParticipantRow: View {
     }
 }
 
-private struct StepRow: View {
-    let number: String
-    let text: String
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text(number)
-                .font(AFSRFont.headline(13))
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(Color.afsrPurpleAdaptive, in: Circle())
-            Text(text)
-                .font(AFSRFont.body(14))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-    }
-}

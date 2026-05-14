@@ -6,6 +6,7 @@ import CloudKit
 struct RettAppApp: App {
     @UIApplicationDelegateAdaptor(RettAppDelegate.self) private var appDelegate
     @State private var syncService = CloudKitSyncService()
+    @Environment(\.scenePhase) private var scenePhase
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -100,6 +101,14 @@ struct RettAppApp: App {
                 .task {
                     await syncService.refreshAccountStatus()
                     await syncService.refreshShareStatus()
+                    // Enregistre les CKDatabaseSubscription pour recevoir des
+                    // pushes silencieux quand l'autre parent modifie un record.
+                    await syncService.ensureSubscriptions()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.cloudKitRemoteChange)) { _ in
+                    Task { @MainActor in
+                        await syncService.quickPull(context: sharedModelContainer.mainContext)
+                    }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.didReceiveShareMetadata)) { note in
                     guard let metadata = note.object as? CKShare.Metadata else { return }
@@ -107,8 +116,21 @@ struct RettAppApp: App {
                         do {
                             try await syncService.acceptShare(metadata)
                             try await syncService.pullChanges(into: sharedModelContainer.mainContext)
+                            await syncService.refreshShareStatus()
                         } catch {
                             syncService.lastErrorMessage = error.localizedDescription
+                        }
+                    }
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    // Pull silencieux à chaque retour au foreground pour que
+                    // les changements de l'autre parent apparaissent sans
+                    // intervention manuelle.
+                    if newPhase == .active {
+                        Task { @MainActor in
+                            await syncService.refreshAccountStatus()
+                            await syncService.refreshShareStatus()
+                            await syncService.quickPull(context: sharedModelContainer.mainContext)
                         }
                     }
                 }

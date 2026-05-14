@@ -105,6 +105,8 @@ final class SeizureEvent {
     var notes: String
     var childProfileId: UUID?
     var exportedToHealthKit: Bool
+    /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+    var lastModifiedAt: Date = Date()
 
     var seizureType: SeizureType {
         get { SeizureType(rawValue: seizureTypeRaw) ?? .other }
@@ -150,3 +152,5 @@ final class SeizureEvent {
         return "\(s) s"
     }
 }
+
+extension SeizureEvent: SyncTimestamped {}

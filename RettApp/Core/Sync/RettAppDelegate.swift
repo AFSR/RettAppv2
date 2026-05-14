@@ -12,11 +12,44 @@ import UserNotifications
 final class RettAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     static let didReceiveShareMetadata = Notification.Name("RettAppDidReceiveShareMetadata")
+    /// Émis quand l'app reçoit un silent push d'une `CKDatabaseSubscription`
+    /// (changement distant sur la base privée ou partagée). Écouté dans
+    /// `RettAppApp` pour déclencher un `quickPull` immédiat.
+    static let cloudKitRemoteChange = Notification.Name("RettAppCloudKitRemoteChange")
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // Enregistrement pour les silent push CloudKit. Ne demande PAS de
+        // permission utilisateur — `content-available` est invisible.
+        application.registerForRemoteNotifications()
         return true
+    }
+
+    // MARK: - Silent push (CloudKit subscriptions)
+
+    /// Wakeup en arrière-plan : appelé par iOS quand un silent push arrive.
+    /// On vérifie que c'est bien une notification CloudKit (sinon on ignore)
+    /// puis on poste une notification interne — `RettAppApp` la capte et
+    /// déclenche un pull silencieux qui rafraîchit l'UI via `@Query`.
+    func application(_ application: UIApplication,
+                     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo) else {
+            completionHandler(.noData)
+            return
+        }
+        // On accepte tous les types CloudKit (.database, .recordZone, .query)
+        // — la plus utile est .database, postée par CKDatabaseSubscription.
+        _ = notification
+        NotificationCenter.default.post(name: Self.cloudKitRemoteChange, object: nil)
+        completionHandler(.newData)
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // Sandbox / simulateur sans Apple ID : non bloquant, on log.
+        print("⚠️ registerForRemoteNotifications a échoué : \(error.localizedDescription)")
     }
 
     func application(_ application: UIApplication,
