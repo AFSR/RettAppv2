@@ -203,7 +203,17 @@ final class CloudKitSyncService {
         // utilise prepareShareForController). Conservé en filet de sécurité.
         try await ensureSignedIn()
         let zone = try await ensureZone()
-        if let existing = currentShare ?? (try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: zone.zoneID)) {
+        // Important : on ne peut pas écrire `currentShare ?? (try? await …)`
+        // parce que l'opérateur `??` utilise un `@autoclosure` non-async,
+        // et un `await` dans un autoclosure ne compile pas en Swift 5.9.
+        // On résout les deux côtés explicitement.
+        let resolved: CKShare?
+        if let local = currentShare {
+            resolved = local
+        } else {
+            resolved = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: zone.zoneID)
+        }
+        if let existing = resolved {
             currentShare = existing
             role = .owner
             if let url = existing.url { return url }
