@@ -18,9 +18,10 @@ enum CKRecordType {
     static let seizure          = "SeizureEvent"
     static let mood             = "MoodEntry"
     static let dailyObservation = "DailyObservation"
+    static let symptom          = "SymptomEvent"
 
     /// Tous les record types utilisés. Sert au pull pour balayer la zone.
-    static let all = [childProfile, medication, medicationLog, seizure, mood, dailyObservation]
+    static let all = [childProfile, medication, medicationLog, seizure, mood, dailyObservation, symptom]
 }
 
 /// Clé custom utilisée pour le tie-breaker last-writer-wins entre deux
@@ -461,5 +462,60 @@ extension DailyObservation {
         target.generalNotes = record["generalNotes"] as? String ?? ""
         target.childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
         target.lastModifiedAt = record.incomingLastModified ?? Date()
+    }
+}
+
+// MARK: - SymptomEvent
+
+extension SymptomEvent {
+    func toCKRecord(zoneID: CKRecordZone.ID) -> CKRecord {
+        let recordID = CKRecord.ID(recordName: id.uuidString, zoneID: zoneID)
+        let r = CKRecord(recordType: CKRecordType.symptom, recordID: recordID)
+        r["timestamp"] = timestamp as CKRecordValue
+        r["symptomTypeRaw"] = symptomTypeRaw as CKRecordValue
+        r["intensityRaw"] = intensityRaw as CKRecordValue
+        r["durationMinutes"] = durationMinutes as CKRecordValue
+        r["notes"] = notes as CKRecordValue
+        if let childProfileId {
+            r["childProfileId"] = childProfileId.uuidString as CKRecordValue
+        }
+        r.writeLastModified(lastModifiedAt)
+        return r
+    }
+
+    static func upsert(from record: CKRecord, in context: ModelContext) {
+        guard let id = UUID(uuidString: record.recordID.recordName) else { return }
+        let existing = (try? context.fetch(FetchDescriptor<SymptomEvent>(
+            predicate: #Predicate { $0.id == id }
+        )).first)
+
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
+
+        let timestamp = record["timestamp"] as? Date ?? Date()
+        let symptomTypeRaw = record["symptomTypeRaw"] as? String ?? RettSymptom.other.rawValue
+        let intensity = record["intensityRaw"] as? Int ?? 0
+        let durationMinutes = record["durationMinutes"] as? Int ?? 0
+        let notes = record["notes"] as? String ?? ""
+        let childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
+        let symptomType = RettSymptom(rawValue: symptomTypeRaw) ?? .other
+        let lastModified = record.incomingLastModified ?? Date()
+
+        if let existing {
+            existing.timestamp = timestamp
+            existing.symptomType = symptomType
+            existing.intensityRaw = intensity
+            existing.durationMinutes = durationMinutes
+            existing.notes = notes
+            existing.childProfileId = childProfileId
+            existing.lastModifiedAt = lastModified
+        } else {
+            let new = SymptomEvent(
+                id: id, timestamp: timestamp, symptomType: symptomType,
+                intensity: intensity, durationMinutes: durationMinutes,
+                notes: notes, childProfileId: childProfileId
+            )
+            new.lastModifiedAt = lastModified
+            context.insert(new)
+        }
     }
 }

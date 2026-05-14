@@ -3,6 +3,7 @@ import CloudKit
 import SwiftData
 import Observation
 import os.log
+import UserNotifications
 
 /// Orchestre la synchronisation entre les deux parents via CloudKit Sharing.
 ///
@@ -536,6 +537,9 @@ final class CloudKitSyncService {
         if let obs = try? context.fetch(FetchDescriptor<DailyObservation>()) {
             records.append(contentsOf: obs.map { $0.toCKRecord(zoneID: zoneID) })
         }
+        if let symptoms = try? context.fetch(FetchDescriptor<SymptomEvent>()) {
+            records.append(contentsOf: symptoms.map { $0.toCKRecord(zoneID: zoneID) })
+        }
 
         if records.isEmpty {
             Self.log.info("replicateAll: aucun enregistrement local à pousser")
@@ -598,6 +602,13 @@ final class CloudKitSyncService {
             return
         }
 
+        // Snapshot du nombre de crises locales AVANT le pull, pour repérer les
+        // crises ajoutées par l'autre parent et émettre une notification locale
+        // (« Marc vient d'enregistrer une crise »).
+        let seizureCountBefore: Int = {
+            (try? context.fetchCount(FetchDescriptor<SeizureEvent>())) ?? 0
+        }()
+
         var totalUpserted = 0
         var totalDeleted = 0
         for zoneID in zoneIDs {
@@ -614,6 +625,50 @@ final class CloudKitSyncService {
         try? context.save()
         lastSyncedAt = Date()
         Self.log.info("pullChanges OK : \(totalUpserted) upsertés, \(totalDeleted) supprimés")
+
+        // Détection des nouvelles crises distantes. On limite aux pulls côté
+        // participant (scope == .shared) pour ne pas notifier pour ses propres
+        // crises qui reviendraient via l'echo serveur côté propriétaire.
+        if scope == .shared {
+            let seizureCountAfter = (try? context.fetchCount(FetchDescriptor<SeizureEvent>())) ?? 0
+            let delta = seizureCountAfter - seizureCountBefore
+            if delta > 0 {
+                await notifyRemoteSeizures(count: delta)
+            }
+        }
+    }
+
+    /// Émet une notification locale (banner + son) pour signaler `count`
+    /// nouvelle(s) crise(s) tout juste apparue(s) côté serveur. Best-effort :
+    /// pas de retry, pas de blocage de l'UI si la permission n'est pas
+    /// accordée.
+    private func notifyRemoteSeizures(count: Int) async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+            return
+        }
+        let content = UNMutableNotificationContent()
+        content.title = "⚠️ Nouvelle crise enregistrée"
+        if let owner = ownerDisplayNameFromShare, !owner.isEmpty {
+            content.body = count == 1
+                ? "\(owner) vient d'enregistrer une crise. Ouvrez RettApp pour voir le détail."
+                : "\(owner) vient d'enregistrer \(count) crises. Ouvrez RettApp pour voir le détail."
+        } else {
+            content.body = count == 1
+                ? "L'autre parent vient d'enregistrer une crise. Ouvrez RettApp pour voir le détail."
+                : "L'autre parent vient d'enregistrer \(count) crises. Ouvrez RettApp pour voir le détail."
+        }
+        content.sound = .default
+        content.categoryIdentifier = "afsr.remote.seizure"
+        let id = "afsr.remote.seizure.\(UUID().uuidString)"
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
+        do {
+            try await center.add(request)
+            Self.log.info("Notif locale émise pour \(count) crise(s) distantes")
+        } catch {
+            Self.log.error("notifyRemoteSeizures: \(error.localizedDescription)")
+        }
     }
 
     /// Pull une zone individuelle, en plusieurs passes si `moreComing` est vrai.
@@ -676,6 +731,7 @@ final class CloudKitSyncService {
         case CKRecordType.seizure:          SeizureEvent.upsert(from: record, in: context)
         case CKRecordType.mood:             MoodEntry.upsert(from: record, in: context)
         case CKRecordType.dailyObservation: DailyObservation.upsert(from: record, in: context)
+        case CKRecordType.symptom:          SymptomEvent.upsert(from: record, in: context)
         default: break
         }
     }
@@ -703,6 +759,9 @@ final class CloudKitSyncService {
         }
         if let o = try? context.fetch(FetchDescriptor<DailyObservation>(predicate: #Predicate { $0.id == id })).first {
             context.delete(o); return
+        }
+        if let sym = try? context.fetch(FetchDescriptor<SymptomEvent>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(sym); return
         }
     }
 
