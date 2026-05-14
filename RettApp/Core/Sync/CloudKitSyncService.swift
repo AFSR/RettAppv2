@@ -167,7 +167,13 @@ final class CloudKitSyncService {
         let share = CKShare(recordZoneID: zone.zoneID)
         share[CKShare.SystemFieldKey.title] = "Suivi RettApp — \(childProfile?.fullName ?? "enfant")" as CKRecordValue
         share[CKShare.SystemFieldKey.shareType] = "fr.afsr.RettApp.familyShare" as CKRecordValue
-        share.publicPermission = .none // forcer l'invitation explicite (plus sûr)
+        // `.readWrite` : toute personne qui ouvre le lien (AirDrop, Messages,
+        // Mail) peut rejoindre. Indispensable pour AirDrop — avec `.none`,
+        // CloudKit refuse l'acceptation parce qu'aucune identité (e-mail) n'a
+        // été déclarée avant l'envoi, et l'invité ne reçoit qu'un lien mort.
+        // La sécurité repose sur la confidentialité du lien (envoi en
+        // présentiel via AirDrop, ou destinataire de confiance).
+        share.publicPermission = .readWrite
         // Champ custom : nom affichable du propriétaire, lu côté participant
         // pour afficher « Partagé par X » sans dépendre de discoverUserIdentity.
         if let ownerName = await currentUserDisplayName() {
@@ -194,6 +200,16 @@ final class CloudKitSyncService {
         currentShare = savedShare
         role = .owner
         return (savedShare, container)
+    }
+
+    /// Renvoie le couple `(share, container)` à passer à
+    /// `UICloudSharingController(share:container:)` quand un partage existe
+    /// déjà — c'est l'init canonique pour le mode « gérer les participants »
+    /// (ajouter / retirer des invités, copier le lien). Différent du chemin
+    /// `prepareShareForController` qui sert au tout premier partage.
+    func existingShareForController() -> (CKShare, CKContainer)? {
+        guard let share = currentShare else { return nil }
+        return (share, container)
     }
 
     /// API rétrocompatible : renvoie uniquement l'URL pour l'ancien flow
