@@ -10,7 +10,6 @@ struct ParentSharingView: View {
     @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
 
-    @State private var presentShareSheet = false
     @State private var presentStopConfirm = false
     @State private var participantToRemove: ParticipantInfo?
     @State private var workingError: String?
@@ -39,22 +38,6 @@ struct ParentSharingView: View {
             // e-mail / nom Apple ID (best effort — l'iOS gère la feuille système).
             await sync.requestParticipantsDiscoverability()
             await sync.refreshShareStatus()
-        }
-        .sheet(isPresented: $presentShareSheet) {
-            CloudShareSheet(
-                mode: shareSheetMode,
-                title: "Suivi RettApp — \(profiles.first?.fullName ?? "enfant")",
-                onSaved: { _ in
-                    Task { await sync.refreshShareStatus() }
-                },
-                onStopped: {
-                    Task { await sync.refreshShareStatus() }
-                },
-                onFailed: { error in
-                    workingError = error.localizedDescription
-                }
-            )
-            .ignoresSafeArea()
         }
         .confirmationDialog(
             sync.role == .participant ? "Quitter le partage ?" : "Arrêter le partage ?",
@@ -248,14 +231,14 @@ struct ParentSharingView: View {
             switch sync.role {
             case .none:
                 Button {
-                    presentShareSheet = true
+                    presentShareSheet()
                 } label: {
                     Label("Inviter un autre parent", systemImage: "person.crop.circle.badge.plus")
                 }
                 .disabled(sync.accountStatus != .available || sync.syncState == .syncing)
             case .owner:
                 Button {
-                    presentShareSheet = true
+                    presentShareSheet()
                 } label: {
                     Label("Gérer le partage / inviter un autre parent", systemImage: "person.2.badge.gearshape")
                 }
@@ -393,24 +376,42 @@ struct ParentSharingView: View {
         }
     }
 
-    /// Choisit l'init UICloudSharingController approprié :
+    /// Présente `UICloudSharingController` directement sur la window (pas dans
+    /// un `.sheet` SwiftUI — voir `CloudSharePresenter`). Choisit le bon
+    /// initialiseur :
     /// - share existant → mode « gérer les participants »
     /// - sinon → preparationHandler qui crée un nouveau share
-    private var shareSheetMode: CloudShareSheet.Mode {
+    private func presentShareSheet() {
+        let title = "Suivi RettApp — \(profiles.first?.fullName ?? "enfant")"
+        let mode: CloudSharePresenter.Mode
         if let (share, container) = sync.existingShareForController() {
-            return .existing(share, container)
-        }
-        return .prepare {
-            do {
-                let result = try await sync.prepareShareForController(
-                    childProfile: profiles.first,
-                    context: modelContext
-                )
-                return .success(result)
-            } catch {
-                return .failure(error)
+            mode = .existing(share, container)
+        } else {
+            mode = .prepare { [profiles, modelContext] in
+                do {
+                    let result = try await sync.prepareShareForController(
+                        childProfile: profiles.first,
+                        context: modelContext
+                    )
+                    return .success(result)
+                } catch {
+                    return .failure(error)
+                }
             }
         }
+        CloudSharePresenter.present(
+            mode: mode,
+            title: title,
+            onSaved: { _ in
+                Task { await sync.refreshShareStatus() }
+            },
+            onStopped: {
+                Task { await sync.refreshShareStatus() }
+            },
+            onFailed: { error in
+                workingError = error.localizedDescription
+            }
+        )
     }
 
     private func syncNow() async {
