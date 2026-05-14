@@ -14,13 +14,21 @@ struct ParentSharingView: View {
     @State private var presentStopConfirm = false
     @State private var participantToRemove: ParticipantInfo?
     @State private var workingError: String?
+    @State private var presentResetConfirm = false
+    @State private var isResetting = false
 
     var body: some View {
         Form {
             accountSection
             shareStatusSection
             participantsSection
+            if !sync.recentRemoteActivity.isEmpty {
+                activityTimelineSection
+            }
             actionsSection
+            if sync.role != .none {
+                troubleshootSection
+            }
             infoSection
         }
         .navigationTitle("Partage entre parents")
@@ -290,6 +298,69 @@ struct ParentSharingView: View {
         }
     }
 
+    private var activityTimelineSection: some View {
+        Section {
+            ForEach(sync.recentRemoteActivity.prefix(10)) { activity in
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: activity.entity.icon)
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(activityLabel(activity))
+                            .font(AFSRFont.body(14))
+                        Text(activity.timestamp, format: .relative(presentation: .numeric))
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("Activité distante récente")
+        } footer: {
+            Text("Changements rapatriés depuis l'autre parent lors des dernières synchronisations.")
+        }
+    }
+
+    private func activityLabel(_ activity: RemoteActivity) -> String {
+        let owner = sync.ownerDisplayNameFromShare?.isEmpty == false
+            ? sync.ownerDisplayNameFromShare!
+            : "L'autre parent"
+        let entityLabel = activity.count > 1 ? activity.entity.pluralLabel : activity.entity.label
+        let verb = activity.count > 1 ? "a ajouté" : "a ajouté"
+        return "\(owner) \(verb) \(activity.count) \(entityLabel)"
+    }
+
+    private var troubleshootSection: some View {
+        Section {
+            Button(role: .destructive) {
+                presentResetConfirm = true
+            } label: {
+                HStack {
+                    if isResetting { ProgressView().controlSize(.small) }
+                    Label(isResetting ? "Réinitialisation…" : "Réinitialiser la synchronisation",
+                          systemImage: "arrow.counterclockwise.circle")
+                }
+            }
+            .disabled(isResetting || sync.syncState == .syncing)
+        } header: {
+            Text("Dépannage")
+        } footer: {
+            Text("À utiliser uniquement si la synchronisation semble bloquée. Cette action efface les marqueurs internes côté appareil (tokens de changement, abonnements push) puis pousse vos données locales et retire l'intégralité du contenu partagé depuis iCloud. Vos données restent intactes ; le partage et l'autre parent ne sont pas affectés.")
+        }
+        .confirmationDialog(
+            "Réinitialiser la synchronisation ?",
+            isPresented: $presentResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Réinitialiser", role: .destructive) {
+                Task { await resetSync() }
+            }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("L'opération peut prendre quelques dizaines de secondes selon le volume de données.")
+        }
+    }
+
     private var infoSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
@@ -336,6 +407,16 @@ struct ParentSharingView: View {
         do {
             try await sync.replicateAll(from: modelContext)
             try await sync.pullChanges(into: modelContext)
+        } catch {
+            workingError = error.localizedDescription
+        }
+    }
+
+    private func resetSync() async {
+        isResetting = true
+        defer { isResetting = false }
+        do {
+            try await sync.resetSyncState(context: modelContext)
         } catch {
             workingError = error.localizedDescription
         }

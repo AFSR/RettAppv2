@@ -72,6 +72,11 @@ final class CloudKitSyncService {
     /// par `refreshShareStatus` à partir du champ custom du `CKShare`.
     var ownerDisplayNameFromShare: String?
 
+    /// Journal court des dernières activités distantes (récup à chaque pull
+    /// `.shared`). Affiché dans Réglages → Partage pour donner de la
+    /// visibilité sur ce que fait l'autre parent. Plafonné à 30 entrées.
+    var recentRemoteActivity: [RemoteActivity] = []
+
     /// Tâche de synchronisation différée (debounce) déclenchée par
     /// `scheduleSync(context:)` après une écriture locale.
     private var pendingSyncTask: Task<Void, Never>?
@@ -602,12 +607,11 @@ final class CloudKitSyncService {
             return
         }
 
-        // Snapshot du nombre de crises locales AVANT le pull, pour repérer les
-        // crises ajoutées par l'autre parent et émettre une notification locale
-        // (« Marc vient d'enregistrer une crise »).
-        let seizureCountBefore: Int = {
-            (try? context.fetchCount(FetchDescriptor<SeizureEvent>())) ?? 0
-        }()
+        // Snapshot des compteurs locaux AVANT le pull, pour calculer le delta
+        // par type et :
+        //   - alimenter `recentRemoteActivity` (timeline UI dans Réglages),
+        //   - émettre une notification locale sur les nouvelles crises.
+        let counts = currentCounts(in: context)
 
         var totalUpserted = 0
         var totalDeleted = 0
@@ -626,15 +630,45 @@ final class CloudKitSyncService {
         lastSyncedAt = Date()
         Self.log.info("pullChanges OK : \(totalUpserted) upsertés, \(totalDeleted) supprimés")
 
-        // Détection des nouvelles crises distantes. On limite aux pulls côté
+        // Détection des changements distants. On limite aux pulls côté
         // participant (scope == .shared) pour ne pas notifier pour ses propres
-        // crises qui reviendraient via l'echo serveur côté propriétaire.
+        // pushes qui reviendraient via l'echo serveur côté propriétaire.
         if scope == .shared {
-            let seizureCountAfter = (try? context.fetchCount(FetchDescriptor<SeizureEvent>())) ?? 0
-            let delta = seizureCountAfter - seizureCountBefore
-            if delta > 0 {
-                await notifyRemoteSeizures(count: delta)
+            let after = currentCounts(in: context)
+            let deltas = after.diff(against: counts)
+            recordRemoteActivity(deltas)
+            if let seizureDelta = deltas[.seizure], seizureDelta > 0 {
+                await notifyRemoteSeizures(count: seizureDelta)
             }
+        }
+    }
+
+    /// Snapshot léger des fetchCounts par type. Utilisé avant/après pull pour
+    /// dériver l'activité distante.
+    private func currentCounts(in context: ModelContext) -> EntityCounts {
+        EntityCounts(
+            medications:        (try? context.fetchCount(FetchDescriptor<Medication>())) ?? 0,
+            medicationLogs:     (try? context.fetchCount(FetchDescriptor<MedicationLog>())) ?? 0,
+            seizures:           (try? context.fetchCount(FetchDescriptor<SeizureEvent>())) ?? 0,
+            moods:              (try? context.fetchCount(FetchDescriptor<MoodEntry>())) ?? 0,
+            observations:       (try? context.fetchCount(FetchDescriptor<DailyObservation>())) ?? 0,
+            symptoms:           (try? context.fetchCount(FetchDescriptor<SymptomEvent>())) ?? 0
+        )
+    }
+
+    /// Enregistre les deltas positifs dans la timeline `recentRemoteActivity`,
+    /// plafonnée à 30 entrées (FIFO). Une seule entrée par type / pull, ce
+    /// qui évite de polluer la liste avec une activité massive.
+    private func recordRemoteActivity(_ deltas: [RemoteActivity.Entity: Int]) {
+        let now = Date()
+        var entries: [RemoteActivity] = []
+        for (entity, count) in deltas where count > 0 {
+            entries.append(RemoteActivity(entity: entity, count: count, timestamp: now))
+        }
+        guard !entries.isEmpty else { return }
+        recentRemoteActivity.insert(contentsOf: entries, at: 0)
+        if recentRemoteActivity.count > 30 {
+            recentRemoteActivity = Array(recentRemoteActivity.prefix(30))
         }
     }
 
@@ -736,11 +770,13 @@ final class CloudKitSyncService {
         }
     }
 
-    /// Supprime localement le record correspondant à une suppression CloudKit distante.
-    private func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
+    /// Supprime localement le record correspondant à une suppression CloudKit
+    /// distante. Exposé en `static internal` pour être appelable depuis les
+    /// tests (round-trip de suppression) sans avoir à instancier le service.
+    static func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
         guard let id = UUID(uuidString: recordID.recordName) else { return }
 
-        // On essaie chacun des 6 types — c'est le moyen le plus simple sans avoir
+        // On essaie chacun des 7 types — c'est le moyen le plus simple sans avoir
         // le recordType (Apple ne le donne pas dans CKDatabase.RecordZoneChange.Deletion).
         if let p = try? context.fetch(FetchDescriptor<ChildProfile>(predicate: #Predicate { $0.id == id })).first {
             context.delete(p); return
@@ -763,6 +799,10 @@ final class CloudKitSyncService {
         if let sym = try? context.fetch(FetchDescriptor<SymptomEvent>(predicate: #Predicate { $0.id == id })).first {
             context.delete(sym); return
         }
+    }
+
+    private func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
+        Self.deleteLocal(recordID: recordID, in: context)
     }
 
     // MARK: - Acceptance
@@ -909,6 +949,32 @@ final class CloudKitSyncService {
             Self.log.error("quickPull error: \(error.localizedDescription)")
         }
     }
+
+    // MARK: - Hard reset (recovery)
+
+    /// Réinitialisation complète de la couche de synchronisation. À utiliser
+    /// quand quelque chose part en biais : tokens corrompus, subscriptions
+    /// désynchronisées, données qui ne convergent plus.
+    ///
+    /// Effet :
+    ///   1. Purge tous les `CKServerChangeToken` persistés → prochain pull
+    ///      re-télécharge l'intégralité des records.
+    ///   2. Re-enregistre les `CKDatabaseSubscription` (silent push) en
+    ///      effaçant le drapeau « déjà fait ».
+    ///   3. Pousse l'état local puis pull tout, pour repartir sur une base
+    ///      commune et complète des deux côtés.
+    ///
+    /// Ne touche **pas** aux records locaux SwiftData ni au `CKShare` :
+    /// l'utilisateur garde ses données et son partage. C'est uniquement la
+    /// mécanique de sync qui est remise à zéro.
+    func resetSyncState(context: ModelContext) async throws {
+        Self.log.info("resetSyncState: purge des tokens + re-souscription + re-sync complète")
+        ChangeTokenStore.clearAll()
+        UserDefaults.standard.removeObject(forKey: Self.subscriptionsRegisteredKey)
+        await ensureSubscriptions()
+        try await replicateAll(from: context)
+        try await pullChanges(into: context)
+    }
 }
 
 // MARK: - Participant info
@@ -973,6 +1039,75 @@ struct ParticipantInfo: Identifiable, Hashable {
         if let e = email, !e.isEmpty { return e }
         if let p = phone, !p.isEmpty { return p }
         return "Apple ID anonyme"
+    }
+}
+
+// MARK: - Remote activity (timeline UI)
+
+/// Une entrée de la timeline d'activité distante affichée dans
+/// « Réglages → Partage entre parents ». Représente un événement type :
+/// « l'autre parent a ajouté 3 observations » à un instant donné.
+struct RemoteActivity: Identifiable, Hashable {
+    let id: UUID = UUID()
+    let entity: Entity
+    let count: Int
+    let timestamp: Date
+
+    enum Entity: String, Hashable {
+        case medication, medicationLog, seizure, mood, observation, symptom
+
+        var label: String {
+            switch self {
+            case .medication:    return "médicament"
+            case .medicationLog: return "prise de médicament"
+            case .seizure:       return "crise"
+            case .mood:          return "humeur"
+            case .observation:   return "observation"
+            case .symptom:       return "symptôme"
+            }
+        }
+
+        var pluralLabel: String {
+            switch self {
+            case .medication:    return "médicaments"
+            case .medicationLog: return "prises de médicament"
+            case .seizure:       return "crises"
+            case .mood:          return "humeurs"
+            case .observation:   return "observations"
+            case .symptom:       return "symptômes"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .medication, .medicationLog: return "pills.fill"
+            case .seizure:                    return "waveform.path.ecg"
+            case .mood:                       return "face.smiling"
+            case .observation:                return "fork.knife"
+            case .symptom:                    return "stethoscope"
+            }
+        }
+    }
+}
+
+/// Compteurs par type d'entité utilisés pour calculer un diff après pull.
+fileprivate struct EntityCounts {
+    let medications: Int
+    let medicationLogs: Int
+    let seizures: Int
+    let moods: Int
+    let observations: Int
+    let symptoms: Int
+
+    func diff(against base: EntityCounts) -> [RemoteActivity.Entity: Int] {
+        [
+            .medication:    medications    - base.medications,
+            .medicationLog: medicationLogs - base.medicationLogs,
+            .seizure:       seizures       - base.seizures,
+            .mood:          moods          - base.moods,
+            .observation:   observations   - base.observations,
+            .symptom:       symptoms       - base.symptoms
+        ]
     }
 }
 

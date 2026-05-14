@@ -302,4 +302,84 @@ final class CKRecordRoundtripTests: XCTestCase {
         )
         XCTAssertEqual(fetched.name, "Mis à jour")
     }
+
+    // MARK: - Remote deletion propagation (Phase 5)
+
+    /// Une suppression distante (récupérée via `recordZoneChanges`) doit
+    /// retirer le record local correspondant — quel que soit son type.
+    /// La logique de dispatch teste les 7 types un par un parce que CloudKit
+    /// ne nous renvoie pas le `recordType` avec les deletions.
+    func test_deleteLocal_removesMedication() throws {
+        let context = try makeContext()
+        let id = UUID()
+        let med = Medication(
+            id: id, name: "À supprimer", doseAmount: 1, doseUnit: .mg,
+            scheduledHours: [HourMinute(hour: 9, minute: 0)],
+            kind: .regular
+        )
+        context.insert(med)
+        try context.save()
+
+        let recordID = CKRecord.ID(recordName: id.uuidString, zoneID: zoneID)
+        CloudKitSyncService.deleteLocal(recordID: recordID, in: context)
+        try context.save()
+
+        let remaining = try context.fetch(FetchDescriptor<Medication>(predicate: #Predicate { $0.id == id }))
+        XCTAssertTrue(remaining.isEmpty, "Le médicament local doit avoir été supprimé")
+    }
+
+    func test_deleteLocal_removesSeizure() throws {
+        let context = try makeContext()
+        let id = UUID()
+        let now = Date()
+        let seizure = SeizureEvent(id: id, startTime: now, endTime: now.addingTimeInterval(30))
+        context.insert(seizure)
+        try context.save()
+
+        let recordID = CKRecord.ID(recordName: id.uuidString, zoneID: zoneID)
+        CloudKitSyncService.deleteLocal(recordID: recordID, in: context)
+        try context.save()
+
+        let remaining = try context.fetch(FetchDescriptor<SeizureEvent>(predicate: #Predicate { $0.id == id }))
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    func test_deleteLocal_removesSymptom() throws {
+        let context = try makeContext()
+        let id = UUID()
+        let sym = SymptomEvent(id: id, symptomType: .bruxism)
+        context.insert(sym)
+        try context.save()
+
+        let recordID = CKRecord.ID(recordName: id.uuidString, zoneID: zoneID)
+        CloudKitSyncService.deleteLocal(recordID: recordID, in: context)
+        try context.save()
+
+        let remaining = try context.fetch(FetchDescriptor<SymptomEvent>(predicate: #Predicate { $0.id == id }))
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    /// Un ID qui ne correspond à aucun record local est silencieusement ignoré
+    /// (pas de throw, pas de modification). Important parce que les
+    /// suppressions distantes peuvent rejouer plusieurs fois si les tokens
+    /// sont réinitialisés.
+    func test_deleteLocal_unknownIdIsNoOp() throws {
+        let context = try makeContext()
+        let id = UUID()
+        let med = Medication(
+            id: id, name: "Existant", doseAmount: 1, doseUnit: .mg,
+            scheduledHours: [HourMinute(hour: 9, minute: 0)],
+            kind: .regular
+        )
+        context.insert(med)
+        try context.save()
+
+        // Suppression sur un autre UUID — ne doit rien faire.
+        let unknownRecordID = CKRecord.ID(recordName: UUID().uuidString, zoneID: zoneID)
+        CloudKitSyncService.deleteLocal(recordID: unknownRecordID, in: context)
+        try context.save()
+
+        let stillThere = try context.fetch(FetchDescriptor<Medication>(predicate: #Predicate { $0.id == id }))
+        XCTAssertEqual(stillThere.count, 1, "Le record existant ne doit pas avoir été touché")
+    }
 }
