@@ -101,6 +101,14 @@ struct RettAppApp: App {
                 .task {
                     await syncService.refreshAccountStatus()
                     await syncService.refreshShareStatus()
+                    // Enregistre les CKDatabaseSubscription pour recevoir des
+                    // pushes silencieux quand l'autre parent modifie un record.
+                    await syncService.ensureSubscriptions()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.cloudKitRemoteChange)) { _ in
+                    Task { @MainActor in
+                        await syncService.quickPull(context: sharedModelContainer.mainContext)
+                    }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.didReceiveShareMetadata)) { note in
                     guard let metadata = note.object as? CKShare.Metadata else { return }

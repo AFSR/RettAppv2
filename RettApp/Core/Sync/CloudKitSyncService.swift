@@ -66,10 +66,6 @@ final class CloudKitSyncService {
     private(set) var currentShare: CKShare?
     private var ownedZone: CKRecordZone?
 
-    /// Token de changements pour les pulls incrémentaux (par database scope).
-    private var changeTokenPrivate: CKServerChangeToken?
-    private var changeTokenShared: CKServerChangeToken?
-
     /// Nom du propriétaire stocké côté participant pour pouvoir afficher
     /// « partagé par Marc » même sans `userDiscoverability` activée. Renseigné
     /// par `refreshShareStatus` à partir du champ custom du `CKShare`.
@@ -407,6 +403,9 @@ final class CloudKitSyncService {
         role = .none
         participantCount = 0
         participants = []
+        // Les tokens de changement sont invalidés (la zone n'est plus partagée
+        // — pour les futurs partages, on repartira de zéro).
+        ChangeTokenStore.clearAll()
         await refreshShareStatus()
     }
 
@@ -482,6 +481,9 @@ final class CloudKitSyncService {
             role = .none
             participantCount = 0
             participants = []
+            // Les tokens de changement de la zone partagée ne sont plus valides
+            // une fois qu'on a quitté le partage.
+            ChangeTokenStore.clearAll()
             // Re-vérifie l'état pour que l'UI reflète la réalité côté serveur.
             await refreshShareStatus()
         } else if let err = lastError {
@@ -560,9 +562,20 @@ final class CloudKitSyncService {
 
     // MARK: - Pull (CloudKit → SwiftData)
 
-    /// Tire tous les changements depuis CloudKit vers SwiftData.
-    /// Utilise `recordZoneChanges` (token-based) plutôt que `CKQuery`, qui exigeait
-    /// que `recordName` soit déclaré « queryable » dans le schema CloudKit Console.
+    /// Tire les changements depuis CloudKit vers SwiftData.
+    ///
+    /// **Incrémental** : on persiste un `CKServerChangeToken` par zone dans
+    /// `UserDefaults` (cf. `ChangeTokenStore`). Au pull suivant, CloudKit ne
+    /// renvoie que les records modifiés *depuis* ce token, ce qui :
+    ///   - réduit massivement la bande passante et la latence pour les
+    ///     synchronisations répétées,
+    ///   - évite le problème d'« écho » (ré-importer ses propres pushes)
+    ///     parce que CloudKit n'envoie pas un record que l'appelant a
+    ///     lui-même écrit après le token.
+    ///
+    /// Si le serveur indique qu'un token est expiré (rare — change de zone,
+    /// reset du store), on le purge automatiquement et on re-pull depuis le
+    /// début (`since: nil`).
     func pullChanges(into context: ModelContext) async throws {
         try await ensureSignedIn()
         syncState = .syncing
@@ -588,30 +601,71 @@ final class CloudKitSyncService {
         var totalUpserted = 0
         var totalDeleted = 0
         for zoneID in zoneIDs {
-            // recordZoneChanges (since: nil) ramène TOUTES les modifications.
-            // Pas besoin que les fields soient queryable — c'est un fetch par token, pas une query.
-            let result = try await database.recordZoneChanges(inZoneWith: zoneID, since: nil)
-
-            for (_, modResult) in result.modificationResultsByID {
-                switch modResult {
-                case .success(let modification):
-                    upsert(modification.record, in: context)
-                    totalUpserted += 1
-                case .failure(let err):
-                    Self.log.error("Pull modif: \(err.localizedDescription)")
-                }
-            }
-
-            // Suppressions distantes : on supprime localement aussi
-            for deletion in result.deletions {
-                deleteLocal(recordID: deletion.recordID, in: context)
-                totalDeleted += 1
-            }
+            try await pullZone(
+                zoneID: zoneID,
+                scope: scope,
+                database: database,
+                context: context,
+                upserted: &totalUpserted,
+                deleted: &totalDeleted
+            )
         }
 
         try? context.save()
         lastSyncedAt = Date()
         Self.log.info("pullChanges OK : \(totalUpserted) upsertés, \(totalDeleted) supprimés")
+    }
+
+    /// Pull une zone individuelle, en plusieurs passes si `moreComing` est vrai.
+    /// Met à jour le `CKServerChangeToken` persistant à la fin de chaque passe
+    /// (donc on ne re-télécharge pas tout si une passe ultérieure échoue).
+    private func pullZone(
+        zoneID: CKRecordZone.ID,
+        scope: CKDatabase.Scope,
+        database: CKDatabase,
+        context: ModelContext,
+        upserted: inout Int,
+        deleted: inout Int
+    ) async throws {
+        var sinceToken = ChangeTokenStore.load(zoneID: zoneID, scope: scope)
+        var moreComing = true
+
+        while moreComing {
+            let result: (
+                modificationResultsByID: [CKRecord.ID: Result<CKDatabase.RecordZoneChange.Modification, Error>],
+                deletions: [CKDatabase.RecordZoneChange.Deletion],
+                changeToken: CKServerChangeToken,
+                moreComing: Bool
+            )
+            do {
+                result = try await database.recordZoneChanges(inZoneWith: zoneID, since: sinceToken)
+            } catch let error as CKError where error.code == .changeTokenExpired {
+                // Le serveur a rejeté notre token (ex. zone réinitialisée) —
+                // on repart de zéro pour cette zone.
+                Self.log.info("pullZone: token expiré pour \(zoneID.zoneName), reset")
+                ChangeTokenStore.clear(zoneID: zoneID, scope: scope)
+                sinceToken = nil
+                continue
+            }
+
+            for (_, modResult) in result.modificationResultsByID {
+                switch modResult {
+                case .success(let modification):
+                    upsert(modification.record, in: context)
+                    upserted += 1
+                case .failure(let err):
+                    Self.log.error("Pull modif: \(err.localizedDescription)")
+                }
+            }
+            for deletion in result.deletions {
+                deleteLocal(recordID: deletion.recordID, in: context)
+                deleted += 1
+            }
+
+            ChangeTokenStore.save(result.changeToken, zoneID: zoneID, scope: scope)
+            sinceToken = result.changeToken
+            moreComing = result.moreComing
+        }
     }
 
     private func upsert(_ record: CKRecord, in context: ModelContext) {
@@ -680,6 +734,59 @@ final class CloudKitSyncService {
 
     private func appropriateDatabaseScope() -> CKDatabase.Scope {
         role == .participant ? .shared : .private
+    }
+
+    // MARK: - Subscriptions (silent push notifications)
+
+    /// S'assure que les `CKDatabaseSubscription` sont enregistrées pour la
+    /// base privée et la base partagée. Quand l'autre parent (ou nous-mêmes
+    /// depuis un autre appareil) modifie un record, CloudKit envoie un push
+    /// silencieux (`shouldSendContentAvailable = true`) à l'app — l'AppDelegate
+    /// intercepte la notif et déclenche un `quickPull` pour rafraîchir
+    /// l'écran sans intervention de l'utilisateur.
+    ///
+    /// Idempotent : la première fois on enregistre, ensuite on no-op (drapeau
+    /// dans `UserDefaults`).
+    func ensureSubscriptions() async {
+        guard accountStatus == .available else { return }
+
+        let registered = UserDefaults.standard.bool(forKey: Self.subscriptionsRegisteredKey)
+        if registered { return }
+
+        do {
+            try await registerDatabaseSubscription(
+                database: container.privateCloudDatabase,
+                subscriptionID: "afsr.private.changes"
+            )
+            try await registerDatabaseSubscription(
+                database: container.sharedCloudDatabase,
+                subscriptionID: "afsr.shared.changes"
+            )
+            UserDefaults.standard.set(true, forKey: Self.subscriptionsRegisteredKey)
+            Self.log.info("CKDatabaseSubscriptions registered")
+        } catch {
+            Self.log.error("ensureSubscriptions error: \(error.localizedDescription)")
+        }
+    }
+
+    private static let subscriptionsRegisteredKey = "afsr.ck.subscriptionsRegistered.v1"
+
+    private func registerDatabaseSubscription(database: CKDatabase, subscriptionID: String) async throws {
+        let id = CKSubscription.ID(subscriptionID)
+        // Si déjà existante côté serveur, on ne fait rien.
+        do {
+            _ = try await database.subscription(for: id)
+            return
+        } catch let error as CKError where error.code == .unknownItem {
+            // tomber dans la création
+        }
+
+        let subscription = CKDatabaseSubscription(subscriptionID: id)
+        let info = CKSubscription.NotificationInfo()
+        // Silent push : pas d'UI, juste un wake-up de l'app pour qu'elle pulle.
+        info.shouldSendContentAvailable = true
+        subscription.notificationInfo = info
+        _ = try await database.save(subscription)
     }
 
     // MARK: - Auto-sync (debounce)
@@ -783,6 +890,54 @@ struct ParticipantInfo: Identifiable, Hashable {
         if let e = email, !e.isEmpty { return e }
         if let p = phone, !p.isEmpty { return p }
         return "Apple ID anonyme"
+    }
+}
+
+// MARK: - Change-token persistence
+
+/// Stockage des `CKServerChangeToken` dans `UserDefaults`, indexés par
+/// `(scope, zoneID)`. Les tokens sont sérialisés via `NSKeyedArchiver` —
+/// `CKServerChangeToken` adopte `NSSecureCoding`.
+///
+/// Persistance volontairement légère : pas besoin du Keychain, les tokens
+/// ne sont pas des secrets, juste des bookmarks vers la position serveur.
+enum ChangeTokenStore {
+    private static let keyPrefix = "afsr.ck.changeToken"
+
+    static func key(zoneID: CKRecordZone.ID, scope: CKDatabase.Scope) -> String {
+        let scopeStr: String
+        switch scope {
+        case .private: scopeStr = "private"
+        case .shared:  scopeStr = "shared"
+        case .public:  scopeStr = "public"
+        @unknown default: scopeStr = "unknown"
+        }
+        return "\(keyPrefix).\(scopeStr).\(zoneID.ownerName).\(zoneID.zoneName)"
+    }
+
+    static func save(_ token: CKServerChangeToken, zoneID: CKRecordZone.ID, scope: CKDatabase.Scope) {
+        let k = key(zoneID: zoneID, scope: scope)
+        if let data = try? NSKeyedArchiver.archivedData(withRootObject: token, requiringSecureCoding: true) {
+            UserDefaults.standard.set(data, forKey: k)
+        }
+    }
+
+    static func load(zoneID: CKRecordZone.ID, scope: CKDatabase.Scope) -> CKServerChangeToken? {
+        let k = key(zoneID: zoneID, scope: scope)
+        guard let data = UserDefaults.standard.data(forKey: k) else { return nil }
+        return try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: data)
+    }
+
+    static func clear(zoneID: CKRecordZone.ID, scope: CKDatabase.Scope) {
+        UserDefaults.standard.removeObject(forKey: key(zoneID: zoneID, scope: scope))
+    }
+
+    /// Purge toutes les entrées (utilisé à `stopSharing` / `leaveShare`).
+    static func clearAll() {
+        let defaults = UserDefaults.standard
+        for k in defaults.dictionaryRepresentation().keys where k.hasPrefix(keyPrefix) {
+            defaults.removeObject(forKey: k)
+        }
     }
 }
 
