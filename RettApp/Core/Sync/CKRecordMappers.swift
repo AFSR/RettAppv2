@@ -23,6 +23,40 @@ enum CKRecordType {
     static let all = [childProfile, medication, medicationLog, seizure, mood, dailyObservation]
 }
 
+/// Clé custom utilisée pour le tie-breaker last-writer-wins entre deux
+/// parents. Distinct de `CKRecord.modificationDate` (auto-géré par le
+/// serveur) car ce dernier reflète le moment où *CloudKit* a accepté la
+/// modification — pas quand le *client* a fait l'écriture.
+enum SyncFields {
+    static let lastModifiedAt = "lastModifiedAt"
+}
+
+extension CKRecord {
+    /// Écrit le tie-breaker sur le record. À appeler depuis chaque
+    /// `toCKRecord(zoneID:)` juste avant `return`.
+    func writeLastModified(_ date: Date) {
+        self[SyncFields.lastModifiedAt] = date as CKRecordValue
+    }
+
+    /// Lit le timestamp côté entrant. On retombe sur `modificationDate`
+    /// (heure serveur) si l'app distante est trop ancienne pour avoir
+    /// poussé ce champ — c'est le meilleur fallback disponible.
+    var incomingLastModified: Date? {
+        (self[SyncFields.lastModifiedAt] as? Date) ?? modificationDate
+    }
+}
+
+/// Pure-Swift decision used by every `upsert(from:)` : si on a déjà la
+/// même clé localement et que l'horodatage local est *strictement* plus
+/// récent que l'entrant, on garde le local. Égalité → accepter (pour
+/// converger vers la même valeur sur les deux côtés).
+fileprivate func shouldApplyIncoming(local: (any SyncTimestamped)?, record: CKRecord) -> Bool {
+    SyncConflictResolver.shouldAcceptIncoming(
+        local: local?.lastModifiedAt,
+        incoming: record.incomingLastModified
+    )
+}
+
 // MARK: - ChildProfile
 
 extension ChildProfile {
@@ -35,6 +69,7 @@ extension ChildProfile {
         r["hasEpilepsy"] = (hasEpilepsy ? 1 : 0) as CKRecordValue
         r["sexRaw"] = sexRaw as CKRecordValue
         r["createdAt"] = createdAt as CKRecordValue
+        r.writeLastModified(lastModifiedAt)
         return r
     }
 
@@ -44,12 +79,15 @@ extension ChildProfile {
             predicate: #Predicate { $0.id == id }
         )).first)
 
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
+
         let firstName = record["firstName"] as? String ?? ""
         let lastName = record["lastName"] as? String ?? ""
         let birthDate = record["birthDate"] as? Date
         let hasEpilepsy = (record["hasEpilepsy"] as? Int ?? 0) == 1
         let sexRaw = record["sexRaw"] as? String ?? ChildSex.unspecified.rawValue
         let createdAt = record["createdAt"] as? Date ?? Date()
+        let lastModified = record.incomingLastModified ?? Date()
 
         if let existing {
             existing.firstName = firstName
@@ -57,6 +95,7 @@ extension ChildProfile {
             existing.birthDate = birthDate
             existing.hasEpilepsy = hasEpilepsy
             existing.sexRaw = sexRaw
+            existing.lastModifiedAt = lastModified
         } else {
             let new = ChildProfile(
                 id: id, firstName: firstName, lastName: lastName,
@@ -64,6 +103,7 @@ extension ChildProfile {
                 sex: ChildSex(rawValue: sexRaw) ?? .unspecified,
                 createdAt: createdAt
             )
+            new.lastModifiedAt = lastModified
             context.insert(new)
         }
     }
@@ -97,6 +137,7 @@ extension Medication {
         if let childID = childProfile?.id {
             r["childProfileId"] = childID.uuidString as CKRecordValue
         }
+        r.writeLastModified(lastModifiedAt)
         return r
     }
 
@@ -105,6 +146,8 @@ extension Medication {
         let existing = (try? context.fetch(FetchDescriptor<Medication>(
             predicate: #Predicate { $0.id == id }
         )).first)
+
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
 
         let name = record["name"] as? String ?? ""
         let doseAmount = record["doseAmount"] as? Double ?? 0
@@ -138,6 +181,7 @@ extension Medication {
             )).first)
         }
 
+        let lastModified = record.incomingLastModified ?? Date()
         if let existing {
             existing.name = name
             existing.doseAmount = doseAmount
@@ -150,6 +194,7 @@ extension Medication {
             // que le setter de `intakes` resynchronise `scheduledHours`.
             if !intakes.isEmpty { existing.intakes = intakes }
             existing.childProfile = child
+            existing.lastModifiedAt = lastModified
         } else {
             let new = Medication(
                 id: id, name: name,
@@ -159,6 +204,7 @@ extension Medication {
                 intakes: intakes.isEmpty ? nil : intakes
             )
             new.childProfile = child
+            new.lastModifiedAt = lastModified
             context.insert(new)
         }
     }
@@ -182,6 +228,7 @@ extension MedicationLog {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r.writeLastModified(lastModifiedAt)
         return r
     }
 
@@ -190,6 +237,8 @@ extension MedicationLog {
         let existing = (try? context.fetch(FetchDescriptor<MedicationLog>(
             predicate: #Predicate { $0.id == id }
         )).first)
+
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
 
         guard let medIDStr = record["medicationId"] as? String,
               let medicationId = UUID(uuidString: medIDStr) else { return }
@@ -204,6 +253,7 @@ extension MedicationLog {
         let childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
         let unit = DoseUnit(rawValue: doseUnitRaw) ?? .mg
 
+        let lastModified = record.incomingLastModified ?? Date()
         if let existing {
             existing.medicationId = medicationId
             existing.medicationName = medicationName
@@ -215,6 +265,7 @@ extension MedicationLog {
             existing.isAdHoc = isAdHoc
             existing.adhocReason = adhocReason
             existing.childProfileId = childProfileId
+            existing.lastModifiedAt = lastModified
         } else {
             let new = MedicationLog(
                 id: id, medicationId: medicationId, medicationName: medicationName,
@@ -223,6 +274,7 @@ extension MedicationLog {
                 childProfileId: childProfileId,
                 isAdHoc: isAdHoc, adhocReason: adhocReason
             )
+            new.lastModifiedAt = lastModified
             context.insert(new)
         }
     }
@@ -244,6 +296,7 @@ extension SeizureEvent {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r.writeLastModified(lastModifiedAt)
         return r
     }
 
@@ -252,6 +305,8 @@ extension SeizureEvent {
         let existing = (try? context.fetch(FetchDescriptor<SeizureEvent>(
             predicate: #Predicate { $0.id == id }
         )).first)
+
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
 
         let startTime = record["startTime"] as? Date ?? Date()
         let endTime = record["endTime"] as? Date ?? startTime
@@ -263,6 +318,7 @@ extension SeizureEvent {
         let type = SeizureType(rawValue: typeRaw) ?? .other
         let trigger = SeizureTrigger(rawValue: triggerRaw) ?? .none
 
+        let lastModified = record.incomingLastModified ?? Date()
         if let existing {
             existing.startTime = startTime
             existing.endTime = endTime
@@ -272,6 +328,7 @@ extension SeizureEvent {
             existing.triggerNotes = triggerNotes
             existing.notes = notes
             existing.childProfileId = childProfileId
+            existing.lastModifiedAt = lastModified
         } else {
             let new = SeizureEvent(
                 id: id, startTime: startTime, endTime: endTime,
@@ -279,6 +336,7 @@ extension SeizureEvent {
                 triggerNotes: triggerNotes, notes: notes,
                 childProfileId: childProfileId
             )
+            new.lastModifiedAt = lastModified
             context.insert(new)
         }
     }
@@ -296,6 +354,7 @@ extension MoodEntry {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r.writeLastModified(lastModifiedAt)
         return r
     }
 
@@ -305,22 +364,27 @@ extension MoodEntry {
             predicate: #Predicate { $0.id == id }
         )).first)
 
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
+
         let timestamp = record["timestamp"] as? Date ?? Date()
         let levelRaw = record["levelRaw"] as? Int ?? MoodLevel.neutral.rawValue
         let notes = record["notes"] as? String ?? ""
         let childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
         let level = MoodLevel(rawValue: levelRaw) ?? .neutral
 
+        let lastModified = record.incomingLastModified ?? Date()
         if let existing {
             existing.timestamp = timestamp
             existing.level = level
             existing.notes = notes
             existing.childProfileId = childProfileId
+            existing.lastModifiedAt = lastModified
         } else {
             let new = MoodEntry(
                 id: id, timestamp: timestamp, level: level,
                 notes: notes, childProfileId: childProfileId
             )
+            new.lastModifiedAt = lastModified
             context.insert(new)
         }
     }
@@ -354,6 +418,7 @@ extension DailyObservation {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r.writeLastModified(lastModifiedAt)
         return r
     }
 
@@ -362,6 +427,8 @@ extension DailyObservation {
         let existing = (try? context.fetch(FetchDescriptor<DailyObservation>(
             predicate: #Predicate { $0.id == id }
         )).first)
+
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
 
         let dayStart = record["dayStart"] as? Date ?? Date()
 
@@ -393,5 +460,6 @@ extension DailyObservation {
         target.napNotes = record["napNotes"] as? String ?? ""
         target.generalNotes = record["generalNotes"] as? String ?? ""
         target.childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
+        target.lastModifiedAt = record.incomingLastModified ?? Date()
     }
 }

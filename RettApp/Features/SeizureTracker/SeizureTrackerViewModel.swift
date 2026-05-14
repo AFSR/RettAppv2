@@ -88,7 +88,7 @@ final class SeizureTrackerViewModel {
         )
         context.insert(event)
         do {
-            try context.save()
+            try context.saveTouching()
         } catch {
             print("Erreur sauvegarde crise : \(error)")
         }

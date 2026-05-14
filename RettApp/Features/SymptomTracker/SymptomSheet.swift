@@ -89,7 +89,7 @@ struct SymptomSheet: View {
             childProfileId: profiles.first?.id
         )
         modelContext.insert(event)
-        try? modelContext.save()
+        try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         dismiss()
     }

@@ -20,6 +20,8 @@ final class MedicationLog {
     var isAdHoc: Bool = false
     /// Raison libre pour les prises ponctuelles (« fièvre », « post-crise », etc.).
     var adhocReason: String = ""
+    /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+    var lastModifiedAt: Date = Date()
 
     var doseUnit: DoseUnit {
         get { DoseUnit(rawValue: doseUnitRaw) ?? .mg }
@@ -64,3 +66,5 @@ final class MedicationLog {
         takenTime ?? scheduledTime
     }
 }
+
+extension MedicationLog: SyncTimestamped {}

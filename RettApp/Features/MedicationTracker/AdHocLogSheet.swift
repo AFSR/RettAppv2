@@ -184,7 +184,7 @@ struct AdHocLogSheet: View {
             adhocReason: reason.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         modelContext.insert(log)
-        try? modelContext.save()
+        try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         dismiss()
     }

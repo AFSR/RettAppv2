@@ -151,8 +151,8 @@ struct ManualSeizureEntrySheet: View {
             childProfileId: profiles.first?.id
         )
         modelContext.insert(event)
-        try? modelContext.save()
-        sync.scheduleSync(context: modelContext)
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext, priority: .urgent)
         dismiss()
     }
 

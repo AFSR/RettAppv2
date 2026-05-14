@@ -57,4 +57,38 @@ final class CloudSyncTests: XCTestCase {
                         "clearAll ne doit toucher que les clés du préfixe")
         defaults.removeObject(forKey: "afsr.unrelated.key")
     }
+
+    // MARK: - SyncConflictResolver
+
+    func test_conflictResolver_acceptsIncomingWhenNoLocal() {
+        XCTAssertTrue(SyncConflictResolver.shouldAcceptIncoming(local: nil, incoming: Date()))
+        XCTAssertTrue(SyncConflictResolver.shouldAcceptIncoming(local: nil, incoming: nil))
+    }
+
+    func test_conflictResolver_keepsLocalWhenIncomingHasNoTimestamp() {
+        // Un push depuis une version trop ancienne qui ne pousse pas le champ
+        // — on garde la version locale plutôt que d'écraser avec un état
+        // qu'on ne peut pas dater.
+        XCTAssertFalse(SyncConflictResolver.shouldAcceptIncoming(local: Date(), incoming: nil))
+    }
+
+    func test_conflictResolver_acceptsWhenIncomingIsStrictlyNewer() {
+        let local = Date(timeIntervalSince1970: 1_000)
+        let incoming = local.addingTimeInterval(1) // +1 s
+        XCTAssertTrue(SyncConflictResolver.shouldAcceptIncoming(local: local, incoming: incoming))
+    }
+
+    func test_conflictResolver_keepsLocalWhenIncomingIsOlder() {
+        let local = Date(timeIntervalSince1970: 1_000)
+        let incoming = local.addingTimeInterval(-1) // -1 s
+        XCTAssertFalse(SyncConflictResolver.shouldAcceptIncoming(local: local, incoming: incoming))
+    }
+
+    func test_conflictResolver_acceptsOnExactEquality() {
+        // Égalité : on accepte. C'est sûr (les deux côtés convergent vers
+        // la même valeur) et ça évite un freeze visible quand deux clients
+        // poussent dans la même milliseconde.
+        let t = Date(timeIntervalSince1970: 1_000)
+        XCTAssertTrue(SyncConflictResolver.shouldAcceptIncoming(local: t, incoming: t))
+    }
 }

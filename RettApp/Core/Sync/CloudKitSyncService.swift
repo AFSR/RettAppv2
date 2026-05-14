@@ -791,6 +791,29 @@ final class CloudKitSyncService {
 
     // MARK: - Auto-sync (debounce)
 
+    /// Priorité de planification d'une synchronisation : ajuste le délai de
+    /// debounce pour équilibrer fraîcheur côté autre parent vs. coût réseau /
+    /// batterie. À utiliser avec `scheduleSync(context:priority:)`.
+    enum SyncPriority {
+        /// Évènement médical : crise d'épilepsie, prise de médicament marquée
+        /// effectuée. Le délai est très court pour que l'autre parent voie
+        /// l'info quasi tout de suite.
+        case urgent
+        /// Édition standard : nouvelle dose, observation quotidienne, etc.
+        case normal
+        /// Édition lourde rarement consultée immédiatement par l'autre
+        /// parent (plan médicamenteux complet, profil enfant).
+        case relaxed
+
+        fileprivate var delay: TimeInterval {
+            switch self {
+            case .urgent:  return 0.5
+            case .normal:  return 3.0
+            case .relaxed: return 10.0
+            }
+        }
+    }
+
     /// Planifie un push + pull différé après une écriture locale. Plusieurs
     /// appels rapprochés sont coalescés : seul le dernier provoque un cycle
     /// de synchronisation, `delay` secondes après le dernier appel.
@@ -801,9 +824,10 @@ final class CloudKitSyncService {
     /// déclencher la synchronisation manuelle.
     ///
     /// No-op si l'utilisateur n'est pas en mode partage.
-    func scheduleSync(context: ModelContext, delay: TimeInterval = 3.0) {
+    func scheduleSync(context: ModelContext, priority: SyncPriority = .normal) {
         guard role != .none else { return }
         pendingSyncTask?.cancel()
+        let delay = priority.delay
         pendingSyncTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(max(0, delay) * 1_000_000_000))
             guard !Task.isCancelled, let self else { return }

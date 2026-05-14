@@ -201,7 +201,7 @@ enum BookletInsertionService {
 
         // Sauvegarde explicite avec logging d'erreur — try? cachait les échecs
         do {
-            try context.save()
+            try context.saveTouching()
             log.info("Sauvegarde réussie. Total : \(summary.summaryText, privacy: .public)")
         } catch {
             log.error("ÉCHEC sauvegarde SwiftData : \(error.localizedDescription, privacy: .public)")

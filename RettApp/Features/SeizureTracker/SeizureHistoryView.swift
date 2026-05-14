@@ -88,8 +88,8 @@ struct SeizureHistoryView: View {
         ) { event in
             Button("Supprimer", role: .destructive) {
                 modelContext.delete(event)
-                try? modelContext.save()
-                sync.scheduleSync(context: modelContext)
+                try? modelContext.saveTouching()
+                sync.scheduleSync(context: modelContext, priority: .urgent)
                 toDelete = nil
             }
             Button("Annuler", role: .cancel) { toDelete = nil }

@@ -149,7 +149,7 @@ struct MedicationPlanView: View {
         for i in offsets {
             modelContext.delete(medications[i])
         }
-        try? modelContext.save()
+        try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         Task {
             await MedicationViewModel().rescheduleAllNotifications(
@@ -185,7 +185,7 @@ struct MedicationPlanView: View {
             med.childProfile = profile
             modelContext.insert(med)
         }
-        try? modelContext.save()
+        try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         let vm = MedicationViewModel()
         await vm.requestNotificationPermissionIfNeeded()

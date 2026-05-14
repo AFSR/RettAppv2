@@ -177,7 +177,7 @@ struct DailyObservationSheet: View {
             )
             modelContext.insert(obs)
         }
-        try? modelContext.save()
+        try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         dismiss()
     }

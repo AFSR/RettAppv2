@@ -70,7 +70,7 @@ struct MoodSheet: View {
             childProfileId: profiles.first?.id
         )
         modelContext.insert(entry)
-        try? modelContext.save()
+        try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         dismiss()
     }

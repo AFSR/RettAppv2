@@ -46,6 +46,8 @@ final class Medication {
     var isActive: Bool
     @Relationship var childProfile: ChildProfile?
     var createdAt: Date
+    /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+    var lastModifiedAt: Date = Date()
 
     /// Type : régulier ou ponctuel. Ajouté en V1.3.0 — par défaut « régulier »
     /// pour préserver le comportement des médicaments existants.
@@ -141,3 +143,5 @@ final class Medication {
         return "\(numberFormat) \(doseUnit.label)"
     }
 }
+
+extension Medication: SyncTimestamped {}

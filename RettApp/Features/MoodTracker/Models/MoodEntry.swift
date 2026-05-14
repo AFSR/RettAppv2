@@ -39,6 +39,8 @@ final class MoodEntry {
     var levelRaw: Int
     var notes: String
     var childProfileId: UUID?
+    /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+    var lastModifiedAt: Date = Date()
 
     var level: MoodLevel {
         get { MoodLevel(rawValue: levelRaw) ?? .neutral }
@@ -59,3 +61,5 @@ final class MoodEntry {
         self.childProfileId = childProfileId
     }
 }
+
+extension MoodEntry: SyncTimestamped {}

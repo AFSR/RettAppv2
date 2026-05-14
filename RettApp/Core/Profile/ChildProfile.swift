@@ -61,6 +61,11 @@ final class ChildProfile {
     /// Valeur par défaut « unspecified » pour préserver les profils existants.
     var sexRaw: String = ChildSex.unspecified.rawValue
     var createdAt: Date
+    /// Timestamp client de la dernière modification, mis à jour par
+    /// `ModelContext.saveTouching()`. Sert de tie-breaker last-writer-wins
+    /// pour la résolution de conflit côté CloudKit Sharing — voir
+    /// `SyncTimestamped` et `SyncConflictResolver`.
+    var lastModifiedAt: Date = Date()
 
     @Relationship(deleteRule: .cascade, inverse: \Medication.childProfile)
     var medications: [Medication] = []
@@ -107,3 +112,5 @@ final class ChildProfile {
         return trimmed.isEmpty ? "votre enfant" : trimmed
     }
 }
+
+extension ChildProfile: SyncTimestamped {}

@@ -310,7 +310,7 @@ struct ProfileSetupView: View {
             modelContext.insert(med)
         }
 
-        try? modelContext.save()
+        try? modelContext.saveTouching()
     }
 }
 

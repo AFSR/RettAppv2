@@ -382,8 +382,8 @@ private struct JournalContent: View {
 
     private func delete(_ log: MedicationLog) {
         modelContext.delete(log)
-        try? modelContext.save()
-        sync.scheduleSync(context: modelContext)
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext, priority: .urgent)
     }
 
     private var summaryHeader: some View {
@@ -502,8 +502,8 @@ private struct JournalContent: View {
     private func toggle(_ log: MedicationLog) {
         log.taken.toggle()
         log.takenTime = log.taken ? Date() : nil
-        try? modelContext.save()
-        sync.scheduleSync(context: modelContext)
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext, priority: .urgent)
     }
 }
 
