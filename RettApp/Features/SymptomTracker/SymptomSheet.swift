@@ -5,6 +5,7 @@ import SwiftData
 struct SymptomSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
 
     @State private var symptomType: RettSymptom = .handStereotypy
@@ -89,6 +90,7 @@ struct SymptomSheet: View {
         )
         modelContext.insert(event)
         try? modelContext.save()
+        sync.scheduleSync(context: modelContext)
         dismiss()
     }
 }

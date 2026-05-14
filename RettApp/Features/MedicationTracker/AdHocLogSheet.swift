@@ -7,6 +7,7 @@ import SwiftData
 struct AdHocLogSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
 
@@ -184,6 +185,7 @@ struct AdHocLogSheet: View {
         )
         modelContext.insert(log)
         try? modelContext.save()
+        sync.scheduleSync(context: modelContext)
         dismiss()
     }
 }

@@ -5,6 +5,7 @@ import SwiftData
 struct MedicationPlanView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
 
@@ -149,6 +150,7 @@ struct MedicationPlanView: View {
             modelContext.delete(medications[i])
         }
         try? modelContext.save()
+        sync.scheduleSync(context: modelContext)
         Task {
             await MedicationViewModel().rescheduleAllNotifications(
                 medications: medications,
@@ -184,6 +186,7 @@ struct MedicationPlanView: View {
             modelContext.insert(med)
         }
         try? modelContext.save()
+        sync.scheduleSync(context: modelContext)
         let vm = MedicationViewModel()
         await vm.requestNotificationPermissionIfNeeded()
         await vm.rescheduleAllNotifications(medications: medications, childFirstName: profile?.firstName ?? "")
