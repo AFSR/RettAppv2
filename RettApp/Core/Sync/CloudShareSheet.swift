@@ -16,10 +16,20 @@ import CloudKit
 /// corrige ces problèmes.
 struct CloudShareSheet: UIViewControllerRepresentable {
 
-    /// Préparation asynchrone du `CKShare` à présenter. iOS appellera ce closure
-    /// au bon moment du flow et attendra le résultat avant d'afficher la
-    /// feuille d'options de partage.
-    let prepareShare: () async -> Result<(CKShare, CKContainer), Error>
+    /// Deux modes selon qu'on partage pour la première fois ou qu'on gère
+    /// un partage existant. UICloudSharingController a deux initialiseurs
+    /// distincts avec des UIs différentes :
+    /// - `init(preparationHandler:)` → écran « Partager avec… » (AirDrop,
+    ///   Messages, Mail). À utiliser pour créer un share.
+    /// - `init(share:container:)` → écran « Gérer le partage » (liste des
+    ///   participants, ajout/retrait, lien à copier). À utiliser quand un
+    ///   share existe déjà.
+    enum Mode {
+        case prepare(() async -> Result<(CKShare, CKContainer), Error>)
+        case existing(CKShare, CKContainer)
+    }
+
+    let mode: Mode
 
     /// Nom à afficher dans la feuille système (« iPhone de Marc voudrait
     /// partager … » — l'utilisateur destinataire voit ce texte avant
@@ -33,16 +43,22 @@ struct CloudShareSheet: UIViewControllerRepresentable {
     var onFailed: ((Error) -> Void)? = nil
 
     func makeUIViewController(context: Context) -> UICloudSharingController {
-        let controller = UICloudSharingController { _, completion in
-            Task { @MainActor in
-                let result = await prepareShare()
-                switch result {
-                case .success(let (share, container)):
-                    completion(share, container, nil)
-                case .failure(let error):
-                    completion(nil, nil, error)
+        let controller: UICloudSharingController
+        switch mode {
+        case .prepare(let prepareShare):
+            controller = UICloudSharingController { _, completion in
+                Task { @MainActor in
+                    let result = await prepareShare()
+                    switch result {
+                    case .success(let (share, container)):
+                        completion(share, container, nil)
+                    case .failure(let error):
+                        completion(nil, nil, error)
+                    }
                 }
             }
+        case .existing(let share, let container):
+            controller = UICloudSharingController(share: share, container: container)
         }
         controller.availablePermissions = [.allowReadWrite, .allowPrivate]
         controller.delegate = context.coordinator

@@ -42,17 +42,7 @@ struct ParentSharingView: View {
         }
         .sheet(isPresented: $presentShareSheet) {
             CloudShareSheet(
-                prepareShare: {
-                    do {
-                        let result = try await sync.prepareShareForController(
-                            childProfile: profiles.first,
-                            context: modelContext
-                        )
-                        return .success(result)
-                    } catch {
-                        return .failure(error)
-                    }
-                },
+                mode: shareSheetMode,
                 title: "Suivi RettApp — \(profiles.first?.fullName ?? "enfant")",
                 onSaved: { _ in
                     Task { await sync.refreshShareStatus() }
@@ -400,6 +390,26 @@ struct ParentSharingView: View {
             participantToRemove = nil
         } catch {
             workingError = error.localizedDescription
+        }
+    }
+
+    /// Choisit l'init UICloudSharingController approprié :
+    /// - share existant → mode « gérer les participants »
+    /// - sinon → preparationHandler qui crée un nouveau share
+    private var shareSheetMode: CloudShareSheet.Mode {
+        if let (share, container) = sync.existingShareForController() {
+            return .existing(share, container)
+        }
+        return .prepare {
+            do {
+                let result = try await sync.prepareShareForController(
+                    childProfile: profiles.first,
+                    context: modelContext
+                )
+                return .success(result)
+            } catch {
+                return .failure(error)
+            }
         }
     }
 
