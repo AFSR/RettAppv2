@@ -215,7 +215,7 @@ final class CloudKitSyncService {
     /// API rétrocompatible : renvoie uniquement l'URL pour l'ancien flow
     /// AirDrop-only. Conservée le temps de la transition.
     func setupSharing(childProfile: ChildProfile?) async throws -> URL {
-        // Ce chemin n'est plus utilisé par l'UI principale (CloudShareSheet
+        // Ce chemin n'est plus utilisé par l'UI principale (CloudSharePresenter
         // utilise prepareShareForController). Conservé en filet de sécurité.
         try await ensureSignedIn()
         let zone = try await ensureZone()
