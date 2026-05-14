@@ -773,7 +773,13 @@ final class CloudKitSyncService {
     /// Supprime localement le record correspondant à une suppression CloudKit
     /// distante. Exposé en `static internal` pour être appelable depuis les
     /// tests (round-trip de suppression) sans avoir à instancier le service.
-    static func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
+    ///
+    /// `nonisolated` parce que la classe est `@MainActor` mais cette méthode
+    /// n'accède à aucun état d'instance — uniquement au `ModelContext` passé
+    /// en paramètre, qui porte sa propre garantie d'isolation. Sans ce
+    /// `nonisolated`, les tests (non-MainActor) ne pourraient pas l'appeler
+    /// directement.
+    nonisolated static func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
         guard let id = UUID(uuidString: recordID.recordName) else { return }
 
         // On essaie chacun des 7 types — c'est le moyen le plus simple sans avoir
