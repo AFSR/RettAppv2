@@ -292,6 +292,7 @@ private struct JournalContent: View {
     @Query private var logs: [MedicationLog]
     @Query private var moods: [MoodEntry]
     @Query private var observations: [DailyObservation]
+    @State private var editingTakenTimeFor: MedicationLog?
     @Query private var seizures: [SeizureEvent]
     @Query private var symptoms: [SymptomEvent]
 
@@ -359,7 +360,13 @@ private struct JournalContent: View {
                 } else {
                     LazyVStack(spacing: 8) {
                         ForEach(combinedFeed) { item in
-                            JournalFeedRow(item: item, onToggle: { log in toggle(log) }, onDelete: { delete($0) }, onSeizureTap: { showSeizureHistory() })
+                            JournalFeedRow(
+                                item: item,
+                                onToggle: { log in toggle(log) },
+                                onDelete: { delete($0) },
+                                onEditTakenTime: { editingTakenTimeFor = $0 },
+                                onSeizureTap: { showSeizureHistory() }
+                            )
                         }
                     }
                     .padding(.horizontal)
@@ -367,6 +374,13 @@ private struct JournalContent: View {
                 Spacer(minLength: 24)
             }
             .padding(.top, 8)
+        }
+        .sheet(item: $editingTakenTimeFor) { log in
+            MedicationTakenTimeSheet(log: log) {
+                try? modelContext.saveTouching()
+                sync.scheduleSync(context: modelContext, priority: .urgent)
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -539,6 +553,7 @@ private struct JournalFeedRow: View {
     let item: JournalFeedItem
     let onToggle: (MedicationLog) -> Void
     let onDelete: (MedicationLog) -> Void
+    let onEditTakenTime: (MedicationLog) -> Void
     let onSeizureTap: () -> Void
 
     var body: some View {
@@ -546,7 +561,8 @@ private struct JournalFeedRow: View {
         case .medication(let log):
             JournalEntryRow(log: log,
                             onToggle: { onToggle(log) },
-                            onDelete: { onDelete(log) })
+                            onDelete: { onDelete(log) },
+                            onEditTakenTime: { onEditTakenTime(log) })
         case .seizure(let s):
             SeizureRowCompact(event: s, onTap: onSeizureTap)
         case .mood(let m):
@@ -676,6 +692,7 @@ private struct JournalEntryRow: View {
     @Bindable var log: MedicationLog
     let onToggle: () -> Void
     let onDelete: () -> Void
+    let onEditTakenTime: () -> Void
 
     private var statusColor: Color {
         if log.isAdHoc { return .afsrPurpleAdaptive }
@@ -754,6 +771,16 @@ private struct JournalEntryRow: View {
         .padding(12)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .contextMenu {
+            if !log.isAdHoc {
+                Button {
+                    onEditTakenTime()
+                } label: {
+                    Label(log.taken ? "Modifier l'heure de prise" : "Marquer pris à une autre heure…",
+                          systemImage: "clock.arrow.circlepath")
+                }
+            }
+        }
     }
 }
 
@@ -780,6 +807,89 @@ private struct StatPill: View {
 private extension Double {
     var shortString: String {
         truncatingRemainder(dividingBy: 1) == 0 ? String(Int(self)) : String(format: "%.1f", self)
+    }
+}
+
+// MARK: - Edit "taken time" sheet
+
+/// Petite feuille pour corriger l'heure à laquelle un médicament a été donné.
+/// Utile quand on note la prise en différé dans la journée — par exemple le
+/// matin on a donné Keppra à 8h mais on coche seulement le soir : il faut
+/// pouvoir saisir 8h, pas l'heure actuelle.
+///
+/// Pré-rempli :
+/// - `takenTime` existant s'il y en a un,
+/// - sinon `scheduledTime` (cas le plus fréquent : on coche tardivement la
+///   prise prévue ce matin, le plus probable est qu'elle a été donnée à
+///   l'heure planifiée).
+private struct MedicationTakenTimeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var log: MedicationLog
+    /// Appelé après modification pour que le parent puisse persister + sync.
+    let onSave: () -> Void
+
+    @State private var pickedTime: Date
+    @State private var markAsTaken: Bool
+
+    init(log: MedicationLog, onSave: @escaping () -> Void) {
+        self.log = log
+        self.onSave = onSave
+        _pickedTime = State(initialValue: log.takenTime ?? log.scheduledTime)
+        _markAsTaken = State(initialValue: log.taken || log.takenTime == nil)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        Image(systemName: "pills.fill")
+                            .foregroundStyle(.afsrPurpleAdaptive)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(log.medicationName)
+                                .font(AFSRFont.headline(15))
+                            Text("Prévu à \(log.scheduledTime, format: .dateTime.hour().minute())")
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Toggle("Prise effectuée", isOn: $markAsTaken)
+                    if markAsTaken {
+                        DatePicker(
+                            "Heure de prise réelle",
+                            selection: $pickedTime,
+                            displayedComponents: [.hourAndMinute, .date]
+                        )
+                    }
+                } footer: {
+                    Text("Si la prise a été faite plus tôt (ou plus tard) que l'heure prévue, ajustez ici. Vous pouvez aussi cocher une prise oubliée a posteriori, ou la décocher si elle a été indiquée par erreur.")
+                }
+            }
+            .navigationTitle("Heure de prise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Enregistrer") {
+                        if markAsTaken {
+                            log.taken = true
+                            log.takenTime = pickedTime
+                        } else {
+                            log.taken = false
+                            log.takenTime = nil
+                        }
+                        onSave()
+                        dismiss()
+                    }
+                    .bold()
+                }
+            }
+        }
     }
 }
 
