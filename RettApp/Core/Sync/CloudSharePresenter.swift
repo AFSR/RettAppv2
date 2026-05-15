@@ -54,7 +54,13 @@ enum CloudSharePresenter {
         case .existing(let share, let container):
             controller = UICloudSharingController(share: share, container: container)
         }
-        controller.availablePermissions = [.allowReadWrite, .allowPrivate]
+        // `.allowPublic` est INDISPENSABLE pour qu'AirDrop apparaisse dans la
+        // feuille de partage : sans ça, iOS considère que le share ne peut
+        // cibler que des participants nommément invités (Mail/Messages avec
+        // contact), or AirDrop ne connaît le destinataire qu'au moment du
+        // transfert. `.allowPrivate` reste utile pour l'option « Inviter une
+        // personne précise » via Messages/Mail.
+        controller.availablePermissions = [.allowReadWrite, .allowPrivate, .allowPublic]
         controller.delegate = coordinator
         // UICloudSharingController ne retient son delegate qu'en weak — sans
         // cette association forte, le coordinator est libéré dès la sortie
