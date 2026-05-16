@@ -15,6 +15,7 @@ struct ParentSharingView: View {
     @State private var workingError: String?
     @State private var presentResetConfirm = false
     @State private var isResetting = false
+    @State private var isPreparingShare = false
 
     var body: some View {
         Form {
@@ -233,15 +234,24 @@ struct ParentSharingView: View {
                 Button {
                     presentShareSheet()
                 } label: {
-                    Label("Inviter un autre parent", systemImage: "person.crop.circle.badge.plus")
+                    HStack {
+                        if isPreparingShare { ProgressView().controlSize(.small) }
+                        Label(isPreparingShare ? "Préparation du partage…" : "Inviter un autre parent (AirDrop)",
+                              systemImage: "dot.radiowaves.left.and.right")
+                    }
                 }
-                .disabled(sync.accountStatus != .available || sync.syncState == .syncing)
+                .disabled(sync.accountStatus != .available || sync.syncState == .syncing || isPreparingShare)
             case .owner:
                 Button {
                     presentShareSheet()
                 } label: {
-                    Label("Gérer le partage / inviter un autre parent", systemImage: "person.2.badge.gearshape")
+                    HStack {
+                        if isPreparingShare { ProgressView().controlSize(.small) }
+                        Label(isPreparingShare ? "Préparation du partage…" : "Renvoyer l'invitation par AirDrop",
+                              systemImage: "dot.radiowaves.left.and.right")
+                    }
                 }
+                .disabled(isPreparingShare)
                 Button(role: .destructive) {
                     presentStopConfirm = true
                 } label: {
@@ -267,7 +277,7 @@ struct ParentSharingView: View {
         } header: {
             Text("Actions")
         } footer: {
-            Text("L'invitation utilise la feuille de partage iOS native : AirDrop apparaît automatiquement quand les deux iPhones sont à proximité, et le destinataire reçoit une notification d'acceptation. La synchronisation se fait automatiquement à l'ouverture de l'app et après chaque saisie importante.")
+            Text("Invitation strictement en présentiel via AirDrop : approchez les deux iPhones, touchez le bouton ci-dessus, puis sélectionnez l'autre iPhone dans la liste AirDrop qui s'affiche. Messages, Mail et autres canaux à distance sont volontairement exclus. La synchronisation est ensuite automatique des deux côtés.")
         }
     }
 
@@ -376,42 +386,31 @@ struct ParentSharingView: View {
         }
     }
 
-    /// Présente `UICloudSharingController` directement sur la window (pas dans
-    /// un `.sheet` SwiftUI — voir `CloudSharePresenter`). Choisit le bon
-    /// initialiseur :
-    /// - share existant → mode « gérer les participants »
-    /// - sinon → preparationHandler qui crée un nouveau share
+    /// Prépare le `CKShare` puis présente la feuille AirDrop-only via
+    /// `ProximityShare`. C'est volontairement le seul canal proposé :
+    /// l'invitation doit se faire en présentiel pour garantir l'intégrité du
+    /// destinataire (Messages/Mail seraient acceptables techniquement mais
+    /// ouvriraient une porte d'attaque sociale qu'on préfère fermer côté UX).
     private func presentShareSheet() {
-        let title = "Suivi RettApp — \(profiles.first?.fullName ?? "enfant")"
-        let mode: CloudSharePresenter.Mode
-        if let (share, container) = sync.existingShareForController() {
-            mode = .existing(share, container)
-        } else {
-            mode = .prepare { [profiles, modelContext] in
-                do {
-                    let result = try await sync.prepareShareForController(
-                        childProfile: profiles.first,
-                        context: modelContext
-                    )
-                    return .success(result)
-                } catch {
-                    return .failure(error)
+        Task {
+            isPreparingShare = true
+            defer { isPreparingShare = false }
+            do {
+                let (share, _) = try await sync.prepareShareForController(
+                    childProfile: profiles.first,
+                    context: modelContext
+                )
+                guard let url = share.url else {
+                    workingError = "Le lien de partage n'a pas pu être généré. Vérifiez la connexion iCloud."
+                    return
                 }
-            }
-        }
-        CloudSharePresenter.present(
-            mode: mode,
-            title: title,
-            onSaved: { _ in
-                Task { await sync.refreshShareStatus() }
-            },
-            onStopped: {
-                Task { await sync.refreshShareStatus() }
-            },
-            onFailed: { error in
+                ProximityShare.present(url: url) {
+                    Task { await sync.refreshShareStatus() }
+                }
+            } catch {
                 workingError = error.localizedDescription
             }
-        )
+        }
     }
 
     private func syncNow() async {
