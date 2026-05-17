@@ -339,22 +339,24 @@ struct DraftMedicationEditor: View {
                 TextField("Ex. Keppra, Doliprane, Mélatonine…", text: $name)
                     .autocorrectionDisabled()
                 if !name.isEmpty {
-                    let suggestions = CommonFrenchMedications.suggestions(matching: name, limit: 6)
-                    ForEach(suggestions, id: \.self) { suggestion in
+                    let suggestions = MedicationCatalog.suggestions(matching: name, limit: 6)
+                    ForEach(suggestions) { suggestion in
                         Button {
-                            // Strip DCI parenthetical (e.g., "Doliprane (paracétamol)" → "Doliprane")
-                            if let parenIdx = suggestion.firstIndex(of: "(") {
-                                name = String(suggestion[..<parenIdx]).trimmingCharacters(in: .whitespaces)
-                            } else {
-                                name = suggestion
-                            }
+                            name = suggestion.shortName
                         } label: {
                             HStack {
                                 Image(systemName: "pills.fill")
                                     .foregroundStyle(.afsrPurpleAdaptive)
                                     .font(.system(size: 13))
-                                Text(suggestion)
-                                    .font(AFSRFont.body(14))
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(suggestion.shortName)
+                                        .font(AFSRFont.body(14))
+                                    if let active = suggestion.activeIngredient, !active.isEmpty {
+                                        Text(active)
+                                            .font(AFSRFont.caption())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
                             }
                         }

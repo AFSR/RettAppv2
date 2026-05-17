@@ -75,6 +75,13 @@ app_target.add_resources([strings_ref])
 launch_ref = resources_group.new_reference('LaunchScreen.storyboard')
 launch_ref.last_known_file_type = 'file.storyboard'
 app_target.add_resources([launch_ref])
+# BDPM (base de médicaments) — généré par scripts/build_bdpm_db.rb
+bdpm_path = File.join(ROOT, APP_DIR, 'Resources', 'bdpm.sqlite')
+if File.exist?(bdpm_path)
+  bdpm_ref = resources_group.new_reference('bdpm.sqlite')
+  bdpm_ref.last_known_file_type = 'file'
+  app_target.add_resources([bdpm_ref])
+end
 # Info.plist (référencée seulement, PAS un resource — utilisée via INFOPLIST_FILE)
 info_ref = resources_group.new_reference('Info.plist')
 info_ref.last_known_file_type = 'text.plist.xml'

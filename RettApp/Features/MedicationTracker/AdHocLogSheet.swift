@@ -53,20 +53,27 @@ struct AdHocLogSheet: View {
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.words)
 
-                        // Autocomplétion sur la liste française fréquente
-                        let suggestions = CommonFrenchMedications.suggestions(matching: freeName)
+                        // Autocomplétion BDPM (fallback : liste française fréquente)
+                        let suggestions = MedicationCatalog.suggestions(matching: freeName)
                         if !suggestions.isEmpty {
-                            ForEach(suggestions, id: \.self) { suggestion in
+                            ForEach(suggestions) { suggestion in
                                 Button {
-                                    freeName = suggestion.components(separatedBy: " (").first ?? suggestion
+                                    freeName = suggestion.shortName
                                 } label: {
                                     HStack {
                                         Image(systemName: "pills.fill")
                                             .foregroundStyle(.afsrPurpleAdaptive)
                                             .imageScale(.small)
-                                        Text(suggestion)
-                                            .foregroundStyle(.primary)
-                                            .font(AFSRFont.body(14))
+                                        VStack(alignment: .leading, spacing: 0) {
+                                            Text(suggestion.shortName)
+                                                .foregroundStyle(.primary)
+                                                .font(AFSRFont.body(14))
+                                            if let active = suggestion.activeIngredient, !active.isEmpty {
+                                                Text(active)
+                                                    .foregroundStyle(.secondary)
+                                                    .font(AFSRFont.caption())
+                                            }
+                                        }
                                         Spacer()
                                     }
                                 }
