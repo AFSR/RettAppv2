@@ -12,6 +12,7 @@ struct MedicalReportView: View {
     @Query(sort: \MoodEntry.timestamp) private var allMoods: [MoodEntry]
     @Query(sort: \DailyObservation.dayStart) private var allObservations: [DailyObservation]
     @Query(sort: \SymptomEvent.timestamp) private var allSymptoms: [SymptomEvent]
+    @Query(sort: \MedicationRevision.effectiveFrom) private var allRevisions: [MedicationRevision]
 
     @State private var preset: PeriodPreset = .lastMonth
     @State private var customStart: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
@@ -119,6 +120,10 @@ struct MedicalReportView: View {
         let moodsInPeriod = allMoods.filter { $0.timestamp >= start && $0.timestamp <= end }
         let observationsInPeriod = allObservations.filter { $0.dayStart >= start && $0.dayStart <= end }
         let symptomsInPeriod = allSymptoms.filter { $0.timestamp >= start && $0.timestamp <= end }
+        // Inclut aussi la révision « initiale » (effectiveFrom < start) pour
+        // chaque med — utilisée comme état de référence pour calculer les
+        // diffs des modifications faites pendant la période.
+        let revisionsForReport = allRevisions.filter { $0.effectiveFrom <= end }
         let input = MedicalReportGenerator.Input(
             child: profiles.first,
             periodStart: start,
@@ -129,6 +134,7 @@ struct MedicalReportView: View {
             moods: moodsInPeriod,
             observations: observationsInPeriod,
             symptoms: symptomsInPeriod,
+            medicationRevisions: revisionsForReport,
             parentNotes: parentNotes
         )
         do {

@@ -36,7 +36,39 @@ enum MedicalReportGenerator {
         let moods: [MoodEntry]
         let observations: [DailyObservation]
         let symptoms: [SymptomEvent]
+        /// Toutes les révisions de plan ≤ periodEnd. La section « Évolutions »
+        /// filtre celles qui tombent dans la période + utilise les
+        /// précédentes comme référence pour calculer les diffs.
+        let medicationRevisions: [MedicationRevision]
         let parentNotes: String
+
+        // Convenience init pour préserver les appels existants qui n'ont pas
+        // encore migré vers la nouvelle API.
+        init(
+            child: ChildProfile?,
+            periodStart: Date,
+            periodEnd: Date,
+            seizures: [SeizureEvent],
+            medications: [Medication],
+            logs: [MedicationLog],
+            moods: [MoodEntry],
+            observations: [DailyObservation],
+            symptoms: [SymptomEvent],
+            medicationRevisions: [MedicationRevision] = [],
+            parentNotes: String
+        ) {
+            self.child = child
+            self.periodStart = periodStart
+            self.periodEnd = periodEnd
+            self.seizures = seizures
+            self.medications = medications
+            self.logs = logs
+            self.moods = moods
+            self.observations = observations
+            self.symptoms = symptoms
+            self.medicationRevisions = medicationRevisions
+            self.parentNotes = parentNotes
+        }
     }
 
     @MainActor
@@ -89,6 +121,8 @@ enum MedicalReportGenerator {
             drawCorrelationsSection(correlations: correlations, ctx: &ctx, context: context)
 
             drawMedicationAnalysis(analysis: medAnalysis, ctx: &ctx, context: context)
+
+            drawMedicationEvolutions(input: input, ctx: &ctx, context: context)
 
             drawSymptomAnalysis(analysis: symptomAnalysis, ctx: &ctx, context: context)
 
@@ -413,6 +447,127 @@ enum MedicalReportGenerator {
         }
     }
 
+    // MARK: - Évolutions du plan médicamenteux (Phase 2 versioning)
+
+    /// Liste chronologique des changements appliqués au plan pendant la
+    /// période. Pour chaque révision dans `[periodStart, periodEnd]`, on
+    /// compare au snapshot antérieur (dernière révision avant ou la création
+    /// du Medication) et on affiche un diff lisible — nouveau médicament,
+    /// changement de dose, modification des horaires, activation/désactivation,
+    /// activation/désactivation des rappels.
+    private static func drawMedicationEvolutions(
+        input: Input,
+        ctx: inout DrawContext,
+        context: UIGraphicsPDFRendererContext
+    ) {
+        let allRevs = input.medicationRevisions.sorted { $0.effectiveFrom < $1.effectiveFrom }
+        // Révisions dont la date d'effet tombe dans la période
+        let inPeriod = allRevs.filter {
+            $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd
+        }
+        guard !inPeriod.isEmpty else { return }
+
+        ctx.ensureSpace(120, context: context)
+        drawSectionTitle("Évolutions du plan médicamenteux", ctx: &ctx)
+        drawText("Modifications appliquées au plan pendant la période. Les changements de dosage doivent être lus en regard de la section adhérence ci-dessus.",
+                 italic: true, ctx: &ctx)
+        ctx.y += 4
+
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM/yyyy HH:mm"
+
+        // Pour chaque révision en période, identifier la précédente (sinon
+        // c'est la création du médicament : tout est « nouveau »).
+        struct Diff {
+            let date: Date
+            let medName: String
+            let bullets: [String]
+        }
+        var diffs: [Diff] = []
+        for rev in inPeriod {
+            let revID = rev.medicationId
+            let revDate = rev.effectiveFrom
+            let previous = allRevs.last { other in
+                other.medicationId == revID && other.effectiveFrom < revDate
+            }
+            let bullets = diffBullets(previous: previous, current: rev)
+            if !bullets.isEmpty {
+                diffs.append(Diff(date: rev.effectiveFrom, medName: rev.name, bullets: bullets))
+            }
+        }
+        guard !diffs.isEmpty else { return }
+
+        let headers = ["Date", "Médicament", "Modifications"]
+        let widths: [CGFloat] = [95, 110, 310]
+        let rows: [[String]] = diffs.map { diff in
+            let body = "• " + diff.bullets.joined(separator: "\n• ")
+            return [df.string(from: diff.date), diff.medName, body]
+        }
+        drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
+        ctx.y += 8
+    }
+
+    /// Calcule un diff lisible entre deux snapshots de médicament. Renvoie
+    /// `[]` si aucun changement notable.
+    private static func diffBullets(
+        previous: MedicationRevision?,
+        current: MedicationRevision
+    ) -> [String] {
+        // Pas de précédent → c'est la première révision (= création du
+        // médicament dans le plan).
+        guard let previous else {
+            var bullets = ["Ajout au plan"]
+            let dose = MedicationIntake.doseLabel(current.doseAmount, unit: current.doseUnit)
+            bullets.append("Dose initiale : \(dose)")
+            if current.kind == .regular {
+                bullets.append("\(current.intakes.count) prise(s) planifiée(s) par jour")
+            }
+            if !current.isActive { bullets.append("Statut : inactif") }
+            return bullets
+        }
+
+        var bullets: [String] = []
+        if previous.name != current.name {
+            bullets.append("Renommé : « \(previous.name) » → « \(current.name) »")
+        }
+        if previous.doseAmount != current.doseAmount || previous.doseUnitRaw != current.doseUnitRaw {
+            let was = MedicationIntake.doseLabel(previous.doseAmount, unit: previous.doseUnit)
+            let now = MedicationIntake.doseLabel(current.doseAmount, unit: current.doseUnit)
+            bullets.append("Dose : \(was) → \(now)")
+        }
+        if previous.kind != current.kind {
+            bullets.append("Type : \(previous.kind.label) → \(current.kind.label)")
+        }
+        if previous.isActive != current.isActive {
+            bullets.append(current.isActive ? "Réactivé" : "Désactivé (mis en pause)")
+        }
+        if previous.notifyEnabled != current.notifyEnabled {
+            bullets.append(current.notifyEnabled ? "Notifications réactivées" : "Notifications désactivées")
+        }
+        // Comparaison des intakes (heures + dose par prise)
+        let prevKey = previous.intakes.map { "\($0.hour):\($0.minute)@\($0.dose)/\($0.weekdaysRaw)" }.sorted()
+        let currKey = current.intakes.map  { "\($0.hour):\($0.minute)@\($0.dose)/\($0.weekdaysRaw)" }.sorted()
+        if prevKey != currKey {
+            let prevSummary = summarizeIntakes(previous.intakes, unit: previous.doseUnit)
+            let currSummary = summarizeIntakes(current.intakes,  unit: current.doseUnit)
+            bullets.append("Prises : \(prevSummary) → \(currSummary)")
+        }
+        return bullets
+    }
+
+    private static func summarizeIntakes(_ intakes: [MedicationIntake], unit: DoseUnit) -> String {
+        guard !intakes.isEmpty else { return "aucune" }
+        return intakes
+            .sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+            .map { intake -> String in
+                let dose = MedicationIntake.doseLabel(intake.dose, unit: unit)
+                let days = intake.isEveryDay ? "" : " [\(intake.weekdaySummary)]"
+                return "\(intake.formattedTime) \(dose)\(days)"
+            }
+            .joined(separator: ", ")
+    }
+
     private static func drawSynthesis(
         input: Input, overall: MedicalReportAnalysis.OverallStats,
         correlations: [MedicalReportAnalysis.Correlation],
@@ -422,11 +577,15 @@ enum MedicalReportGenerator {
     ) {
         ctx.ensureSpace(80, context: context)
         drawSectionTitle("Synthèse pour le médecin", ctx: &ctx)
+        let planChangesInPeriod = input.medicationRevisions.filter {
+            $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd
+        }.count
         let text = MedicalReportAnalysis.synthesisText(
             overall: overall,
             correlations: correlations,
             medicationAnalysis: medAnalysis,
             symptomAnalysis: symptomAnalysis,
+            planChangesInPeriod: planChangesInPeriod,
             childFirstName: input.child?.firstName ?? ""
         )
         drawText(text, italic: false, ctx: &ctx)

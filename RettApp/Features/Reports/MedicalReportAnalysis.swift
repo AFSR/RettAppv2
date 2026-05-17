@@ -443,6 +443,7 @@ enum MedicalReportAnalysis {
         correlations: [Correlation],
         medicationAnalysis: MedicationAnalysis,
         symptomAnalysis: SymptomAnalysis,
+        planChangesInPeriod: Int = 0,
         childFirstName: String
     ) -> String {
         let name = childFirstName.isEmpty ? "L'enfant" : childFirstName
@@ -480,6 +481,9 @@ enum MedicalReportAnalysis {
             lines.append("\(totalAdHocIntakes) prise\(totalAdHocIntakes > 1 ? "s" : "") ponctuelle\(totalAdHocIntakes > 1 ? "s" : "") (à la demande) sur la période — principalement \(topName).")
         } else if medicationAnalysis.adhocMedicationsCount > 0 {
             lines.append("\(medicationAnalysis.adhocMedicationsCount) traitement à la demande référencé mais aucune prise enregistrée sur la période.")
+        }
+        if planChangesInPeriod > 0 {
+            lines.append("Plan médicamenteux modifié \(planChangesInPeriod) fois sur la période (voir section « Évolutions du plan médicamenteux » ci-dessus pour le détail des changements).")
         }
 
         // Humeur
