@@ -2,27 +2,37 @@ import SwiftUI
 
 /// Édite une prise individuelle d'un médicament (heure, dose, jours actifs,
 /// notifications). Présentée via NavigationLink depuis `MedicationEditor`.
+///
+/// **Pattern transactionnel** : la vue tient un `@State draft` local et
+/// commit explicitement vers le tableau parent au tap « OK ». Évite les
+/// fragilités du binding `intakes[idx] = copy` qui ne propage pas toujours
+/// vers le `@State` parent en iOS 17 (cause du bug 2025-11 « la
+/// modification des prises est sans effet »).
 struct MedicationIntakeEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    /// Identifiant de la prise éditée dans le tableau parent. On ne stocke
-    /// pas un `Binding<MedicationIntake>` directement parce qu'avec
-    /// `ForEach($array)`, le binding renvoyé par SwiftUI référence un index
-    /// qui peut être invalidé pendant un diff (ajout/suppression dans le
-    /// tableau parent ou rebuild SwiftData), ce qui provoque un
-    /// `Index out of range` au runtime.
     let intakeId: UUID
     @Binding var intakes: [MedicationIntake]
     let unit: DoseUnit
 
-    /// Snapshot stable de la prise (jamais nil tant que la vue est à
-    /// l'écran : on n'arrive pas ici sans une prise existante).
-    private var intake: MedicationIntake {
-        intakes.first(where: { $0.id == intakeId })
-            ?? MedicationIntake(hour: 8, minute: 0, dose: 0)
-    }
-
-    @State private var doseString: String = ""
+    @State private var draft: MedicationIntake
+    @State private var doseString: String
     @FocusState private var doseFieldFocused: Bool
+
+    init(intakeId: UUID, intakes: Binding<[MedicationIntake]>, unit: DoseUnit) {
+        self.intakeId = intakeId
+        self._intakes = intakes
+        self.unit = unit
+        let initial = intakes.wrappedValue.first(where: { $0.id == intakeId })
+            ?? MedicationIntake(hour: 8, minute: 0, dose: 0)
+        self._draft = State(initialValue: initial)
+        let formatted: String
+        if initial.dose.truncatingRemainder(dividingBy: 1) == 0 {
+            formatted = String(Int(initial.dose))
+        } else {
+            formatted = String(initial.dose)
+        }
+        self._doseString = State(initialValue: formatted)
+    }
 
     enum WeekdayPreset: String, CaseIterable, Identifiable, Hashable {
         case everyDay, weekdaysOnly, weekendOnly, custom
@@ -44,30 +54,38 @@ struct MedicationIntakeEditorView: View {
             weekdaysSection
             notifySection
         }
-        .navigationTitle("Prise de \(intake.formattedTime)")
+        .navigationTitle("Prise de \(draft.formattedTime)")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: syncDoseString)
-        // Bouton « OK » au-dessus du clavier décimal (pas de touche Retour
-        // sur .decimalPad) pour permettre de valider la dose sans avoir à
-        // taper en dehors du champ.
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("OK") { doseFieldFocused = false }
-                    .bold()
+                Button("OK") { doseFieldFocused = false }.bold()
             }
-            // Bouton « OK » explicite dans la barre de navigation : les
-            // modifications sont propagées au tableau parent à chaque frappe
-            // via `mutate`, mais l'utilisateur attend un point de validation
-            // visible pour confirmer ses changements et revenir.
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Annuler") { dismiss() }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("OK") {
                     doseFieldFocused = false
+                    commit()
                     dismiss()
                 }
                 .bold()
             }
         }
+    }
+
+    // MARK: - Commit
+
+    /// Écrit le draft local dans le tableau parent. On reconstruit le tableau
+    /// puis on réassigne en entier — c'est ce qui garantit la propagation du
+    /// `@Binding<[…]>` vers le `@State` parent. La version « intakes[idx] = … »
+    /// se comportait silencieusement comme un no-op dans certains cas iOS 17.
+    private func commit() {
+        guard let idx = intakes.firstIndex(where: { $0.id == intakeId }) else { return }
+        var newArray = intakes
+        newArray[idx] = draft
+        intakes = newArray
     }
 
     // MARK: - Sections
@@ -94,7 +112,7 @@ struct MedicationIntakeEditorView: View {
                     .focused($doseFieldFocused)
                     .onChange(of: doseString) { _, newValue in
                         if let v = Double(newValue.replacingOccurrences(of: ",", with: ".")) {
-                            mutate { $0.dose = v }
+                            draft.dose = v
                         }
                     }
                 Text(unit.label).foregroundStyle(.secondary)
@@ -128,7 +146,7 @@ struct MedicationIntakeEditorView: View {
     @ViewBuilder
     private var notifySection: some View {
         Section {
-            Toggle(isOn: notifyBinding) {
+            Toggle(isOn: $draft.notifyEnabled) {
                 Label("Rappeler cette prise", systemImage: "bell.badge")
             }
         } footer: {
@@ -136,68 +154,44 @@ struct MedicationIntakeEditorView: View {
         }
     }
 
-    // MARK: - Helpers
-
-    private func syncDoseString() {
-        if intake.dose.truncatingRemainder(dividingBy: 1) == 0 {
-            doseString = String(Int(intake.dose))
-        } else {
-            doseString = String(intake.dose)
-        }
-    }
-
-    private func mutate(_ block: (inout MedicationIntake) -> Void) {
-        guard let idx = intakes.firstIndex(where: { $0.id == intakeId }) else { return }
-        var copy = intakes[idx]
-        block(&copy)
-        intakes[idx] = copy
-    }
-
-    private var notifyBinding: Binding<Bool> {
-        Binding(
-            get: { intake.notifyEnabled },
-            set: { newValue in mutate { $0.notifyEnabled = newValue } }
-        )
-    }
+    // MARK: - Bindings sur le draft
 
     private var timeBinding: Binding<Date> {
         Binding(
             get: {
                 var c = DateComponents()
-                c.hour = intake.hour
-                c.minute = intake.minute
+                c.hour = draft.hour
+                c.minute = draft.minute
                 return Calendar.current.date(from: c) ?? Date()
             },
             set: { newDate in
                 let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
-                mutate {
-                    $0.hour = comps.hour ?? $0.hour
-                    $0.minute = comps.minute ?? $0.minute
-                }
+                draft.hour = comps.hour ?? draft.hour
+                draft.minute = comps.minute ?? draft.minute
             }
         )
     }
 
     private var weekdaysBinding: Binding<Set<Int>> {
         Binding(
-            get: { intake.weekdays },
-            set: { newValue in mutate { $0.weekdays = newValue } }
+            get: { draft.weekdays },
+            set: { draft.weekdays = $0 }
         )
     }
 
     private var presetBinding: Binding<WeekdayPreset> {
         Binding(
             get: {
-                if intake.isEveryDay { return .everyDay }
-                if intake.isWeekdaysOnly { return .weekdaysOnly }
-                if intake.isWeekendOnly { return .weekendOnly }
+                if draft.isEveryDay { return .everyDay }
+                if draft.isWeekdaysOnly { return .weekdaysOnly }
+                if draft.isWeekendOnly { return .weekendOnly }
                 return .custom
             },
             set: { preset in
                 switch preset {
-                case .everyDay:     mutate { $0.weekdays = MedicationIntake.allWeekdays }
-                case .weekdaysOnly: mutate { $0.weekdays = MedicationIntake.weekdaysOnly }
-                case .weekendOnly:  mutate { $0.weekdays = MedicationIntake.weekendOnly }
+                case .everyDay:     draft.weekdays = MedicationIntake.allWeekdays
+                case .weekdaysOnly: draft.weekdays = MedicationIntake.weekdaysOnly
+                case .weekendOnly:  draft.weekdays = MedicationIntake.weekendOnly
                 case .custom:       break
                 }
             }
