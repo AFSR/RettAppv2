@@ -185,9 +185,19 @@ final class CloudKitSyncService {
             savePolicy: .ifServerRecordUnchanged
         )
 
-        // Récupère le share sauvegardé (avec recordChangeTag à jour) plutôt
-        // que la copie locale, pour que UICloudSharingController ne re-tente
-        // pas de le créer.
+        // `modifyRecords` ne lève PAS quand un save individuel échoue — il
+        // faut inspecter `saveResults` à la main. Sans ça, on récupérait
+        // silencieusement la copie locale du share, qui n'a pas d'URL côté
+        // serveur — d'où le message « lien de partage n'a pas pu être
+        // généré ». On remonte l'erreur réelle avec un contexte parlant
+        // (souvent : schéma CloudKit non déployé en production).
+        for (_, modResult) in saveResult.saveResults {
+            if case .failure(let err) = modResult {
+                Self.log.error("share save failed: \(err.localizedDescription)")
+                throw SyncError.shareSaveFailed(underlying: err)
+            }
+        }
+
         let savedShare: CKShare = {
             for (_, modResult) in saveResult.saveResults {
                 if case .success(let saved) = modResult, let s = saved as? CKShare {
@@ -196,6 +206,13 @@ final class CloudKitSyncService {
             }
             return share
         }()
+
+        // Sécurité supplémentaire : si après tout ça l'URL est absente, on
+        // refuse de continuer plutôt que de retourner un share inutilisable.
+        guard savedShare.url != nil else {
+            Self.log.error("share saved but no URL — probable production schema mismatch")
+            throw SyncError.shareURLUnavailable
+        }
 
         currentShare = savedShare
         role = .owner
@@ -1196,6 +1213,7 @@ enum ChangeTokenStore {
 enum SyncError: LocalizedError {
     case iCloudUnavailable(CloudKitSyncService.AccountStatus)
     case shareURLUnavailable
+    case shareSaveFailed(underlying: Error)
 
     var errorDescription: String? {
         switch self {
@@ -1206,7 +1224,26 @@ enum SyncError: LocalizedError {
             case .unavailable: return "iCloud temporairement indisponible. Réessayez plus tard."
             default: return "iCloud non disponible."
             }
-        case .shareURLUnavailable: return "L'URL de partage n'a pas pu être générée."
+        case .shareURLUnavailable:
+            return "L'URL de partage n'a pas pu être générée. Le schéma CloudKit en production n'est probablement pas déployé — vérifiez le CloudKit Dashboard."
+        case .shareSaveFailed(let err):
+            // Distingue les cas les plus fréquents en production. Tous les
+            // autres restent loggés en console pour diagnostic.
+            if let ck = err as? CKError {
+                switch ck.code {
+                case .notAuthenticated:
+                    return "Compte iCloud non authentifié. Vérifiez Réglages iOS → [votre nom] → iCloud."
+                case .networkUnavailable, .networkFailure:
+                    return "Réseau iCloud indisponible. Réessayez en Wi-Fi."
+                case .quotaExceeded:
+                    return "Espace iCloud insuffisant. Libérez de l'espace dans Réglages iCloud."
+                case .permissionFailure:
+                    return "Autorisation iCloud refusée pour le conteneur de l'app. Vérifiez Réglages iCloud → RettApp."
+                default:
+                    return "Le partage CloudKit a échoué (code \(ck.errorCode)). Détail : \(ck.localizedDescription)"
+                }
+            }
+            return "Le partage CloudKit a échoué : \(err.localizedDescription)"
         }
     }
 }
