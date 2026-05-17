@@ -404,11 +404,48 @@ struct MedicationPlanView: View {
         // horodatée. Cette révision sert ensuite à reconstituer le plan tel
         // qu'il était à une date donnée (cf. MedicationRevision.latest).
         MedicationRevision.capture(of: target, in: modelContext)
+
+        // Re-génère les logs du jour pour le médicament modifié : les logs
+        // déjà pris sont préservés (l'historique reste fidèle), mais les
+        // logs encore non-pris qui correspondaient au PLAN PRÉCÉDENT sont
+        // supprimés — sinon ils restaient dans le journal en plus des
+        // nouveaux générés par `ensureLogsExist` au prochain affichage,
+        // d'où la confusion utilisateur (« le journal se popule de
+        // doublons »).
+        regenerateTodaysPendingLogs(for: target)
+
         try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         let vm = MedicationViewModel()
         await vm.requestNotificationPermissionIfNeeded()
         await vm.rescheduleAllNotifications(medications: medications, childFirstName: profile?.firstName ?? "")
+        // Régénère les logs du jour à partir du nouveau plan.
+        vm.ensureLogsExist(for: Date(), medications: medications, profile: profile, in: modelContext)
+    }
+
+    /// Supprime les `MedicationLog` du jour (00:00 → 24:00) pour le médicament
+    /// donné qui n'ont PAS encore été marqués comme pris. Les logs déjà pris
+    /// restent : l'historique factuel ne doit jamais être réécrit
+    /// rétroactivement par un changement de plan.
+    private func regenerateTodaysPendingLogs(for med: Medication) {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: Date())
+        let nextDay = cal.date(byAdding: .day, value: 1, to: day) ?? day
+        let medID = med.id
+        let descriptor = FetchDescriptor<MedicationLog>(
+            predicate: #Predicate { log in
+                log.medicationId == medID
+                && log.scheduledTime >= day
+                && log.scheduledTime < nextDay
+                && log.taken == false
+                && log.isAdHoc == false
+            }
+        )
+        if let pending = try? modelContext.fetch(descriptor) {
+            for log in pending {
+                modelContext.delete(log)
+            }
+        }
     }
 }
 
@@ -431,6 +468,13 @@ struct MedicationEditor: View {
     @State private var notifyEnabled: Bool = true
     @State private var showDeleteConfirm: Bool = false
     @FocusState private var defaultDoseFocused: Bool
+    /// Flag pour ne charger `medication.intakes` qu'une seule fois quand
+    /// l'éditeur apparaît. `.onAppear` re-fire en iOS 17 après chaque pop
+    /// d'une sub-vue (typiquement la `MedicationIntakeEditorView`) — sans
+    /// ce flag, l'état local serait écrasé par les valeurs *originales* du
+    /// `Medication` qui n'a pas encore été sauvegardé, et toutes les modifs
+    /// faites dans le sous-éditeur disparaîtraient visuellement.
+    @State private var hasLoaded: Bool = false
 
     struct SaveResult {
         let name: String
@@ -602,7 +646,11 @@ struct MedicationEditor: View {
                 Button("OK") { defaultDoseFocused = false }.bold()
             }
         }
-        .onAppear { loadFromMedication() }
+        .onAppear {
+            guard !hasLoaded else { return }
+            loadFromMedication()
+            hasLoaded = true
+        }
         .confirmationDialog(
             "Supprimer ce médicament ?",
             isPresented: $showDeleteConfirm,
