@@ -12,16 +12,17 @@ import SwiftData
 /// - Les relations (Medication.childProfile) sont représentées par leur UUID en string —
 ///   la résolution se fait côté SwiftData après upsert (relations recréées par fetch)
 enum CKRecordType {
-    static let childProfile     = "ChildProfile"
-    static let medication       = "Medication"
-    static let medicationLog    = "MedicationLog"
-    static let seizure          = "SeizureEvent"
-    static let mood             = "MoodEntry"
-    static let dailyObservation = "DailyObservation"
-    static let symptom          = "SymptomEvent"
+    static let childProfile       = "ChildProfile"
+    static let medication         = "Medication"
+    static let medicationLog      = "MedicationLog"
+    static let seizure            = "SeizureEvent"
+    static let mood               = "MoodEntry"
+    static let dailyObservation   = "DailyObservation"
+    static let symptom            = "SymptomEvent"
+    static let medicationRevision = "MedicationRevision"
 
     /// Tous les record types utilisés. Sert au pull pour balayer la zone.
-    static let all = [childProfile, medication, medicationLog, seizure, mood, dailyObservation, symptom]
+    static let all = [childProfile, medication, medicationLog, seizure, mood, dailyObservation, symptom, medicationRevision]
 }
 
 /// Clé custom utilisée pour le tie-breaker last-writer-wins entre deux
@@ -513,6 +514,80 @@ extension SymptomEvent {
                 id: id, timestamp: timestamp, symptomType: symptomType,
                 intensity: intensity, durationMinutes: durationMinutes,
                 notes: notes, childProfileId: childProfileId
+            )
+            new.lastModifiedAt = lastModified
+            context.insert(new)
+        }
+    }
+}
+
+// MARK: - MedicationRevision (versioning du plan)
+
+extension MedicationRevision {
+    func toCKRecord(zoneID: CKRecordZone.ID) -> CKRecord {
+        let recordID = CKRecord.ID(recordName: id.uuidString, zoneID: zoneID)
+        let r = CKRecord(recordType: CKRecordType.medicationRevision, recordID: recordID)
+        r["medicationId"] = medicationId.uuidString as CKRecordValue
+        r["effectiveFrom"] = effectiveFrom as CKRecordValue
+        r["name"] = name as CKRecordValue
+        r["doseAmount"] = doseAmount as CKRecordValue
+        r["doseUnitRaw"] = doseUnitRaw as CKRecordValue
+        r["kindRaw"] = kindRaw as CKRecordValue
+        r["isActive"] = (isActive ? 1 : 0) as CKRecordValue
+        r["notifyEnabled"] = (notifyEnabled ? 1 : 0) as CKRecordValue
+        if let data = try? JSONEncoder().encode(intakes),
+           let str = String(data: data, encoding: .utf8) {
+            r["intakes"] = str as CKRecordValue
+        }
+        r.writeLastModified(lastModifiedAt)
+        return r
+    }
+
+    static func upsert(from record: CKRecord, in context: ModelContext) {
+        guard let id = UUID(uuidString: record.recordID.recordName) else { return }
+        let existing = (try? context.fetch(FetchDescriptor<MedicationRevision>(
+            predicate: #Predicate { $0.id == id }
+        )).first)
+
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
+
+        guard let medIDStr = record["medicationId"] as? String,
+              let medicationId = UUID(uuidString: medIDStr) else { return }
+        let effectiveFrom = record["effectiveFrom"] as? Date ?? Date()
+        let name = record["name"] as? String ?? ""
+        let doseAmount = record["doseAmount"] as? Double ?? 0
+        let doseUnitRaw = record["doseUnitRaw"] as? String ?? DoseUnit.mg.rawValue
+        let kindRaw = record["kindRaw"] as? String ?? MedicationKind.regular.rawValue
+        let isActive = (record["isActive"] as? Int ?? 1) == 1
+        let notifyEnabled = (record["notifyEnabled"] as? Int ?? 1) == 1
+        let unit = DoseUnit(rawValue: doseUnitRaw) ?? .mg
+        let kind = MedicationKind(rawValue: kindRaw) ?? .regular
+
+        var intakes: [MedicationIntake] = []
+        if let str = record["intakes"] as? String,
+           let data = str.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode([MedicationIntake].self, from: data) {
+            intakes = decoded
+        }
+        let lastModified = record.incomingLastModified ?? Date()
+
+        if let existing {
+            existing.medicationId = medicationId
+            existing.effectiveFrom = effectiveFrom
+            existing.name = name
+            existing.doseAmount = doseAmount
+            existing.doseUnit = unit
+            existing.kind = kind
+            existing.isActive = isActive
+            existing.notifyEnabled = notifyEnabled
+            existing.intakes = intakes
+            existing.lastModifiedAt = lastModified
+        } else {
+            let new = MedicationRevision(
+                id: id, medicationId: medicationId, effectiveFrom: effectiveFrom,
+                name: name, doseAmount: doseAmount, doseUnit: unit,
+                intakes: intakes, kind: kind,
+                isActive: isActive, notifyEnabled: notifyEnabled
             )
             new.lastModifiedAt = lastModified
             context.insert(new)

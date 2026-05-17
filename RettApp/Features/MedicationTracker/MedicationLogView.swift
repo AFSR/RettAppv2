@@ -206,6 +206,7 @@ struct MedicationPlanView: View {
 
     private func save(_ r: MedicationEditor.SaveResult, editing: Medication?) async {
         let hours = r.intakes.map { HourMinute(hour: $0.hour, minute: $0.minute) }
+        let target: Medication
         if let editing {
             editing.name = r.name
             editing.doseAmount = r.defaultDose
@@ -216,6 +217,7 @@ struct MedicationPlanView: View {
             // Important : on écrit `intakes` après les autres champs car le
             // setter synchronise `scheduledHours` à partir de la liste finale.
             editing.intakes = r.intakes
+            target = editing
         } else {
             let med = Medication(
                 name: r.name,
@@ -229,7 +231,12 @@ struct MedicationPlanView: View {
             )
             med.childProfile = profile
             modelContext.insert(med)
+            target = med
         }
+        // Versioning : on capture l'état post-modification dans une révision
+        // horodatée. Cette révision sert ensuite à reconstituer le plan tel
+        // qu'il était à une date donnée (cf. MedicationRevision.latest).
+        MedicationRevision.capture(of: target, in: modelContext)
         try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext)
         let vm = MedicationViewModel()
@@ -374,7 +381,17 @@ struct MedicationEditor: View {
             // édition. Le swipe-to-delete dans la liste reste disponible
             // depuis le plan, mais l'utilisateur attend aussi une option
             // claire à l'intérieur du formulaire.
-            if medication != nil {
+            if let med = medication {
+                Section {
+                    NavigationLink {
+                        MedicationRevisionHistoryView(medicationId: med.id, medicationName: med.name)
+                    } label: {
+                        Label("Historique des modifications", systemImage: "clock.arrow.circlepath")
+                    }
+                } footer: {
+                    Text("Liste chronologique de toutes les modifications de dosage, horaires et activation depuis la création de ce médicament dans le plan.")
+                }
+
                 Section {
                     Button(role: .destructive) {
                         showDeleteConfirm = true

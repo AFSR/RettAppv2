@@ -588,6 +588,9 @@ final class CloudKitSyncService {
         if let symptoms = try? context.fetch(FetchDescriptor<SymptomEvent>()) {
             records.append(contentsOf: symptoms.map { $0.toCKRecord(zoneID: zoneID) })
         }
+        if let revisions = try? context.fetch(FetchDescriptor<MedicationRevision>()) {
+            records.append(contentsOf: revisions.map { $0.toCKRecord(zoneID: zoneID) })
+        }
 
         if records.isEmpty {
             Self.log.info("replicateAll: aucun enregistrement local à pousser")
@@ -809,6 +812,7 @@ final class CloudKitSyncService {
         case CKRecordType.mood:             MoodEntry.upsert(from: record, in: context)
         case CKRecordType.dailyObservation: DailyObservation.upsert(from: record, in: context)
         case CKRecordType.symptom:          SymptomEvent.upsert(from: record, in: context)
+        case CKRecordType.medicationRevision: MedicationRevision.upsert(from: record, in: context)
         default: break
         }
     }
@@ -847,6 +851,9 @@ final class CloudKitSyncService {
         }
         if let sym = try? context.fetch(FetchDescriptor<SymptomEvent>(predicate: #Predicate { $0.id == id })).first {
             context.delete(sym); return
+        }
+        if let rev = try? context.fetch(FetchDescriptor<MedicationRevision>(predicate: #Predicate { $0.id == id })).first {
+            context.delete(rev); return
         }
     }
 
