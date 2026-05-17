@@ -18,6 +18,11 @@ struct MedicationPlanView: View {
     /// clique sur un medicament du plan, cela ouvre un nouveau medicament »).
     @State private var editorSheet: EditorSheet?
     @State private var importSummary: MedicationImporter.ImportResult?
+    /// Date d'observation rétroactive — nil = mode édition courant. Quand
+    /// non-nil, le plan affiche l'état tel qu'il était à cette date (lecture
+    /// seule), reconstruit via `MedicationRevision.latest(...)`.
+    @State private var historicalDate: Date?
+    @State private var showDatePicker: Bool = false
 
     enum EditorSheet: Identifiable {
         case create
@@ -35,83 +40,100 @@ struct MedicationPlanView: View {
 
     var body: some View {
         List {
+            if historicalDate != nil {
+                historicalBanner
+            }
             Section {
-                ForEach(medications) { med in
-                    Button {
-                        editorSheet = .edit(med)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(med.name)
-                                    .font(AFSRFont.headline(17))
-                                    .foregroundStyle(.primary)
-                                if med.kind == .adhoc {
-                                    Text("Ponctuel")
-                                        .font(AFSRFont.caption())
-                                        .padding(.horizontal, 6).padding(.vertical, 2)
-                                        .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
-                                        .foregroundStyle(.afsrPurpleAdaptive)
-                                }
-                                Spacer()
-                                if med.kind == .regular && !med.notifyEnabled {
-                                    Image(systemName: "bell.slash.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
-                                        .accessibilityLabel("Notifications désactivées")
-                                }
-                                if !med.isActive {
-                                    Text("Inactif")
-                                        .font(AFSRFont.caption())
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Text(rowSubtitle(for: med))
-                                .font(AFSRFont.caption())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                ForEach(planEntries) { entry in
+                    planRow(entry)
                 }
-                .onDelete(perform: delete)
+                .onDelete(perform: historicalDate == nil ? delete : nil)
             } footer: {
-                Text("Les notifications sont recréées automatiquement après modification.")
+                Text(historicalDate == nil
+                     ? "Les notifications sont recréées automatiquement après modification."
+                     : "Plan en mode historique : lecture seule. Pour modifier, revenez d'abord au plan actuel.")
             }
 
-            Section {
-                Button {
-                    editorSheet = .create
-                } label: {
-                    Label("Ajouter un médicament", systemImage: "plus.circle.fill")
+            if historicalDate == nil {
+                Section {
+                    Button {
+                        editorSheet = .create
+                    } label: {
+                        Label("Ajouter un médicament", systemImage: "plus.circle.fill")
+                    }
                 }
             }
         }
-        .navigationTitle("Plan médicamenteux")
+        .navigationTitle(historicalDate == nil ? "Plan médicamenteux" : "Plan au passé")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Fermer") { dismiss() }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                CSVImportMenu(
-                    buildTemplate: { try MedicationImporter.writeTemplate() },
-                    onImportedContent: { content in
-                        let result = MedicationImporter.importCSV(
-                            contents: content,
-                            childProfile: profile,
-                            context: modelContext
-                        )
-                        importSummary = result
-                        // Replanifie les notifications après l'import
-                        Task {
-                            let vm = MedicationViewModel()
-                            await vm.requestNotificationPermissionIfNeeded()
-                            await vm.rescheduleAllNotifications(
-                                medications: medications,
-                                childFirstName: profile?.firstName ?? ""
-                            )
+                Menu {
+                    if historicalDate == nil {
+                        Button {
+                            showDatePicker = true
+                        } label: {
+                            Label("Afficher le plan à une date passée", systemImage: "clock.arrow.circlepath")
+                        }
+                    } else {
+                        Button {
+                            historicalDate = nil
+                        } label: {
+                            Label("Revenir au plan actuel", systemImage: "arrow.uturn.backward")
                         }
                     }
-                )
+                    Divider()
+                    Button {
+                        // Placeholder pour ouvrir le menu CSV existant
+                    } label: {
+                        Label("Import / Export CSV", systemImage: "doc.text")
+                    }
+                    .hidden() // visuellement remplacé par le menu CSV séparé ci-dessous
+                } label: {
+                    Image(systemName: historicalDate == nil ? "ellipsis.circle" : "clock.fill")
+                }
             }
+            // Le menu CSV reste un bouton à part (il porte sa propre UI de
+            // file picker et de sheet de partage) — on ne le mélange pas dans
+            // le Menu principal.
+            ToolbarItem(placement: .topBarTrailing) {
+                if historicalDate == nil {
+                    CSVImportMenu(
+                        buildTemplate: { try MedicationImporter.writeTemplate() },
+                        onImportedContent: { content in
+                            let result = MedicationImporter.importCSV(
+                                contents: content,
+                                childProfile: profile,
+                                context: modelContext
+                            )
+                            importSummary = result
+                            // Replanifie les notifications après l'import
+                            Task {
+                                let vm = MedicationViewModel()
+                                await vm.requestNotificationPermissionIfNeeded()
+                                await vm.rescheduleAllNotifications(
+                                    medications: medications,
+                                    childFirstName: profile?.firstName ?? ""
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        .sheet(isPresented: $showDatePicker) {
+            DatePickerSheet(
+                initial: historicalDate ?? Date(),
+                onCancel: { showDatePicker = false },
+                onApply: { date in
+                    historicalDate = date
+                    showDatePicker = false
+                }
+            )
+            .presentationDetents([.medium])
         }
         .sheet(item: $editorSheet) { item in
             NavigationStack {
@@ -148,6 +170,151 @@ struct MedicationPlanView: View {
             }
             return Text(msg)
         }
+    }
+
+    // MARK: - Plan entries (current vs historical)
+
+    /// Représentation unifiée d'une ligne du plan, alimentée soit par le
+    /// `Medication` courant, soit par sa dernière `MedicationRevision`
+    /// antérieure à la date historique sélectionnée.
+    private struct PlanEntry: Identifiable {
+        let id: UUID
+        let name: String
+        let kind: MedicationKind
+        let doseAmount: Double
+        let doseUnit: DoseUnit
+        let intakes: [MedicationIntake]
+        let isActive: Bool
+        let notifyEnabled: Bool
+        /// Référence au `Medication` éditable. nil en mode historique.
+        let editable: Medication?
+    }
+
+    /// Liste à afficher : médicaments courants OU snapshots historiques
+    /// reconstitués via `MedicationRevision.latest(...)` selon `historicalDate`.
+    private var planEntries: [PlanEntry] {
+        guard let date = historicalDate else {
+            return medications.map { med in
+                PlanEntry(
+                    id: med.id,
+                    name: med.name,
+                    kind: med.kind,
+                    doseAmount: med.doseAmount,
+                    doseUnit: med.doseUnit,
+                    intakes: med.intakes,
+                    isActive: med.isActive,
+                    notifyEnabled: med.notifyEnabled,
+                    editable: med
+                )
+            }
+        }
+        // Mode historique : on exclut les médocs créés APRÈS `date`, et pour
+        // chacun on cherche la dernière révision antérieure à `date`.
+        return medications.compactMap { med in
+            guard med.createdAt <= date else { return nil }
+            let rev = MedicationRevision.latest(medicationId: med.id, before: date, in: modelContext)
+            return PlanEntry(
+                id: med.id,
+                name: rev?.name ?? med.name,
+                kind: rev?.kind ?? med.kind,
+                doseAmount: rev?.doseAmount ?? med.doseAmount,
+                doseUnit: rev?.doseUnit ?? med.doseUnit,
+                intakes: rev?.intakes ?? med.intakes,
+                isActive: rev?.isActive ?? med.isActive,
+                notifyEnabled: rev?.notifyEnabled ?? med.notifyEnabled,
+                editable: nil
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func planRow(_ entry: PlanEntry) -> some View {
+        let content = VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(entry.name)
+                    .font(AFSRFont.headline(17))
+                    .foregroundStyle(.primary)
+                if entry.kind == .adhoc {
+                    Text("Ponctuel")
+                        .font(AFSRFont.caption())
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                }
+                Spacer()
+                if entry.kind == .regular && !entry.notifyEnabled {
+                    Image(systemName: "bell.slash.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Notifications désactivées")
+                }
+                if !entry.isActive {
+                    Text("Inactif")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text(rowSubtitleForEntry(entry))
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+        }
+        if let med = entry.editable {
+            Button { editorSheet = .edit(med) } label: { content }
+        } else {
+            content // lecture seule en mode historique
+        }
+    }
+
+    private func rowSubtitleForEntry(_ e: PlanEntry) -> String {
+        switch e.kind {
+        case .adhoc:
+            let dose = MedicationIntake.doseLabel(e.doseAmount, unit: e.doseUnit)
+            return "\(dose) · à la demande"
+        case .regular:
+            if e.intakes.isEmpty {
+                return MedicationIntake.doseLabel(e.doseAmount, unit: e.doseUnit)
+            }
+            let uniformDose = Set(e.intakes.map(\.dose)).count == 1
+            let uniformDays = Set(e.intakes.map(\.weekdaysRaw)).count == 1
+            if uniformDose && uniformDays {
+                let suffix = e.intakes.first?.isEveryDay == false
+                    ? " · \(e.intakes.first?.weekdaySummary ?? "")"
+                    : ""
+                let times = e.intakes.map(\.formattedTime).joined(separator: ", ")
+                return "\(MedicationIntake.doseLabel(e.doseAmount, unit: e.doseUnit)) — \(times)\(suffix)"
+            }
+            return e.intakes.map { intake in
+                let dose = MedicationIntake.doseLabel(intake.dose, unit: e.doseUnit)
+                return "\(intake.formattedTime) \(dose) (\(intake.weekdaySummary))"
+            }.joined(separator: " · ")
+        }
+    }
+
+    @ViewBuilder
+    private var historicalBanner: some View {
+        Section {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "clock.fill")
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Plan reconstitué")
+                        .font(AFSRFont.headline(14))
+                    if let date = historicalDate {
+                        Text(date, format: .dateTime.day().month(.wide).year().hour().minute())
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Button("Plan actuel") {
+                    historicalDate = nil
+                }
+                .font(AFSRFont.caption())
+                .buttonStyle(.bordered)
+            }
+            .padding(.vertical, 4)
+        }
+        .listRowBackground(Color.afsrPurpleAdaptive.opacity(0.08))
     }
 
     private func rowSubtitle(for med: Medication) -> String {
@@ -505,6 +672,52 @@ struct MedicationEditor: View {
         intakes = existing.isEmpty
             ? [MedicationIntake(hour: 8, minute: 0, dose: medication.doseAmount)]
             : existing
+    }
+}
+
+// MARK: - Historical date picker
+
+/// Petite feuille pour choisir la date à laquelle reconstituer le plan
+/// médicamenteux. Plafonnée à `Date()` parce qu'on ne reconstitue pas le
+/// futur (les révisions sont créées au présent).
+private struct DatePickerSheet: View {
+    let initial: Date
+    let onCancel: () -> Void
+    let onApply: (Date) -> Void
+
+    @State private var selected: Date
+
+    init(initial: Date, onCancel: @escaping () -> Void, onApply: @escaping (Date) -> Void) {
+        self.initial = initial
+        self.onCancel = onCancel
+        self.onApply = onApply
+        _selected = State(initialValue: initial)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    DatePicker(
+                        "Date d'observation",
+                        selection: $selected,
+                        in: ...Date(),
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.graphical)
+                } footer: {
+                    Text("Le plan affichera l'état tel qu'il était à cette date — utile pour préparer une consultation médicale ou comparer un dosage actuel à un dosage passé.")
+                }
+            }
+            .navigationTitle("Plan à une date passée")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuler", action: onCancel) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Afficher") { onApply(selected) }.bold()
+                }
+            }
+        }
     }
 }
 
