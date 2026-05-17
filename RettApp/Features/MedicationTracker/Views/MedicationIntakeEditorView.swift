@@ -22,6 +22,7 @@ struct MedicationIntakeEditorView: View {
     }
 
     @State private var doseString: String = ""
+    @FocusState private var doseFieldFocused: Bool
 
     enum WeekdayPreset: String, CaseIterable, Identifiable, Hashable {
         case everyDay, weekdaysOnly, weekendOnly, custom
@@ -46,6 +47,27 @@ struct MedicationIntakeEditorView: View {
         .navigationTitle("Prise de \(intake.formattedTime)")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: syncDoseString)
+        // Bouton « OK » au-dessus du clavier décimal (pas de touche Retour
+        // sur .decimalPad) pour permettre de valider la dose sans avoir à
+        // taper en dehors du champ.
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("OK") { doseFieldFocused = false }
+                    .bold()
+            }
+            // Bouton « OK » explicite dans la barre de navigation : les
+            // modifications sont propagées au tableau parent à chaque frappe
+            // via `mutate`, mais l'utilisateur attend un point de validation
+            // visible pour confirmer ses changements et revenir.
+            ToolbarItem(placement: .confirmationAction) {
+                Button("OK") {
+                    doseFieldFocused = false
+                    dismiss()
+                }
+                .bold()
+            }
+        }
     }
 
     // MARK: - Sections
@@ -69,6 +91,7 @@ struct MedicationIntakeEditorView: View {
             HStack {
                 TextField("Quantité", text: $doseString)
                     .keyboardType(.decimalPad)
+                    .focused($doseFieldFocused)
                     .onChange(of: doseString) { _, newValue in
                         if let v = Double(newValue.replacingOccurrences(of: ",", with: ".")) {
                             mutate { $0.dose = v }

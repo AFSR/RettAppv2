@@ -9,9 +9,27 @@ struct MedicationPlanView: View {
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
 
-    @State private var showEditor = false
-    @State private var editing: Medication?
+    /// Combine création et édition dans une seule source de vérité pour la
+    /// feuille modale. Avant : deux `@State` séparés (`editing` + `showEditor`)
+    /// — SwiftUI évaluait parfois le `body` du sheet AVANT que `editing` ait
+    /// fini de propager, faisant que le premier tap ouvrait l'éditeur en mode
+    /// création au lieu d'édition, créant un médicament fantôme à chaque
+    /// tentative (cf. issue utilisateur 2025-11 : « la première fois qu'on
+    /// clique sur un medicament du plan, cela ouvre un nouveau medicament »).
+    @State private var editorSheet: EditorSheet?
     @State private var importSummary: MedicationImporter.ImportResult?
+
+    enum EditorSheet: Identifiable {
+        case create
+        case edit(Medication)
+
+        var id: String {
+            switch self {
+            case .create: return "create"
+            case .edit(let m): return m.id.uuidString
+            }
+        }
+    }
 
     private var profile: ChildProfile? { profiles.first }
 
@@ -20,8 +38,7 @@ struct MedicationPlanView: View {
             Section {
                 ForEach(medications) { med in
                     Button {
-                        editing = med
-                        showEditor = true
+                        editorSheet = .edit(med)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
@@ -61,8 +78,7 @@ struct MedicationPlanView: View {
 
             Section {
                 Button {
-                    editing = nil
-                    showEditor = true
+                    editorSheet = .create
                 } label: {
                     Label("Ajouter un médicament", systemImage: "plus.circle.fill")
                 }
@@ -97,10 +113,23 @@ struct MedicationPlanView: View {
                 )
             }
         }
-        .sheet(isPresented: $showEditor) {
+        .sheet(item: $editorSheet) { item in
             NavigationStack {
-                MedicationEditor(medication: editing) { result in
-                    Task { await save(result) }
+                switch item {
+                case .create:
+                    MedicationEditor(medication: nil) { result in
+                        Task { await save(result, editing: nil) }
+                    }
+                case .edit(let med):
+                    MedicationEditor(
+                        medication: med,
+                        onSave: { result in
+                            Task { await save(result, editing: med) }
+                        },
+                        onDelete: {
+                            deleteMedication(med)
+                        }
+                    )
                 }
             }
         }
@@ -159,7 +188,23 @@ struct MedicationPlanView: View {
         }
     }
 
-    private func save(_ r: MedicationEditor.SaveResult) async {
+    /// Suppression depuis le bouton « Supprimer ce médicament » à l'intérieur
+    /// de l'éditeur. Même comportement que swipe-to-delete : on retire le
+    /// `Medication` (les `MedicationLog` orphelins restent dans le journal
+    /// pour conserver l'historique tel quel) et on resynchronise.
+    private func deleteMedication(_ med: Medication) {
+        modelContext.delete(med)
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext)
+        Task {
+            await MedicationViewModel().rescheduleAllNotifications(
+                medications: medications,
+                childFirstName: profile?.firstName ?? ""
+            )
+        }
+    }
+
+    private func save(_ r: MedicationEditor.SaveResult, editing: Medication?) async {
         let hours = r.intakes.map { HourMinute(hour: $0.hour, minute: $0.minute) }
         if let editing {
             editing.name = r.name
@@ -199,6 +244,7 @@ struct MedicationEditor: View {
     @Environment(\.dismiss) private var dismiss
     let medication: Medication?
     let onSave: (SaveResult) -> Void
+    var onDelete: (() -> Void)? = nil
 
     @State private var name: String = ""
     @State private var defaultDoseText: String = ""
@@ -209,6 +255,8 @@ struct MedicationEditor: View {
     @State private var kind: MedicationKind = .regular
     @State private var active: Bool = true
     @State private var notifyEnabled: Bool = true
+    @State private var showDeleteConfirm: Bool = false
+    @FocusState private var defaultDoseFocused: Bool
 
     struct SaveResult {
         let name: String
@@ -262,6 +310,7 @@ struct MedicationEditor: View {
                 HStack {
                     TextField("Quantité", text: $defaultDoseText)
                         .keyboardType(.decimalPad)
+                        .focused($defaultDoseFocused)
                     Picker("Unité", selection: $unit) {
                         ForEach(DoseUnit.allCases) { u in
                             Text(u.label).tag(u)
@@ -317,6 +366,22 @@ struct MedicationEditor: View {
                     Text("Interrupteur principal. Vous pouvez aussi désactiver individuellement chaque prise (utile pour les jours pris en charge par l'école ou l'autre parent).")
                 }
             }
+
+            // Bouton explicite de suppression, visible uniquement en mode
+            // édition. Le swipe-to-delete dans la liste reste disponible
+            // depuis le plan, mais l'utilisateur attend aussi une option
+            // claire à l'intérieur du formulaire.
+            if medication != nil {
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Supprimer ce médicament", systemImage: "trash")
+                    }
+                } footer: {
+                    Text("Supprime le médicament du plan ainsi que toutes ses prises planifiées et leur historique de validation.")
+                }
+            }
         }
         .navigationTitle(medication == nil ? "Nouveau médicament" : "Modifier")
         .navigationBarTitleDisplayMode(.inline)
@@ -324,6 +389,7 @@ struct MedicationEditor: View {
             ToolbarItem(placement: .cancellationAction) { Button("Annuler") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Enregistrer") {
+                    defaultDoseFocused = false
                     let amount = Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) ?? 0
                     let finalIntakes = kind == .regular ? intakes : []
                     onSave(SaveResult(
@@ -342,8 +408,27 @@ struct MedicationEditor: View {
                           || (kind == .regular && intakes.isEmpty))
                 .bold()
             }
+            // Touche « OK » au-dessus du clavier décimal (sinon l'utilisateur
+            // ne peut pas sortir du champ Dose sans cliquer en-dehors).
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("OK") { defaultDoseFocused = false }.bold()
+            }
         }
         .onAppear { loadFromMedication() }
+        .confirmationDialog(
+            "Supprimer ce médicament ?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer", role: .destructive) {
+                onDelete?()
+                dismiss()
+            }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Cette action est irréversible. Le médicament et son historique de prises seront effacés.")
+        }
     }
 
     @ViewBuilder
