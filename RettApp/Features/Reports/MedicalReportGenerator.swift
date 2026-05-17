@@ -118,11 +118,16 @@ enum MedicalReportGenerator {
             drawStatsSection(input: input, overall: overall, granularity: granularity,
                              buckets: seizureBuckets, ctx: &ctx, context: context)
 
-            drawCorrelationsSection(correlations: correlations, ctx: &ctx, context: context)
+            drawCorrelationsSection(
+                correlations: correlations,
+                planChangesInPeriod: planChangesCount(input: input),
+                ctx: &ctx, context: context
+            )
 
             drawMedicationAnalysis(analysis: medAnalysis, ctx: &ctx, context: context)
 
             drawMedicationEvolutions(input: input, ctx: &ctx, context: context)
+            drawPlanChangeImpacts(input: input, ctx: &ctx, context: context)
 
             drawSymptomAnalysis(analysis: symptomAnalysis, ctx: &ctx, context: context)
 
@@ -345,11 +350,24 @@ enum MedicalReportGenerator {
 
     private static func drawCorrelationsSection(
         correlations: [MedicalReportAnalysis.Correlation],
+        planChangesInPeriod: Int,
         ctx: inout DrawContext, context: UIGraphicsPDFRendererContext
     ) {
         ctx.ensureSpace(120, context: context)
         drawSectionTitle("Étude exploratoire des corrélations", ctx: &ctx)
         drawText("Coefficients de Pearson (r ∈ [-1, +1]) calculés sur les jours où les deux signaux sont renseignés. Force interprétée selon les conventions usuelles : faible (|r|<0,2), modérée (0,2-0,4), forte (>0,4). Ces résultats sont exploratoires et ne démontrent pas de causalité.", italic: true, ctx: &ctx)
+
+        // Avertissement quand le plan a été modifié sur la période — une
+        // corrélation calculée sur un plan instable peut refléter un effet
+        // d'un changement de dose plutôt qu'un signal continu.
+        if planChangesInPeriod > 0 {
+            let strength = planChangesInPeriod >= 3
+                ? "Attention : "
+                : "À noter : "
+            let warning = "\(strength)le plan médicamenteux a été modifié \(planChangesInPeriod) fois pendant la période. Les corrélations ci-dessous mélangent plusieurs régimes de traitement — un signal peut être l'effet d'un changement de dose. La section « Impact estimé des changements du plan » plus bas isole les fenêtres avant / après chaque modification."
+            drawText(warning, italic: true, ctx: &ctx)
+            ctx.y += 2
+        }
 
         if correlations.isEmpty {
             drawText("Données insuffisantes : il faut au moins 5 jours communs avec un signal renseigné pour calculer une corrélation.", italic: true, ctx: &ctx)
@@ -566,6 +584,84 @@ enum MedicalReportGenerator {
                 return "\(intake.formattedTime) \(dose)\(days)"
             }
             .joined(separator: ", ")
+    }
+
+    // MARK: - Impact des changements du plan (corrélation-conscient)
+
+    /// Compte le nombre de révisions tombées dans la période — utilisé
+    /// pour l'avertissement dans la section corrélations.
+    private static func planChangesCount(input: Input) -> Int {
+        input.medicationRevisions.filter {
+            $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd
+        }.count
+    }
+
+    /// Pour chaque modification du plan, présente côte à côte les stats des
+    /// 14 jours avant et après. Aide le médecin à juger l'effet visible
+    /// d'un changement de dose, sans inférer de causalité — c'est une
+    /// observation, pas un test statistique.
+    private static func drawPlanChangeImpacts(
+        input: Input,
+        ctx: inout DrawContext,
+        context: UIGraphicsPDFRendererContext
+    ) {
+        let analysisInput = MedicalReportAnalysis.Input(
+            periodStart: input.periodStart, periodEnd: input.periodEnd,
+            seizures: input.seizures, medications: input.medications,
+            logs: input.logs, moods: input.moods, observations: input.observations,
+            symptoms: input.symptoms
+        )
+        let impacts = MedicalReportAnalysis.planChangeImpacts(
+            analysisInput,
+            revisions: input.medicationRevisions
+        )
+        guard !impacts.isEmpty else { return }
+
+        ctx.ensureSpace(140, context: context)
+        drawSectionTitle("Impact estimé des changements du plan", ctx: &ctx)
+        drawText("Pour chaque modification, comparaison des 14 jours avant et après. Les fenêtres sont tronquées par les bornes de la période. Lecture purement observationnelle : une amélioration ne prouve pas la causalité du changement (effet placebo, évolution spontanée, saisonnalité, autres facteurs).",
+                 italic: true, ctx: &ctx)
+        ctx.y += 4
+
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM/yyyy"
+
+        let headers = ["Date", "Médicament", "Crises/j", "Min/j", "Humeur", "Sommeil"]
+        let widths: [CGFloat] = [70, 110, 75, 75, 80, 80]
+        let rows: [[String]] = impacts.map { imp in
+            [
+                df.string(from: imp.revisionDate),
+                imp.medicationName,
+                deltaCell(before: imp.before.seizuresPerDay, after: imp.after.seizuresPerDay, fmt: "%.1f"),
+                deltaCell(before: imp.before.seizureMinutesPerDay, after: imp.after.seizureMinutesPerDay, fmt: "%.1f"),
+                optionalDeltaCell(before: imp.before.moodAvg, after: imp.after.moodAvg),
+                optionalDeltaCell(before: imp.before.sleepRatingAvg, after: imp.after.sleepRatingAvg)
+            ]
+        }
+        drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
+        ctx.y += 4
+        drawText("Légende : « avant → après » avec écart entre parenthèses. Crises/j et Min/j = moyennes journalières sur la fenêtre. Humeur et Sommeil = échelles 1-5 (vide si non renseigné dans la fenêtre).",
+                 italic: true, ctx: &ctx)
+        ctx.y += 8
+    }
+
+    private static func deltaCell(before: Double, after: Double, fmt: String) -> String {
+        let b = String(format: fmt, before)
+        let a = String(format: fmt, after)
+        let delta = after - before
+        let sign = delta >= 0 ? "+" : ""
+        let d = String(format: fmt, delta)
+        return "\(b)→\(a)\n(\(sign)\(d))"
+    }
+
+    private static func optionalDeltaCell(before: Double?, after: Double?) -> String {
+        guard let b = before, let a = after else { return "—" }
+        let bStr = String(format: "%.1f", b)
+        let aStr = String(format: "%.1f", a)
+        let delta = a - b
+        let sign = delta >= 0 ? "+" : ""
+        return "\(bStr)→\(aStr)\n(\(sign)\(String(format: "%.1f", delta)))"
     }
 
     private static func drawSynthesis(

@@ -247,6 +247,96 @@ enum MedicalReportAnalysis {
         var direction: String { r >= 0 ? "positive" : "négative" }
     }
 
+    // MARK: - Plan change impact (versioning awareness)
+
+    /// Statistiques agrégées sur une fenêtre temporelle, utilisées pour
+    /// comparer la situation avant/après un changement du plan médicamenteux.
+    struct PlanChangeWindowStats {
+        let days: Int
+        let seizuresPerDay: Double
+        let seizureMinutesPerDay: Double
+        let moodAvg: Double?       // 1-5
+        let sleepRatingAvg: Double? // 1-5
+    }
+
+    /// Une révision du plan tombée pendant la période, accompagnée des
+    /// stats des fenêtres avant/après. Permet au médecin de juger si la
+    /// modification semble avoir eu un effet sur les signaux (crises,
+    /// humeur, sommeil) — sans inférer de causalité.
+    struct PlanChangeImpact {
+        let revisionDate: Date
+        let medicationName: String
+        let before: PlanChangeWindowStats
+        let after: PlanChangeWindowStats
+
+        var seizureDeltaPerDay: Double { after.seizuresPerDay - before.seizuresPerDay }
+        var seizureDurationDeltaMinPerDay: Double {
+            after.seizureMinutesPerDay - before.seizureMinutesPerDay
+        }
+    }
+
+    /// Pour chaque révision tombée dans la période, calcule les stats des
+    /// fenêtres `windowDays` avant et après. Les fenêtres sont tronquées par
+    /// les bornes de la période — pas de fuite en dehors du rapport.
+    static func planChangeImpacts(
+        _ input: Input,
+        revisions: [MedicationRevision],
+        windowDays: Int = 14,
+        calendar: Calendar = .current
+    ) -> [PlanChangeImpact] {
+        let inPeriod = revisions
+            .filter { $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd }
+            .sorted { $0.effectiveFrom < $1.effectiveFrom }
+
+        return inPeriod.map { rev in
+            let date = rev.effectiveFrom
+            let beforeStart = calendar.date(byAdding: .day, value: -windowDays, to: date) ?? date
+            let beforeBounded = max(beforeStart, input.periodStart)
+            let afterEnd = calendar.date(byAdding: .day, value: windowDays, to: date) ?? date
+            let afterBounded = min(afterEnd, input.periodEnd)
+
+            let before = windowStats(from: beforeBounded, to: date, in: input)
+            let after = windowStats(from: date, to: afterBounded, in: input)
+
+            return PlanChangeImpact(
+                revisionDate: date,
+                medicationName: rev.name,
+                before: before,
+                after: after
+            )
+        }
+    }
+
+    private static func windowStats(
+        from start: Date,
+        to end: Date,
+        in input: Input
+    ) -> PlanChangeWindowStats {
+        let interval = end.timeIntervalSince(start)
+        let days = max(1, Int((interval / 86_400).rounded()))
+        let seizures = input.seizures.filter { $0.startTime >= start && $0.startTime < end }
+        let moods = input.moods.filter { $0.timestamp >= start && $0.timestamp < end }
+        let obs = input.observations.filter { $0.dayStart >= start && $0.dayStart < end }
+
+        let seizureCount = seizures.count
+        let seizureMin = Double(seizures.reduce(0) { $0 + $1.durationSeconds }) / 60.0
+        let moodAvg: Double? = moods.isEmpty ? nil
+            : moods.map { Double($0.levelRaw) }.reduce(0, +) / Double(moods.count)
+        let sleepRatings = obs.compactMap { o -> Int? in
+            o.nightSleepRatingRaw > 0 ? o.nightSleepRatingRaw : nil
+        }
+        let sleepAvg: Double? = sleepRatings.isEmpty ? nil
+            : Double(sleepRatings.reduce(0, +)) / Double(sleepRatings.count)
+
+        return PlanChangeWindowStats(
+            days: days,
+            seizuresPerDay: Double(seizureCount) / Double(days),
+            seizureMinutesPerDay: seizureMin / Double(days),
+            moodAvg: moodAvg,
+            sleepRatingAvg: sleepAvg
+        )
+    }
+
     /// Calcule les corrélations à partir des signaux journaliers.
     /// Garde uniquement les jours où les deux signaux sont présents.
     static func correlations(from signals: [DailySignals]) -> [Correlation] {
