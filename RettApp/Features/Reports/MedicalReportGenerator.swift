@@ -128,6 +128,7 @@ enum MedicalReportGenerator {
 
             drawMedicationEvolutions(input: input, ctx: &ctx, context: context)
             drawPlanChangeImpacts(input: input, ctx: &ctx, context: context)
+            drawSegmentedCorrelations(input: input, ctx: &ctx, context: context)
 
             drawSymptomAnalysis(analysis: symptomAnalysis, ctx: &ctx, context: context)
 
@@ -664,6 +665,59 @@ enum MedicalReportGenerator {
         return "\(bStr)→\(aStr)\n(\(sign)\(String(format: "%.1f", delta)))"
     }
 
+    // MARK: - Corrélations par segment
+
+    /// Re-calcule les corrélations sur chaque sous-période bornée par un
+    /// changement de plan. Le médecin peut ainsi voir si une corrélation
+    /// observée sur l'ensemble du rapport tient à travers les régimes de
+    /// traitement ou si elle est portée par un seul.
+    ///
+    /// Skip silencieusement si la période n'a connu aucun changement
+    /// (auquel cas la section corrélations classique suffit) ou si aucun
+    /// segment n'atteint le seuil de 5 jours communs nécessaires pour
+    /// Pearson.
+    private static func drawSegmentedCorrelations(
+        input: Input,
+        ctx: inout DrawContext,
+        context: UIGraphicsPDFRendererContext
+    ) {
+        let analysisInput = MedicalReportAnalysis.Input(
+            periodStart: input.periodStart, periodEnd: input.periodEnd,
+            seizures: input.seizures, medications: input.medications,
+            logs: input.logs, moods: input.moods, observations: input.observations,
+            symptoms: input.symptoms
+        )
+        let segments = MedicalReportAnalysis.segmentedCorrelations(
+            analysisInput, revisions: input.medicationRevisions
+        )
+        guard segments.count >= 2 else { return } // pas de segmentation utile
+
+        ctx.ensureSpace(140, context: context)
+        drawSectionTitle("Corrélations recalculées par régime de traitement", ctx: &ctx)
+        drawText("La période est découpée en sous-segments bornés par chaque modification du plan. Les corrélations sont recalculées sur chaque segment de plus de 5 jours. Une corrélation qui change de signe ou s'atténue entre segments suggère qu'elle est portée par un seul régime — utile pour départager un effet du traitement d'un effet d'un autre facteur.",
+                 italic: true, ctx: &ctx)
+        ctx.y += 4
+
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM"
+
+        // Une ligne par segment : Période | n jours | les corrélations
+        // significatives séparées par ' · '.
+        let headers = ["Segment", "Jours", "Corrélations (signal : r, n)"]
+        let widths: [CGFloat] = [110, 50, 355]
+        let rows: [[String]] = segments.map { seg in
+            let label = "Du \(df.string(from: seg.start)) au \(df.string(from: seg.end))"
+            let body = seg.correlations
+                .sorted { abs($0.r) > abs($1.r) }
+                .map { "\($0.signal) : \(String(format: "%+.2f", $0.r)) (\($0.n))" }
+                .joined(separator: " · ")
+            return [label, "\(seg.durationDays)", body.isEmpty ? "—" : body]
+        }
+        drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
+        ctx.y += 8
+    }
+
     private static func drawSynthesis(
         input: Input, overall: MedicalReportAnalysis.OverallStats,
         correlations: [MedicalReportAnalysis.Correlation],
@@ -676,12 +730,23 @@ enum MedicalReportGenerator {
         let planChangesInPeriod = input.medicationRevisions.filter {
             $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd
         }.count
+        let analysisInput = MedicalReportAnalysis.Input(
+            periodStart: input.periodStart, periodEnd: input.periodEnd,
+            seizures: input.seizures, medications: input.medications,
+            logs: input.logs, moods: input.moods, observations: input.observations,
+            symptoms: input.symptoms
+        )
+        let impacts = MedicalReportAnalysis.planChangeImpacts(
+            analysisInput, revisions: input.medicationRevisions
+        )
+        let mostImpactful = MedicalReportAnalysis.mostImpactfulPlanChange(impacts: impacts)
         let text = MedicalReportAnalysis.synthesisText(
             overall: overall,
             correlations: correlations,
             medicationAnalysis: medAnalysis,
             symptomAnalysis: symptomAnalysis,
             planChangesInPeriod: planChangesInPeriod,
+            mostImpactfulChange: mostImpactful,
             childFirstName: input.child?.firstName ?? ""
         )
         drawText(text, italic: false, ctx: &ctx)
