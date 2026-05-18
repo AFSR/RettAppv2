@@ -110,6 +110,14 @@ struct MedicationPlanView: View {
                                 context: modelContext
                             )
                             importSummary = result
+                            // Capture une révision initiale pour chaque med
+                            // importé : sans ça, l'historique de plan ne
+                            // démarrerait qu'à la première modification
+                            // ultérieure côté UI.
+                            MedicationRevision.backfillIfNeeded(in: modelContext)
+                            // Push vers l'autre parent en priorité urgente —
+                            // un plan importé en masse doit propager vite.
+                            sync.scheduleSync(context: modelContext, priority: .urgent)
                             // Replanifie les notifications après l'import
                             Task {
                                 let vm = MedicationViewModel()
@@ -346,7 +354,7 @@ struct MedicationPlanView: View {
             modelContext.delete(medications[i])
         }
         try? modelContext.saveTouching()
-        sync.scheduleSync(context: modelContext)
+        sync.scheduleSync(context: modelContext, priority: .urgent)
         Task {
             await MedicationViewModel().rescheduleAllNotifications(
                 medications: medications,
@@ -362,7 +370,7 @@ struct MedicationPlanView: View {
     private func deleteMedication(_ med: Medication) {
         modelContext.delete(med)
         try? modelContext.saveTouching()
-        sync.scheduleSync(context: modelContext)
+        sync.scheduleSync(context: modelContext, priority: .urgent)
         Task {
             await MedicationViewModel().rescheduleAllNotifications(
                 medications: medications,
@@ -415,7 +423,7 @@ struct MedicationPlanView: View {
         regenerateTodaysPendingLogs(for: target)
 
         try? modelContext.saveTouching()
-        sync.scheduleSync(context: modelContext)
+        sync.scheduleSync(context: modelContext, priority: .urgent)
         let vm = MedicationViewModel()
         await vm.requestNotificationPermissionIfNeeded()
         await vm.rescheduleAllNotifications(medications: medications, childFirstName: profile?.firstName ?? "")
