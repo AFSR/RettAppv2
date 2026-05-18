@@ -70,10 +70,15 @@ enum MedicationLogImporter {
         var skipped = 0
         var errors: [String] = []
 
-        // Index des médicaments par nom pour lookup rapide
+        // Index des médicaments par nom pour lookup rapide. `uniquingKeysWith`
+        // protège contre les doublons potentiels (utilisateur ayant créé
+        // manuellement deux « Likozam », ou import lancé deux fois) — on
+        // garde le premier rencontré, les logs s'attacheront à celui-là.
+        // L'utilisateur peut dédupliquer après coup via Settings.
         let medsByName: [String: Medication] = {
             let fetched = (try? context.fetch(FetchDescriptor<Medication>())) ?? []
-            return Dictionary(uniqueKeysWithValues: fetched.map { ($0.name, $0) })
+            return Dictionary(fetched.map { ($0.name, $0) },
+                              uniquingKeysWith: { first, _ in first })
         }()
 
         for (index, row) in rows.enumerated() {
