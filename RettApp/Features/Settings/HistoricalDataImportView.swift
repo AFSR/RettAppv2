@@ -30,12 +30,20 @@ struct HistoricalDataImportView: View {
     /// on l'aurait perdu au moment de router le résultat.
     @State private var pickerType: PendingImport?
     @State private var showPicker: Bool = false
-    @State private var combinedShareURL: URL?
-    @State private var showCombinedShare = false
-    @State private var combinedExportError: String?
-    @State private var templateShareURL: URL?
-    @State private var showTemplateShare = false
-    @State private var templateError: String?
+    /// État unique pour la feuille de partage (export JSON OU téléchargement
+    /// de modèle CSV). Deux `.sheet(isPresented:)` distincts se gênaient
+    /// mutuellement en iOS 17 ; un seul `.sheet(item:)` indexé par cette
+    /// valeur est fiable.
+    @State private var shareItem: ShareItem?
+    @State private var exportError: String?
+
+    /// Wrapper Identifiable pour le sheet de partage. L'`id` est l'URL —
+    /// SwiftUI rebuild le sheet à chaque nouvelle URL, donc on peut
+    /// enchaîner deux exports différents sans relancer la vue.
+    struct ShareItem: Identifiable {
+        let url: URL
+        var id: URL { url }
+    }
 
     /// Identifie quel handler doit traiter le fichier sélectionné.
     enum PendingImport: Identifiable {
@@ -130,25 +138,18 @@ struct HistoricalDataImportView: View {
         ) { result in
             handleFilePickResult(result)
         }
-        .sheet(isPresented: $showCombinedShare) {
-            if let url = combinedShareURL { ShareSheet(items: [url]) }
-        }
-        .sheet(isPresented: $showTemplateShare) {
-            if let url = templateShareURL { ShareSheet(items: [url]) }
+        // Sheet unique pour partager un fichier (JSON ou CSV template).
+        // `.sheet(item:)` est plus fiable que deux `.sheet(isPresented:)`
+        // empilés — iOS 17 sait clairement quoi présenter via l'identifiant.
+        .sheet(item: $shareItem) { item in
+            ShareSheet(items: [item.url])
         }
         .alert("Export impossible",
-               isPresented: Binding(get: { combinedExportError != nil },
-                                    set: { if !$0 { combinedExportError = nil } })) {
-            Button("OK") { combinedExportError = nil }
+               isPresented: Binding(get: { exportError != nil },
+                                    set: { if !$0 { exportError = nil } })) {
+            Button("OK") { exportError = nil }
         } message: {
-            Text(combinedExportError ?? "")
-        }
-        .alert("Erreur",
-               isPresented: Binding(get: { templateError != nil },
-                                    set: { if !$0 { templateError = nil } })) {
-            Button("OK") { templateError = nil }
-        } message: {
-            Text(templateError ?? "")
+            Text(exportError ?? "")
         }
     }
 
@@ -319,19 +320,18 @@ struct HistoricalDataImportView: View {
     private func exportCombined() {
         do {
             let url = try CombinedBackupService.export(context: modelContext)
-            combinedShareURL = url
-            showCombinedShare = true
+            shareItem = ShareItem(url: url)
         } catch {
-            combinedExportError = error.localizedDescription
+            exportError = error.localizedDescription
         }
     }
 
     private func downloadTemplate(_ builder: () throws -> URL) {
         do {
-            templateShareURL = try builder()
-            showTemplateShare = true
+            let url = try builder()
+            shareItem = ShareItem(url: url)
         } catch {
-            templateError = error.localizedDescription
+            exportError = error.localizedDescription
         }
     }
 
