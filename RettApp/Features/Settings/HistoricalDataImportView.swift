@@ -5,16 +5,31 @@ import UniformTypeIdentifiers
 /// Sous-page Réglages → Données → Importer des données historiques.
 ///
 /// Pattern d'import : **un seul `.fileImporter`** au niveau de la vue
-/// parent, routé via `pendingImport: PendingImport?` pour identifier qui
-/// a demandé. iOS 17 a un bug SwiftUI où plusieurs `.fileImporter` dans
-/// la même hiérarchie deviennent inertes (seul le dernier attaché
-/// présente effectivement). On consolide pour éviter ce piège.
+/// parent. Deux états distincts pour piloter le picker :
+/// - `showPicker: Bool` → binding du `.fileImporter`
+/// - `pickerType: PendingImport?` → quel handler doit traiter le fichier
+///
+/// Les deux sont séparés volontairement parce qu'en iOS 17 SwiftUI
+/// réinitialise le binding `isPresented` du picker AVANT d'appeler le
+/// completion handler. Si on encodait le type dans le binding lui-même,
+/// on perdrait l'info au moment de router le résultat. `pickerType`
+/// survit au callback et n'est remis à zéro qu'à l'intérieur.
+///
+/// Idem côté `.fileImporter` empilés : avoir plusieurs `.fileImporter` au
+/// sein d'une même hiérarchie SwiftUI les rend silencieusement inertes —
+/// d'où l'unique modifier au niveau de la `Form`.
 struct HistoricalDataImportView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [ChildProfile]
 
     @State private var summary: SummaryAlert?
-    @State private var pendingImport: PendingImport?
+    /// Type d'import en cours — persiste à travers le callback du picker.
+    /// Découpé volontairement de `showPicker` (Bool) parce qu'en iOS 17
+    /// SwiftUI réinitialise le binding `isPresented` AVANT d'appeler le
+    /// completion handler. Si on stockait le type dans le binding lui-même,
+    /// on l'aurait perdu au moment de router le résultat.
+    @State private var pickerType: PendingImport?
+    @State private var showPicker: Bool = false
     @State private var combinedShareURL: URL?
     @State private var showCombinedShare = false
     @State private var combinedExportError: String?
@@ -33,19 +48,20 @@ struct HistoricalDataImportView: View {
 
         var id: String { String(describing: self) }
 
-        var allowedTypes: [UTType] {
-            switch self {
-            case .combinedBackup:
-                return [.json]
-            default:
-                var types: [UTType] = [.commaSeparatedText, .plainText, .text]
-                if let xls = UTType("org.openxmlformats.spreadsheetml.sheet") {
-                    types.append(xls)
-                }
-                return types
-            }
-        }
     }
+
+    /// Types autorisés couvrant à la fois CSV et JSON. On utilise une seule
+    /// liste statique passée au `.fileImporter` parce qu'iOS 17 lit
+    /// `allowedContentTypes` à l'installation du modifier, pas à la
+    /// présentation — un calcul dynamique basé sur `pickerType` n'aurait
+    /// pas pris effet.
+    private static let allAllowedTypes: [UTType] = {
+        var types: [UTType] = [.json, .commaSeparatedText, .plainText, .text]
+        if let xls = UTType("org.openxmlformats.spreadsheetml.sheet") {
+            types.append(xls)
+        }
+        return types
+    }()
 
     private var profile: ChildProfile? { profiles.first }
 
@@ -103,15 +119,13 @@ struct HistoricalDataImportView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
-        // UN SEUL fileImporter pour toute la page — consolidé pour éviter
-        // le bug iOS 17 où plusieurs .fileImporter rendaient le picker
-        // silencieusement inerte.
+        // UN SEUL fileImporter pour toute la page (les multiples
+        // .fileImporter empilés sont silencieusement inertes en iOS 17),
+        // avec un Bool de présentation séparé du `pickerType` qui doit
+        // survivre au callback.
         .fileImporter(
-            isPresented: Binding(
-                get: { pendingImport != nil },
-                set: { if !$0 { pendingImport = nil } }
-            ),
-            allowedContentTypes: pendingImport?.allowedTypes ?? [.commaSeparatedText, .plainText, .text],
+            isPresented: $showPicker,
+            allowedContentTypes: Self.allAllowedTypes,
             allowsMultipleSelection: false
         ) { result in
             handleFilePickResult(result)
@@ -165,7 +179,8 @@ struct HistoricalDataImportView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             Button {
-                pendingImport = .combinedBackup
+                pickerType = .combinedBackup
+                showPicker = true
             } label: {
                 Label("Importer une sauvegarde complète (JSON)", systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -206,7 +221,8 @@ struct HistoricalDataImportView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             Button {
-                pendingImport = pendingType
+                pickerType = pendingType
+                showPicker = true
             } label: {
                 Label("Importer un fichier CSV rempli", systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -217,8 +233,11 @@ struct HistoricalDataImportView: View {
     // MARK: - Routing du picker unique
 
     private func handleFilePickResult(_ result: Result<[URL], Error>) {
-        let importer = pendingImport
-        pendingImport = nil
+        // `pickerType` survit volontairement au binding `showPicker`
+        // (réinitialisé par SwiftUI avant le callback). On capture
+        // localement puis on remet à zéro pour la prochaine ouverture.
+        let importer = pickerType
+        pickerType = nil
         switch result {
         case .failure(let error):
             if (error as NSError).code != NSUserCancelledError {
