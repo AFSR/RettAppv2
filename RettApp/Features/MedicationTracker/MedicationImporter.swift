@@ -8,37 +8,33 @@ enum MedicationImporter {
 
     /// Colonnes :
     /// - `name` : nom du médicament (requis)
-    /// - `dose_amount` : dose par défaut (requis)
+    /// - `dose_amount` : dose par défaut (requis, virgule ou point)
     /// - `dose_unit` : `mg` | `ml` | `tablet`
-    /// - `scheduled_hours` : prises séparées par `|`. Chaque prise au format
-    ///   `HH:MM[@dose][/jours][!notif]`. Exemples :
-    ///   - `08:00|20:00` → deux prises, dose par défaut, tous les jours
-    ///   - `08:00@5|20:00@10` → 5 le matin, 10 le soir
-    ///   - `08:00/MTWRF|10:00/SU` → en semaine vs week-end
-    ///   - `08:00!off` → désactive le rappel pour cette prise
-    ///   - jours : `M`=lun, `T`=mar, `W`=mer, `R`=jeu, `F`=ven, `S`=sam, `U`=dim
+    /// - `scheduled_hours` : heures de prise séparées par `|`
+    ///   (ex. `08:00|20:00`). Pour un ad-hoc, laissez vide.
+    ///   Forme avancée par prise : `HH:MM[@dose][/jours][!off]`
+    ///   - `08:00@250/MTWRF` → 250 mg en semaine seulement
+    ///   - `20:30!off` → désactive le rappel pour cette prise
+    ///   - jours : `M`=lun, `T`=mar, `W`=mer, `R`=jeu, `F`=ven, `S`=sam, `U`=dim,
+    ///     `WD`=semaine, `WE`=week-end, `*`=tous
     /// - `kind` : `regular` (défaut) ou `adhoc`
-    /// - `active` : `1`/`0` (optionnel, 1 par défaut)
-    /// - `effective_from` (**optionnel**, format `yyyy-MM-dd` ou ISO 8601) :
-    ///   - vide → cette ligne définit l'état **actuel** du médicament
-    ///   - rempli → cette ligne représente une **révision historique**.
-    ///     Plusieurs lignes avec le même `name` et des `effective_from`
-    ///     différents reconstituent l'historique complet du plan. La
-    ///     dernière révision dans le temps devient automatiquement l'état
-    ///     courant du médicament.
+    /// - `active` : `1` (défaut) ou `0`
+    /// - `effective_from` (**optionnel**, `yyyy-MM-dd` ou ISO 8601) :
+    ///   - vide → état actuel du médicament
+    ///   - daté → révision historique ajoutée à l'historique du plan.
+    ///     Plusieurs lignes pour un même nom reconstruisent l'historique.
     static var templateContent: String {
         let header = CSVParser.joinLine([
             "name", "dose_amount", "dose_unit", "scheduled_hours", "kind", "active", "effective_from"
         ])
         let rows = [
-            // État actuel — pas d'effective_from
+            // Exemple récurrent simple
             CSVParser.joinLine(["Keppra", "500", "mg", "08:00|20:00", "regular", "1", ""]),
-            // Exemple d'historique pour Dépakine — 2 révisions + état courant
-            CSVParser.joinLine(["Dépakine", "250", "mg", "08:00@250/MTWRF|10:00@500/SU", "regular", "1", "2025-01-01"]),
-            CSVParser.joinLine(["Dépakine", "500", "mg", "08:00@500/MTWRF|10:00@500/SU", "regular", "1", "2025-06-15"]),
-            CSVParser.joinLine(["Dépakine", "500", "mg", "08:00@500|20:00@500", "regular", "1", ""]),
-            CSVParser.joinLine(["Mélatonine", "5", "mg", "20:30!off", "regular", "1", ""]),
-            CSVParser.joinLine(["Doliprane (à la demande)", "150", "mg", "", "adhoc", "1", ""]),
+            // Exemple ad-hoc (sans horaires)
+            CSVParser.joinLine(["Doliprane", "150", "mg", "", "adhoc", "1", ""]),
+            // Ligne vide à compléter — laissez l'effective_from vide pour
+            // un état actuel, ou mettez une date passée pour ajouter à
+            // l'historique du plan.
             CSVParser.joinLine(["", "", "", "", "", "", ""])
         ]
         return ([header] + rows).joined(separator: "\n") + "\n"

@@ -77,7 +77,7 @@ struct HistoricalDataImportView: View {
             importSection(
                 title: "Plan médicamenteux",
                 icon: "pills.fill",
-                description: "Médicaments réguliers ou ponctuels (nom, dose, horaires). Colonne facultative effective_from pour horodater une révision et reconstituer l'historique des modifications du plan.",
+                description: "Une ligne par médicament. Colonnes : nom, dose, unité (mg/ml/tablet), horaires (ex. 08:00|20:00), type (regular ou adhoc), actif (1/0). Colonne facultative effective_from au format yyyy-MM-dd pour ajouter une révision historique du plan (utile pour reconstituer les changements de dose passés).",
                 templateBuilder: { try MedicationImporter.writeTemplate() },
                 importer: { content in
                     let r = MedicationImporter.importCSV(contents: content,
