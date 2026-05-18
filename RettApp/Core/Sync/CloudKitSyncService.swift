@@ -683,9 +683,12 @@ final class CloudKitSyncService {
             let after = currentCounts(in: context)
             let deltas = after.diff(against: counts)
             recordRemoteActivity(deltas)
-            if let seizureDelta = deltas[.seizure], seizureDelta > 0 {
-                await notifyRemoteSeizures(count: seizureDelta)
-            }
+            // NB: depuis V1.7, on ne déclenche plus de notif locale ici pour
+            // les nouvelles crises — c'est `CKQuerySubscription` qui s'en
+            // charge directement via APNs (visible même app fermée). Évite
+            // le double-notif quand l'app est au foreground au moment du
+            // push. Le compteur de timeline `recentRemoteActivity` continue
+            // d'être alimenté pour la section Réglages → Activité distante.
         }
     }
 
@@ -722,6 +725,13 @@ final class CloudKitSyncService {
     /// nouvelle(s) crise(s) tout juste apparue(s) côté serveur. Best-effort :
     /// pas de retry, pas de blocage de l'UI si la permission n'est pas
     /// accordée.
+    ///
+    /// **Désactivé en pratique depuis V1.7** : on s'appuie maintenant sur
+    /// `CKQuerySubscription` sur `SeizureEvent` qui déclenche un push APNs
+    /// visible directement via iOS, sans transiter par cette fonction.
+    /// Conservée comme filet de secours pour un éventuel fallback futur
+    /// (rate-limiting APNs, débogage).
+    @available(*, deprecated, message: "Replaced by CKQuerySubscription on SeizureEvent — see ensureSubscriptions().")
     private func notifyRemoteSeizures(count: Int) async {
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
@@ -909,6 +919,8 @@ final class CloudKitSyncService {
         if registered { return }
 
         do {
+            // (1) Subscriptions silencieuses — réveillent l'app pour qu'elle
+            //     pull les changements en arrière-plan, sans bannière.
             try await registerDatabaseSubscription(
                 database: container.privateCloudDatabase,
                 subscriptionID: "afsr.private.changes"
@@ -917,14 +929,59 @@ final class CloudKitSyncService {
                 database: container.sharedCloudDatabase,
                 subscriptionID: "afsr.shared.changes"
             )
+            // (2) Subscriptions visibles ciblées sur `SeizureEvent` : quand
+            //     l'autre parent enregistre ou démarre une crise, CloudKit
+            //     envoie un push APNs avec un `alertBody` → iOS affiche
+            //     immédiatement une bannière, même si l'app est fermée.
+            //     iOS supprime automatiquement la notif chez le créateur du
+            //     record — seul le second parent la voit.
+            try await registerSeizureAlertSubscription(
+                database: container.privateCloudDatabase,
+                subscriptionID: "afsr.private.seizure.alert"
+            )
+            try await registerSeizureAlertSubscription(
+                database: container.sharedCloudDatabase,
+                subscriptionID: "afsr.shared.seizure.alert"
+            )
             UserDefaults.standard.set(true, forKey: Self.subscriptionsRegisteredKey)
-            Self.log.info("CKDatabaseSubscriptions registered")
+            Self.log.info("CKSubscriptions registered (database + seizure alerts)")
         } catch {
             Self.log.error("ensureSubscriptions error: \(error.localizedDescription)")
         }
     }
 
-    private static let subscriptionsRegisteredKey = "afsr.ck.subscriptionsRegistered.v1"
+    /// Crée un `CKQuerySubscription` qui se déclenche à chaque création d'un
+    /// `SeizureEvent` dans la base donnée. Configurée pour livrer une notif
+    /// visible (avec son + badge + alertBody) — le médecin sait qu'une
+    /// crise est en cours sans avoir à ouvrir l'app.
+    private func registerSeizureAlertSubscription(database: CKDatabase, subscriptionID: String) async throws {
+        let id = CKSubscription.ID(subscriptionID)
+        do {
+            _ = try await database.subscription(for: id)
+            return
+        } catch let error as CKError where error.code == .unknownItem {
+            // tomber dans la création
+        }
+
+        let subscription = CKQuerySubscription(
+            recordType: CKRecordType.seizure,
+            predicate: NSPredicate(value: true),
+            subscriptionID: id,
+            options: [.firesOnRecordCreation]
+        )
+        let info = CKSubscription.NotificationInfo()
+        info.alertBody = "⚠️ Une crise vient d'être enregistrée par l'autre parent. Ouvrez RettApp pour voir le détail."
+        info.soundName = "default"
+        info.shouldBadge = true
+        // shouldSendContentAvailable réveille aussi l'app pour qu'elle
+        // pull immédiatement le record et qu'il apparaisse dans le journal
+        // au moment où l'utilisateur tape sur la notif.
+        info.shouldSendContentAvailable = true
+        subscription.notificationInfo = info
+        _ = try await database.save(subscription)
+    }
+
+    private static let subscriptionsRegisteredKey = "afsr.ck.subscriptionsRegistered.v2"
 
     private func registerDatabaseSubscription(database: CKDatabase, subscriptionID: String) async throws {
         let id = CKSubscription.ID(subscriptionID)
