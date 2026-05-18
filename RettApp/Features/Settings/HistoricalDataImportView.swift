@@ -77,14 +77,29 @@ struct HistoricalDataImportView: View {
             importSection(
                 title: "Plan médicamenteux",
                 icon: "pills.fill",
-                description: "Définit les médicaments réguliers ou ponctuels (nom, dose, horaires).",
+                description: "Médicaments réguliers ou ponctuels (nom, dose, horaires). Colonne facultative effective_from pour horodater une révision et reconstituer l'historique des modifications du plan.",
                 templateBuilder: { try MedicationImporter.writeTemplate() },
                 importer: { content in
                     let r = MedicationImporter.importCSV(contents: content,
                                                          childProfile: profile,
                                                          context: modelContext)
                     return SummaryAlert(title: "Import des médicaments",
-                                        body: "\(r.imported) médicament(s) importé(s), \(r.skipped) ligne(s) ignorée(s).",
+                                        body: "\(r.imported) médicament(s) / révision(s) importé(s), \(r.skipped) ligne(s) ignorée(s).",
+                                        details: r.errors.joined(separator: "\n"))
+                }
+            )
+
+            importSection(
+                title: "Prises de médicaments",
+                icon: "checkmark.circle.fill",
+                description: "Historique des prises journalières (heure planifiée, heure réelle, pris ou non, dose, raison pour les ponctuelles). Une ligne par prise.",
+                templateBuilder: { try MedicationLogImporter.writeTemplate() },
+                importer: { content in
+                    let r = MedicationLogImporter.importCSV(contents: content,
+                                                            childProfile: profile,
+                                                            context: modelContext)
+                    return SummaryAlert(title: "Import des prises",
+                                        body: "\(r.imported) prise(s) importée(s), \(r.skipped) ligne(s) ignorée(s).",
                                         details: r.errors.joined(separator: "\n"))
                 }
             )

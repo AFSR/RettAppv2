@@ -19,16 +19,27 @@ enum MedicationImporter {
     ///   - jours : `M`=lun, `T`=mar, `W`=mer, `R`=jeu, `F`=ven, `S`=sam, `U`=dim
     /// - `kind` : `regular` (défaut) ou `adhoc`
     /// - `active` : `1`/`0` (optionnel, 1 par défaut)
+    /// - `effective_from` (**optionnel**, format `yyyy-MM-dd` ou ISO 8601) :
+    ///   - vide → cette ligne définit l'état **actuel** du médicament
+    ///   - rempli → cette ligne représente une **révision historique**.
+    ///     Plusieurs lignes avec le même `name` et des `effective_from`
+    ///     différents reconstituent l'historique complet du plan. La
+    ///     dernière révision dans le temps devient automatiquement l'état
+    ///     courant du médicament.
     static var templateContent: String {
         let header = CSVParser.joinLine([
-            "name", "dose_amount", "dose_unit", "scheduled_hours", "kind", "active"
+            "name", "dose_amount", "dose_unit", "scheduled_hours", "kind", "active", "effective_from"
         ])
         let rows = [
-            CSVParser.joinLine(["Keppra", "500", "mg", "08:00|20:00", "regular", "1"]),
-            CSVParser.joinLine(["Dépakine", "250", "mg", "08:00@250/MTWRF|10:00@500/SU", "regular", "1"]),
-            CSVParser.joinLine(["Mélatonine", "5", "mg", "20:30!off", "regular", "1"]),
-            CSVParser.joinLine(["Doliprane (à la demande)", "150", "mg", "", "adhoc", "1"]),
-            CSVParser.joinLine(["", "", "", "", "", ""])
+            // État actuel — pas d'effective_from
+            CSVParser.joinLine(["Keppra", "500", "mg", "08:00|20:00", "regular", "1", ""]),
+            // Exemple d'historique pour Dépakine — 2 révisions + état courant
+            CSVParser.joinLine(["Dépakine", "250", "mg", "08:00@250/MTWRF|10:00@500/SU", "regular", "1", "2025-01-01"]),
+            CSVParser.joinLine(["Dépakine", "500", "mg", "08:00@500/MTWRF|10:00@500/SU", "regular", "1", "2025-06-15"]),
+            CSVParser.joinLine(["Dépakine", "500", "mg", "08:00@500|20:00@500", "regular", "1", ""]),
+            CSVParser.joinLine(["Mélatonine", "5", "mg", "20:30!off", "regular", "1", ""]),
+            CSVParser.joinLine(["Doliprane (à la demande)", "150", "mg", "", "adhoc", "1", ""]),
+            CSVParser.joinLine(["", "", "", "", "", "", ""])
         ]
         return ([header] + rows).joined(separator: "\n") + "\n"
     }
@@ -54,6 +65,21 @@ enum MedicationImporter {
         var skipped = 0
         var errors: [String] = []
 
+        // (1) Parse toutes les lignes en `ParsedRow` (sans effet de bord),
+        //     puis groupe par nom de médicament. Permet de traiter les
+        //     révisions historiques d'un même med dans l'ordre chronologique.
+        struct ParsedRow {
+            let lineNumber: Int
+            let name: String
+            let dose: Double
+            let unit: DoseUnit
+            let kind: MedicationKind
+            let intakes: [MedicationIntake]
+            let isActive: Bool
+            let effectiveFrom: Date?
+        }
+
+        var parsed: [ParsedRow] = []
         for (index, row) in rows.enumerated() {
             let lineNumber = index + 2
 
@@ -83,19 +109,108 @@ enum MedicationImporter {
             let activeRaw = (row["active"] ?? "1").lowercased()
             let isActive = ["1", "true", "yes", "oui"].contains(activeRaw)
 
-            let hours = intakes.map { HourMinute(hour: $0.hour, minute: $0.minute) }
-            let med = Medication(
+            // Parsing optionnel de l'horodatage de révision.
+            let effectiveFromRaw = (row["effective_from"] ?? "").trimmingCharacters(in: .whitespaces)
+            var effectiveFrom: Date? = nil
+            if !effectiveFromRaw.isEmpty {
+                if let date = CSVDateParser.parse(effectiveFromRaw) {
+                    effectiveFrom = date
+                } else {
+                    skipped += 1
+                    errors.append("Ligne \(lineNumber) : effective_from invalide ('\(effectiveFromRaw)'). Format attendu : yyyy-MM-dd ou ISO 8601.")
+                    continue
+                }
+            }
+
+            parsed.append(ParsedRow(
+                lineNumber: lineNumber,
                 name: name,
-                doseAmount: dose,
-                doseUnit: unit,
-                scheduledHours: hours,
+                dose: dose,
+                unit: unit,
                 kind: kind,
+                intakes: intakes,
                 isActive: isActive,
-                intakes: intakes
+                effectiveFrom: effectiveFrom
+            ))
+        }
+
+        // (2) Group by name (case-sensitive, comme l'UI). Pour chaque
+        //     groupe, on construit (ou retrouve) un `Medication` et on
+        //     insère les révisions horodatées.
+        let groups = Dictionary(grouping: parsed) { $0.name }
+
+        for (name, group) in groups {
+            // Cherche un Medication existant avec ce nom — pour éviter de
+            // dupliquer quand on relance un import.
+            let medQuery = FetchDescriptor<Medication>(
+                predicate: #Predicate { $0.name == name }
             )
-            med.childProfile = childProfile
-            context.insert(med)
+            let existing = (try? context.fetch(medQuery))?.first
+
+            // La ligne « état courant » = celle sans effective_from. S'il y
+            // en a plusieurs (erreur), on garde la dernière vue dans le CSV.
+            // Si aucune n'est marquée « courant », on prend la révision la
+            // plus récente comme état courant.
+            let currentRow: ParsedRow
+            let historyRows: [ParsedRow]
+            if let withoutDate = group.last(where: { $0.effectiveFrom == nil }) {
+                currentRow = withoutDate
+                historyRows = group.filter { $0.effectiveFrom != nil }
+            } else {
+                // Aucune ligne « courante » : la révision la plus récente
+                // sert d'état courant.
+                let sorted = group.sorted { ($0.effectiveFrom ?? .distantPast) < ($1.effectiveFrom ?? .distantPast) }
+                guard let last = sorted.last else { continue }
+                currentRow = last
+                historyRows = sorted
+            }
+
+            let med: Medication
+            if let existing {
+                existing.name = currentRow.name
+                existing.doseAmount = currentRow.dose
+                existing.doseUnit = currentRow.unit
+                existing.kind = currentRow.kind
+                existing.isActive = currentRow.isActive
+                existing.intakes = currentRow.intakes
+                if existing.childProfile == nil { existing.childProfile = childProfile }
+                med = existing
+            } else {
+                let hours = currentRow.intakes.map { HourMinute(hour: $0.hour, minute: $0.minute) }
+                let new = Medication(
+                    name: currentRow.name,
+                    doseAmount: currentRow.dose,
+                    doseUnit: currentRow.unit,
+                    scheduledHours: hours,
+                    kind: currentRow.kind,
+                    isActive: currentRow.isActive,
+                    intakes: currentRow.intakes
+                )
+                new.childProfile = childProfile
+                context.insert(new)
+                med = new
+            }
             imported += 1
+
+            // Insère les révisions historiques pour ce med, triées par date.
+            let sortedHistory = historyRows.sorted {
+                ($0.effectiveFrom ?? .distantPast) < ($1.effectiveFrom ?? .distantPast)
+            }
+            for rev in sortedHistory {
+                guard let date = rev.effectiveFrom else { continue }
+                let revision = MedicationRevision(
+                    medicationId: med.id,
+                    effectiveFrom: date,
+                    name: rev.name,
+                    doseAmount: rev.dose,
+                    doseUnit: rev.unit,
+                    intakes: rev.intakes,
+                    kind: rev.kind,
+                    isActive: rev.isActive,
+                    notifyEnabled: true
+                )
+                context.insert(revision)
+            }
         }
 
         do {
