@@ -595,6 +595,16 @@ struct ChildProfileEditor: View {
             } footer: {
                 Text("Désactiver masque l'onglet de suivi des crises.")
             }
+
+            Section {
+                NavigationLink {
+                    MedicationPlanView()
+                } label: {
+                    Label("Plan médicamenteux", systemImage: "pills.fill")
+                }
+            } footer: {
+                Text("Configure les médicaments réguliers de \(profile.firstName.isEmpty ? "votre enfant" : profile.firstName) : doses, horaires, jours actifs et rappels.")
+            }
         }
         .navigationTitle("Profil de l'enfant")
         .navigationBarTitleDisplayMode(.inline)

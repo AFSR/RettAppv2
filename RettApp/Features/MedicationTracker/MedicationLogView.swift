@@ -9,98 +9,157 @@ struct MedicationPlanView: View {
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
 
-    @State private var showEditor = false
-    @State private var editing: Medication?
+    /// Combine création et édition dans une seule source de vérité pour la
+    /// feuille modale. Avant : deux `@State` séparés (`editing` + `showEditor`)
+    /// — SwiftUI évaluait parfois le `body` du sheet AVANT que `editing` ait
+    /// fini de propager, faisant que le premier tap ouvrait l'éditeur en mode
+    /// création au lieu d'édition, créant un médicament fantôme à chaque
+    /// tentative (cf. issue utilisateur 2025-11 : « la première fois qu'on
+    /// clique sur un medicament du plan, cela ouvre un nouveau medicament »).
+    @State private var editorSheet: EditorSheet?
     @State private var importSummary: MedicationImporter.ImportResult?
+    /// Date d'observation rétroactive — nil = mode édition courant. Quand
+    /// non-nil, le plan affiche l'état tel qu'il était à cette date (lecture
+    /// seule), reconstruit via `MedicationRevision.latest(...)`.
+    @State private var historicalDate: Date?
+    @State private var showDatePicker: Bool = false
+
+    enum EditorSheet: Identifiable {
+        case create
+        case edit(Medication)
+
+        var id: String {
+            switch self {
+            case .create: return "create"
+            case .edit(let m): return m.id.uuidString
+            }
+        }
+    }
 
     private var profile: ChildProfile? { profiles.first }
 
     var body: some View {
         List {
+            if historicalDate != nil {
+                historicalBanner
+            }
             Section {
-                ForEach(medications) { med in
-                    Button {
-                        editing = med
-                        showEditor = true
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(med.name)
-                                    .font(AFSRFont.headline(17))
-                                    .foregroundStyle(.primary)
-                                if med.kind == .adhoc {
-                                    Text("Ponctuel")
-                                        .font(AFSRFont.caption())
-                                        .padding(.horizontal, 6).padding(.vertical, 2)
-                                        .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
-                                        .foregroundStyle(.afsrPurpleAdaptive)
-                                }
-                                Spacer()
-                                if med.kind == .regular && !med.notifyEnabled {
-                                    Image(systemName: "bell.slash.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
-                                        .accessibilityLabel("Notifications désactivées")
-                                }
-                                if !med.isActive {
-                                    Text("Inactif")
-                                        .font(AFSRFont.caption())
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Text(rowSubtitle(for: med))
-                                .font(AFSRFont.caption())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                ForEach(planEntries) { entry in
+                    planRow(entry)
                 }
-                .onDelete(perform: delete)
+                .onDelete(perform: historicalDate == nil ? delete : nil)
             } footer: {
-                Text("Les notifications sont recréées automatiquement après modification.")
+                Text(historicalDate == nil
+                     ? "Les notifications sont recréées automatiquement après modification."
+                     : "Plan en mode historique : lecture seule. Pour modifier, revenez d'abord au plan actuel.")
             }
 
-            Section {
-                Button {
-                    editing = nil
-                    showEditor = true
-                } label: {
-                    Label("Ajouter un médicament", systemImage: "plus.circle.fill")
+            if historicalDate == nil {
+                Section {
+                    Button {
+                        editorSheet = .create
+                    } label: {
+                        Label("Ajouter un médicament", systemImage: "plus.circle.fill")
+                    }
                 }
             }
         }
-        .navigationTitle("Plan médicamenteux")
+        .navigationTitle(historicalDate == nil ? "Plan médicamenteux" : "Plan au passé")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Fermer") { dismiss() }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                CSVImportMenu(
-                    buildTemplate: { try MedicationImporter.writeTemplate() },
-                    onImportedContent: { content in
-                        let result = MedicationImporter.importCSV(
-                            contents: content,
-                            childProfile: profile,
-                            context: modelContext
-                        )
-                        importSummary = result
-                        // Replanifie les notifications après l'import
-                        Task {
-                            let vm = MedicationViewModel()
-                            await vm.requestNotificationPermissionIfNeeded()
-                            await vm.rescheduleAllNotifications(
-                                medications: medications,
-                                childFirstName: profile?.firstName ?? ""
-                            )
+                Menu {
+                    if historicalDate == nil {
+                        Button {
+                            showDatePicker = true
+                        } label: {
+                            Label("Afficher le plan à une date passée", systemImage: "clock.arrow.circlepath")
+                        }
+                    } else {
+                        Button {
+                            historicalDate = nil
+                        } label: {
+                            Label("Revenir au plan actuel", systemImage: "arrow.uturn.backward")
                         }
                     }
-                )
+                    Divider()
+                    Button {
+                        // Placeholder pour ouvrir le menu CSV existant
+                    } label: {
+                        Label("Import / Export CSV", systemImage: "doc.text")
+                    }
+                    .hidden() // visuellement remplacé par le menu CSV séparé ci-dessous
+                } label: {
+                    Image(systemName: historicalDate == nil ? "ellipsis.circle" : "clock.fill")
+                }
+            }
+            // Le menu CSV reste un bouton à part (il porte sa propre UI de
+            // file picker et de sheet de partage) — on ne le mélange pas dans
+            // le Menu principal.
+            ToolbarItem(placement: .topBarTrailing) {
+                if historicalDate == nil {
+                    CSVImportMenu(
+                        buildTemplate: { try MedicationImporter.writeTemplate() },
+                        onImportedContent: { content in
+                            let result = MedicationImporter.importCSV(
+                                contents: content,
+                                childProfile: profile,
+                                context: modelContext
+                            )
+                            importSummary = result
+                            // Capture une révision initiale pour chaque med
+                            // importé : sans ça, l'historique de plan ne
+                            // démarrerait qu'à la première modification
+                            // ultérieure côté UI.
+                            MedicationRevision.backfillIfNeeded(in: modelContext)
+                            // Push vers l'autre parent en priorité urgente —
+                            // un plan importé en masse doit propager vite.
+                            sync.scheduleSync(context: modelContext, priority: .urgent)
+                            // Replanifie les notifications après l'import
+                            Task {
+                                let vm = MedicationViewModel()
+                                await vm.requestNotificationPermissionIfNeeded()
+                                await vm.rescheduleAllNotifications(
+                                    medications: medications,
+                                    childFirstName: profile?.firstName ?? ""
+                                )
+                            }
+                        }
+                    )
+                }
             }
         }
-        .sheet(isPresented: $showEditor) {
+        .sheet(isPresented: $showDatePicker) {
+            DatePickerSheet(
+                initial: historicalDate ?? Date(),
+                onCancel: { showDatePicker = false },
+                onApply: { date in
+                    historicalDate = date
+                    showDatePicker = false
+                }
+            )
+            .presentationDetents([.medium])
+        }
+        .sheet(item: $editorSheet) { item in
             NavigationStack {
-                MedicationEditor(medication: editing) { result in
-                    Task { await save(result) }
+                switch item {
+                case .create:
+                    MedicationEditor(medication: nil) { result in
+                        Task { await save(result, editing: nil) }
+                    }
+                case .edit(let med):
+                    MedicationEditor(
+                        medication: med,
+                        onSave: { result in
+                            Task { await save(result, editing: med) }
+                        },
+                        onDelete: {
+                            deleteMedication(med)
+                        }
+                    )
                 }
             }
         }
@@ -119,6 +178,151 @@ struct MedicationPlanView: View {
             }
             return Text(msg)
         }
+    }
+
+    // MARK: - Plan entries (current vs historical)
+
+    /// Représentation unifiée d'une ligne du plan, alimentée soit par le
+    /// `Medication` courant, soit par sa dernière `MedicationRevision`
+    /// antérieure à la date historique sélectionnée.
+    private struct PlanEntry: Identifiable {
+        let id: UUID
+        let name: String
+        let kind: MedicationKind
+        let doseAmount: Double
+        let doseUnit: DoseUnit
+        let intakes: [MedicationIntake]
+        let isActive: Bool
+        let notifyEnabled: Bool
+        /// Référence au `Medication` éditable. nil en mode historique.
+        let editable: Medication?
+    }
+
+    /// Liste à afficher : médicaments courants OU snapshots historiques
+    /// reconstitués via `MedicationRevision.latest(...)` selon `historicalDate`.
+    private var planEntries: [PlanEntry] {
+        guard let date = historicalDate else {
+            return medications.map { med in
+                PlanEntry(
+                    id: med.id,
+                    name: med.name,
+                    kind: med.kind,
+                    doseAmount: med.doseAmount,
+                    doseUnit: med.doseUnit,
+                    intakes: med.intakes,
+                    isActive: med.isActive,
+                    notifyEnabled: med.notifyEnabled,
+                    editable: med
+                )
+            }
+        }
+        // Mode historique : on exclut les médocs créés APRÈS `date`, et pour
+        // chacun on cherche la dernière révision antérieure à `date`.
+        return medications.compactMap { med in
+            guard med.createdAt <= date else { return nil }
+            let rev = MedicationRevision.latest(medicationId: med.id, before: date, in: modelContext)
+            return PlanEntry(
+                id: med.id,
+                name: rev?.name ?? med.name,
+                kind: rev?.kind ?? med.kind,
+                doseAmount: rev?.doseAmount ?? med.doseAmount,
+                doseUnit: rev?.doseUnit ?? med.doseUnit,
+                intakes: rev?.intakes ?? med.intakes,
+                isActive: rev?.isActive ?? med.isActive,
+                notifyEnabled: rev?.notifyEnabled ?? med.notifyEnabled,
+                editable: nil
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func planRow(_ entry: PlanEntry) -> some View {
+        let content = VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(entry.name)
+                    .font(AFSRFont.headline(17))
+                    .foregroundStyle(.primary)
+                if entry.kind == .adhoc {
+                    Text("Ponctuel")
+                        .font(AFSRFont.caption())
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                }
+                Spacer()
+                if entry.kind == .regular && !entry.notifyEnabled {
+                    Image(systemName: "bell.slash.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Notifications désactivées")
+                }
+                if !entry.isActive {
+                    Text("Inactif")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text(rowSubtitleForEntry(entry))
+                .font(AFSRFont.caption())
+                .foregroundStyle(.secondary)
+        }
+        if let med = entry.editable {
+            Button { editorSheet = .edit(med) } label: { content }
+        } else {
+            content // lecture seule en mode historique
+        }
+    }
+
+    private func rowSubtitleForEntry(_ e: PlanEntry) -> String {
+        switch e.kind {
+        case .adhoc:
+            let dose = MedicationIntake.doseLabel(e.doseAmount, unit: e.doseUnit)
+            return "\(dose) · à la demande"
+        case .regular:
+            if e.intakes.isEmpty {
+                return MedicationIntake.doseLabel(e.doseAmount, unit: e.doseUnit)
+            }
+            let uniformDose = Set(e.intakes.map(\.dose)).count == 1
+            let uniformDays = Set(e.intakes.map(\.weekdaysRaw)).count == 1
+            if uniformDose && uniformDays {
+                let suffix = e.intakes.first?.isEveryDay == false
+                    ? " · \(e.intakes.first?.weekdaySummary ?? "")"
+                    : ""
+                let times = e.intakes.map(\.formattedTime).joined(separator: ", ")
+                return "\(MedicationIntake.doseLabel(e.doseAmount, unit: e.doseUnit)) — \(times)\(suffix)"
+            }
+            return e.intakes.map { intake in
+                let dose = MedicationIntake.doseLabel(intake.dose, unit: e.doseUnit)
+                return "\(intake.formattedTime) \(dose) (\(intake.weekdaySummary))"
+            }.joined(separator: " · ")
+        }
+    }
+
+    @ViewBuilder
+    private var historicalBanner: some View {
+        Section {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "clock.fill")
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Plan reconstitué")
+                        .font(AFSRFont.headline(14))
+                    if let date = historicalDate {
+                        Text(date, format: .dateTime.day().month(.wide).year().hour().minute())
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Button("Plan actuel") {
+                    historicalDate = nil
+                }
+                .font(AFSRFont.caption())
+                .buttonStyle(.bordered)
+            }
+            .padding(.vertical, 4)
+        }
+        .listRowBackground(Color.afsrPurpleAdaptive.opacity(0.08))
     }
 
     private func rowSubtitle(for med: Medication) -> String {
@@ -150,7 +354,7 @@ struct MedicationPlanView: View {
             modelContext.delete(medications[i])
         }
         try? modelContext.saveTouching()
-        sync.scheduleSync(context: modelContext)
+        sync.scheduleSync(context: modelContext, priority: .urgent)
         Task {
             await MedicationViewModel().rescheduleAllNotifications(
                 medications: medications,
@@ -159,8 +363,25 @@ struct MedicationPlanView: View {
         }
     }
 
-    private func save(_ r: MedicationEditor.SaveResult) async {
+    /// Suppression depuis le bouton « Supprimer ce médicament » à l'intérieur
+    /// de l'éditeur. Même comportement que swipe-to-delete : on retire le
+    /// `Medication` (les `MedicationLog` orphelins restent dans le journal
+    /// pour conserver l'historique tel quel) et on resynchronise.
+    private func deleteMedication(_ med: Medication) {
+        modelContext.delete(med)
+        try? modelContext.saveTouching()
+        sync.scheduleSync(context: modelContext, priority: .urgent)
+        Task {
+            await MedicationViewModel().rescheduleAllNotifications(
+                medications: medications,
+                childFirstName: profile?.firstName ?? ""
+            )
+        }
+    }
+
+    private func save(_ r: MedicationEditor.SaveResult, editing: Medication?) async {
         let hours = r.intakes.map { HourMinute(hour: $0.hour, minute: $0.minute) }
+        let target: Medication
         if let editing {
             editing.name = r.name
             editing.doseAmount = r.defaultDose
@@ -171,6 +392,7 @@ struct MedicationPlanView: View {
             // Important : on écrit `intakes` après les autres champs car le
             // setter synchronise `scheduledHours` à partir de la liste finale.
             editing.intakes = r.intakes
+            target = editing
         } else {
             let med = Medication(
                 name: r.name,
@@ -184,12 +406,54 @@ struct MedicationPlanView: View {
             )
             med.childProfile = profile
             modelContext.insert(med)
+            target = med
         }
+        // Versioning : on capture l'état post-modification dans une révision
+        // horodatée. Cette révision sert ensuite à reconstituer le plan tel
+        // qu'il était à une date donnée (cf. MedicationRevision.latest).
+        MedicationRevision.capture(of: target, in: modelContext)
+
+        // Re-génère les logs du jour pour le médicament modifié : les logs
+        // déjà pris sont préservés (l'historique reste fidèle), mais les
+        // logs encore non-pris qui correspondaient au PLAN PRÉCÉDENT sont
+        // supprimés — sinon ils restaient dans le journal en plus des
+        // nouveaux générés par `ensureLogsExist` au prochain affichage,
+        // d'où la confusion utilisateur (« le journal se popule de
+        // doublons »).
+        regenerateTodaysPendingLogs(for: target)
+
         try? modelContext.saveTouching()
-        sync.scheduleSync(context: modelContext)
+        sync.scheduleSync(context: modelContext, priority: .urgent)
         let vm = MedicationViewModel()
         await vm.requestNotificationPermissionIfNeeded()
         await vm.rescheduleAllNotifications(medications: medications, childFirstName: profile?.firstName ?? "")
+        // Régénère les logs du jour à partir du nouveau plan.
+        vm.ensureLogsExist(for: Date(), medications: medications, profile: profile, in: modelContext)
+    }
+
+    /// Supprime les `MedicationLog` du jour (00:00 → 24:00) pour le médicament
+    /// donné qui n'ont PAS encore été marqués comme pris. Les logs déjà pris
+    /// restent : l'historique factuel ne doit jamais être réécrit
+    /// rétroactivement par un changement de plan.
+    private func regenerateTodaysPendingLogs(for med: Medication) {
+        let cal = Calendar.current
+        let day = cal.startOfDay(for: Date())
+        let nextDay = cal.date(byAdding: .day, value: 1, to: day) ?? day
+        let medID = med.id
+        let descriptor = FetchDescriptor<MedicationLog>(
+            predicate: #Predicate { log in
+                log.medicationId == medID
+                && log.scheduledTime >= day
+                && log.scheduledTime < nextDay
+                && log.taken == false
+                && log.isAdHoc == false
+            }
+        )
+        if let pending = try? modelContext.fetch(descriptor) {
+            for log in pending {
+                modelContext.delete(log)
+            }
+        }
     }
 }
 
@@ -199,6 +463,7 @@ struct MedicationEditor: View {
     @Environment(\.dismiss) private var dismiss
     let medication: Medication?
     let onSave: (SaveResult) -> Void
+    var onDelete: (() -> Void)? = nil
 
     @State private var name: String = ""
     @State private var defaultDoseText: String = ""
@@ -209,6 +474,15 @@ struct MedicationEditor: View {
     @State private var kind: MedicationKind = .regular
     @State private var active: Bool = true
     @State private var notifyEnabled: Bool = true
+    @State private var showDeleteConfirm: Bool = false
+    @FocusState private var defaultDoseFocused: Bool
+    /// Flag pour ne charger `medication.intakes` qu'une seule fois quand
+    /// l'éditeur apparaît. `.onAppear` re-fire en iOS 17 après chaque pop
+    /// d'une sub-vue (typiquement la `MedicationIntakeEditorView`) — sans
+    /// ce flag, l'état local serait écrasé par les valeurs *originales* du
+    /// `Medication` qui n'a pas encore été sauvegardé, et toutes les modifs
+    /// faites dans le sous-éditeur disparaîtraient visuellement.
+    @State private var hasLoaded: Bool = false
 
     struct SaveResult {
         let name: String
@@ -237,20 +511,23 @@ struct MedicationEditor: View {
                 TextField("Ex. Keppra, Doliprane, Mélatonine…", text: $name)
                     .autocorrectionDisabled()
                 if !name.isEmpty {
-                    ForEach(CommonFrenchMedications.suggestions(matching: name, limit: 6), id: \.self) { suggestion in
+                    ForEach(MedicationCatalog.suggestions(matching: name, limit: 6)) { suggestion in
                         Button {
-                            if let parenIdx = suggestion.firstIndex(of: "(") {
-                                name = String(suggestion[..<parenIdx]).trimmingCharacters(in: .whitespaces)
-                            } else {
-                                name = suggestion
-                            }
+                            name = suggestion.shortName
                         } label: {
                             HStack {
                                 Image(systemName: "pills.fill")
                                     .foregroundStyle(.afsrPurpleAdaptive)
                                     .font(.system(size: 13))
-                                Text(suggestion)
-                                    .font(AFSRFont.body(14))
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(suggestion.shortName)
+                                        .font(AFSRFont.body(14))
+                                    if let active = suggestion.activeIngredient, !active.isEmpty {
+                                        Text(active)
+                                            .font(AFSRFont.caption())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer()
                             }
                         }
@@ -262,6 +539,7 @@ struct MedicationEditor: View {
                 HStack {
                     TextField("Quantité", text: $defaultDoseText)
                         .keyboardType(.decimalPad)
+                        .focused($defaultDoseFocused)
                     Picker("Unité", selection: $unit) {
                         ForEach(DoseUnit.allCases) { u in
                             Text(u.label).tag(u)
@@ -317,6 +595,32 @@ struct MedicationEditor: View {
                     Text("Interrupteur principal. Vous pouvez aussi désactiver individuellement chaque prise (utile pour les jours pris en charge par l'école ou l'autre parent).")
                 }
             }
+
+            // Bouton explicite de suppression, visible uniquement en mode
+            // édition. Le swipe-to-delete dans la liste reste disponible
+            // depuis le plan, mais l'utilisateur attend aussi une option
+            // claire à l'intérieur du formulaire.
+            if let med = medication {
+                Section {
+                    NavigationLink {
+                        MedicationRevisionHistoryView(medicationId: med.id, medicationName: med.name)
+                    } label: {
+                        Label("Historique des modifications", systemImage: "clock.arrow.circlepath")
+                    }
+                } footer: {
+                    Text("Liste chronologique de toutes les modifications de dosage, horaires et activation depuis la création de ce médicament dans le plan.")
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Supprimer ce médicament", systemImage: "trash")
+                    }
+                } footer: {
+                    Text("Supprime le médicament du plan ainsi que toutes ses prises planifiées et leur historique de validation.")
+                }
+            }
         }
         .navigationTitle(medication == nil ? "Nouveau médicament" : "Modifier")
         .navigationBarTitleDisplayMode(.inline)
@@ -324,6 +628,7 @@ struct MedicationEditor: View {
             ToolbarItem(placement: .cancellationAction) { Button("Annuler") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Enregistrer") {
+                    defaultDoseFocused = false
                     let amount = Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) ?? 0
                     let finalIntakes = kind == .regular ? intakes : []
                     onSave(SaveResult(
@@ -342,8 +647,31 @@ struct MedicationEditor: View {
                           || (kind == .regular && intakes.isEmpty))
                 .bold()
             }
+            // Touche « OK » au-dessus du clavier décimal (sinon l'utilisateur
+            // ne peut pas sortir du champ Dose sans cliquer en-dehors).
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("OK") { defaultDoseFocused = false }.bold()
+            }
         }
-        .onAppear { loadFromMedication() }
+        .onAppear {
+            guard !hasLoaded else { return }
+            loadFromMedication()
+            hasLoaded = true
+        }
+        .confirmationDialog(
+            "Supprimer ce médicament ?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer", role: .destructive) {
+                onDelete?()
+                dismiss()
+            }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Cette action est irréversible. Le médicament et son historique de prises seront effacés.")
+        }
     }
 
     @ViewBuilder
@@ -400,6 +728,52 @@ struct MedicationEditor: View {
         intakes = existing.isEmpty
             ? [MedicationIntake(hour: 8, minute: 0, dose: medication.doseAmount)]
             : existing
+    }
+}
+
+// MARK: - Historical date picker
+
+/// Petite feuille pour choisir la date à laquelle reconstituer le plan
+/// médicamenteux. Plafonnée à `Date()` parce qu'on ne reconstitue pas le
+/// futur (les révisions sont créées au présent).
+private struct DatePickerSheet: View {
+    let initial: Date
+    let onCancel: () -> Void
+    let onApply: (Date) -> Void
+
+    @State private var selected: Date
+
+    init(initial: Date, onCancel: @escaping () -> Void, onApply: @escaping (Date) -> Void) {
+        self.initial = initial
+        self.onCancel = onCancel
+        self.onApply = onApply
+        _selected = State(initialValue: initial)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    DatePicker(
+                        "Date d'observation",
+                        selection: $selected,
+                        in: ...Date(),
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.graphical)
+                } footer: {
+                    Text("Le plan affichera l'état tel qu'il était à cette date — utile pour préparer une consultation médicale ou comparer un dosage actuel à un dosage passé.")
+                }
+            }
+            .navigationTitle("Plan à une date passée")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Annuler", action: onCancel) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Afficher") { onApply(selected) }.bold()
+                }
+            }
+        }
     }
 }
 

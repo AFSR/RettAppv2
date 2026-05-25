@@ -16,7 +16,8 @@ struct RettAppApp: App {
             MedicationLog.self,
             MoodEntry.self,
             DailyObservation.self,
-            SymptomEvent.self
+            SymptomEvent.self,
+            MedicationRevision.self
         ])
 
         // On utilise un nom de fichier versionné — ça évite tout résidu d'un store
@@ -73,7 +74,8 @@ struct RettAppApp: App {
             ("MedicationLog", MedicationLog.self),
             ("MoodEntry", MoodEntry.self),
             ("DailyObservation", DailyObservation.self),
-            ("SymptomEvent", SymptomEvent.self)
+            ("SymptomEvent", SymptomEvent.self),
+            ("MedicationRevision", MedicationRevision.self)
         ]
         for (name, model) in models {
             let s = Schema([model])
@@ -104,6 +106,10 @@ struct RettAppApp: App {
                     // Enregistre les CKDatabaseSubscription pour recevoir des
                     // pushes silencieux quand l'autre parent modifie un record.
                     await syncService.ensureSubscriptions()
+                    // Backfill des révisions de plan médicamenteux pour les
+                    // utilisateurs qui passent depuis une version antérieure
+                    // à cette feature. Idempotent.
+                    MedicationRevision.backfillIfNeeded(in: sharedModelContainer.mainContext)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.cloudKitRemoteChange)) { _ in
                     Task { @MainActor in

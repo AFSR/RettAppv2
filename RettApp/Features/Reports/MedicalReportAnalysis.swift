@@ -247,6 +247,177 @@ enum MedicalReportAnalysis {
         var direction: String { r >= 0 ? "positive" : "négative" }
     }
 
+    // MARK: - Plan change impact (versioning awareness)
+
+    /// Statistiques agrégées sur une fenêtre temporelle, utilisées pour
+    /// comparer la situation avant/après un changement du plan médicamenteux.
+    struct PlanChangeWindowStats {
+        let days: Int
+        let seizuresPerDay: Double
+        let seizureMinutesPerDay: Double
+        let moodAvg: Double?       // 1-5
+        let sleepRatingAvg: Double? // 1-5
+    }
+
+    /// Une révision du plan tombée pendant la période, accompagnée des
+    /// stats des fenêtres avant/après. Permet au médecin de juger si la
+    /// modification semble avoir eu un effet sur les signaux (crises,
+    /// humeur, sommeil) — sans inférer de causalité.
+    struct PlanChangeImpact {
+        let revisionDate: Date
+        let medicationName: String
+        let before: PlanChangeWindowStats
+        let after: PlanChangeWindowStats
+
+        var seizureDeltaPerDay: Double { after.seizuresPerDay - before.seizuresPerDay }
+        var seizureDurationDeltaMinPerDay: Double {
+            after.seizureMinutesPerDay - before.seizureMinutesPerDay
+        }
+    }
+
+    /// Pour chaque révision tombée dans la période, calcule les stats des
+    /// fenêtres `windowDays` avant et après. Les fenêtres sont tronquées par
+    /// les bornes de la période — pas de fuite en dehors du rapport.
+    static func planChangeImpacts(
+        _ input: Input,
+        revisions: [MedicationRevision],
+        windowDays: Int = 14,
+        calendar: Calendar = .current
+    ) -> [PlanChangeImpact] {
+        let inPeriod = revisions
+            .filter { $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd }
+            .sorted { $0.effectiveFrom < $1.effectiveFrom }
+
+        return inPeriod.map { rev in
+            let date = rev.effectiveFrom
+            let beforeStart = calendar.date(byAdding: .day, value: -windowDays, to: date) ?? date
+            let beforeBounded = max(beforeStart, input.periodStart)
+            let afterEnd = calendar.date(byAdding: .day, value: windowDays, to: date) ?? date
+            let afterBounded = min(afterEnd, input.periodEnd)
+
+            let before = windowStats(from: beforeBounded, to: date, in: input)
+            let after = windowStats(from: date, to: afterBounded, in: input)
+
+            return PlanChangeImpact(
+                revisionDate: date,
+                medicationName: rev.name,
+                before: before,
+                after: after
+            )
+        }
+    }
+
+    private static func windowStats(
+        from start: Date,
+        to end: Date,
+        in input: Input
+    ) -> PlanChangeWindowStats {
+        let interval = end.timeIntervalSince(start)
+        let days = max(1, Int((interval / 86_400).rounded()))
+        let seizures = input.seizures.filter { $0.startTime >= start && $0.startTime < end }
+        let moods = input.moods.filter { $0.timestamp >= start && $0.timestamp < end }
+        let obs = input.observations.filter { $0.dayStart >= start && $0.dayStart < end }
+
+        let seizureCount = seizures.count
+        let seizureMin = Double(seizures.reduce(0) { $0 + $1.durationSeconds }) / 60.0
+        let moodAvg: Double? = moods.isEmpty ? nil
+            : moods.map { Double($0.levelRaw) }.reduce(0, +) / Double(moods.count)
+        let sleepRatings = obs.compactMap { o -> Int? in
+            o.nightSleepRatingRaw > 0 ? o.nightSleepRatingRaw : nil
+        }
+        let sleepAvg: Double? = sleepRatings.isEmpty ? nil
+            : Double(sleepRatings.reduce(0, +)) / Double(sleepRatings.count)
+
+        return PlanChangeWindowStats(
+            days: days,
+            seizuresPerDay: Double(seizureCount) / Double(days),
+            seizureMinutesPerDay: seizureMin / Double(days),
+            moodAvg: moodAvg,
+            sleepRatingAvg: sleepAvg
+        )
+    }
+
+    // MARK: - Corrélations par segment (plan-conscient)
+
+    /// Un segment temporel borné par deux dates où le plan médicamenteux est
+    /// supposé stable (aucune révision tombée entre les deux bornes). Sert à
+    /// recalculer les corrélations sans mélanger plusieurs régimes.
+    struct PlanSegment: Identifiable {
+        let id = UUID()
+        let start: Date
+        let end: Date
+        /// Corrélations calculées sur ce segment uniquement. Vide si moins
+        /// de 5 jours communs avec un signal renseigné.
+        let correlations: [Correlation]
+        /// Nombre de jours du segment (utile pour l'UI).
+        var durationDays: Int {
+            max(1, Int((end.timeIntervalSince(start) / 86_400).rounded()))
+        }
+    }
+
+    /// Découpe la période en sous-segments bornés par chaque révision du
+    /// plan, et recalcule les corrélations sur chacun. Permet au médecin de
+    /// vérifier si une corrélation tient à travers les régimes de traitement
+    /// ou si elle est portée par un seul.
+    ///
+    /// Skip les segments < 5 jours (impossible de calculer Pearson) ou
+    /// sans aucune corrélation exploitable.
+    static func segmentedCorrelations(
+        _ input: Input,
+        revisions: [MedicationRevision],
+        calendar: Calendar = .current
+    ) -> [PlanSegment] {
+        let cutoffs = revisions
+            .map { $0.effectiveFrom }
+            .filter { $0 > input.periodStart && $0 < input.periodEnd }
+            .sorted()
+
+        // Boucle sur les segments [start, cutoff], [cutoff, next], …, [last, end]
+        var bounds: [Date] = [input.periodStart] + cutoffs + [input.periodEnd]
+        bounds = Array(Set(bounds)).sorted() // dédoublonne au cas où deux modifs au même instant
+
+        var segments: [PlanSegment] = []
+        for i in 0..<(bounds.count - 1) {
+            let start = bounds[i]
+            let end = bounds[i + 1]
+            let segmentDays = end.timeIntervalSince(start) / 86_400
+            if segmentDays < 5 { continue }
+
+            // On reconstruit un Input limité au segment puis on appelle la
+            // pipeline existante. Léger côté perf (filtre Array) — la
+            // période d'un rapport est plafonnée à ~3 mois max.
+            let scoped = Input(
+                periodStart: start,
+                periodEnd: end,
+                seizures: input.seizures.filter { $0.startTime >= start && $0.startTime < end },
+                medications: input.medications,
+                logs: input.logs.filter { $0.scheduledTime >= start && $0.scheduledTime < end },
+                moods: input.moods.filter { $0.timestamp >= start && $0.timestamp < end },
+                observations: input.observations.filter { $0.dayStart >= start && $0.dayStart < end },
+                symptoms: input.symptoms.filter { $0.timestamp >= start && $0.timestamp < end }
+            )
+            let signals = dailySignals(scoped, calendar: calendar)
+            let corrs = correlations(from: signals)
+            if !corrs.isEmpty {
+                segments.append(PlanSegment(start: start, end: end, correlations: corrs))
+            }
+        }
+        return segments
+    }
+
+    /// Renvoie la révision dont le passage est associé à la baisse la plus
+    /// marquée du nombre journalier de crises (delta absolu, peu importe le
+    /// sens — utile pour les régressions aussi). nil quand aucune révision
+    /// n'a un delta significatif (> 0,1 crise/jour de différence).
+    static func mostImpactfulPlanChange(
+        impacts: [PlanChangeImpact],
+        minAbsDelta: Double = 0.1
+    ) -> PlanChangeImpact? {
+        return impacts
+            .filter { abs($0.seizureDeltaPerDay) >= minAbsDelta }
+            .max(by: { abs($0.seizureDeltaPerDay) < abs($1.seizureDeltaPerDay) })
+    }
+
     /// Calcule les corrélations à partir des signaux journaliers.
     /// Garde uniquement les jours où les deux signaux sont présents.
     static func correlations(from signals: [DailySignals]) -> [Correlation] {
@@ -443,6 +614,8 @@ enum MedicalReportAnalysis {
         correlations: [Correlation],
         medicationAnalysis: MedicationAnalysis,
         symptomAnalysis: SymptomAnalysis,
+        planChangesInPeriod: Int = 0,
+        mostImpactfulChange: PlanChangeImpact? = nil,
         childFirstName: String
     ) -> String {
         let name = childFirstName.isEmpty ? "L'enfant" : childFirstName
@@ -480,6 +653,20 @@ enum MedicalReportAnalysis {
             lines.append("\(totalAdHocIntakes) prise\(totalAdHocIntakes > 1 ? "s" : "") ponctuelle\(totalAdHocIntakes > 1 ? "s" : "") (à la demande) sur la période — principalement \(topName).")
         } else if medicationAnalysis.adhocMedicationsCount > 0 {
             lines.append("\(medicationAnalysis.adhocMedicationsCount) traitement à la demande référencé mais aucune prise enregistrée sur la période.")
+        }
+        if planChangesInPeriod > 0 {
+            lines.append("Plan médicamenteux modifié \(planChangesInPeriod) fois sur la période (voir section « Évolutions du plan médicamenteux » ci-dessus pour le détail des changements).")
+        }
+        if let impact = mostImpactfulChange {
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "fr_FR")
+            df.dateFormat = "dd/MM/yyyy"
+            let delta = impact.seizureDeltaPerDay
+            let beforeRate = String(format: "%.2f", impact.before.seizuresPerDay)
+            let afterRate = String(format: "%.2f", impact.after.seizuresPerDay)
+            let direction = delta < 0 ? "baisse" : "hausse"
+            let absDelta = String(format: "%.2f", abs(delta))
+            lines.append("La modification la plus marquée du plan est celle du \(impact.medicationName) le \(df.string(from: impact.revisionDate)) : \(direction) du nombre journalier de crises de \(beforeRate) à \(afterRate) (delta de \(absDelta) crise/jour sur la fenêtre 14 jours avant/après). Corrélation observationnelle, à interpréter dans le contexte clinique complet.")
         }
 
         // Humeur

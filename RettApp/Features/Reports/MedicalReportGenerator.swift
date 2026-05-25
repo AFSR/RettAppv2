@@ -36,7 +36,39 @@ enum MedicalReportGenerator {
         let moods: [MoodEntry]
         let observations: [DailyObservation]
         let symptoms: [SymptomEvent]
+        /// Toutes les révisions de plan ≤ periodEnd. La section « Évolutions »
+        /// filtre celles qui tombent dans la période + utilise les
+        /// précédentes comme référence pour calculer les diffs.
+        let medicationRevisions: [MedicationRevision]
         let parentNotes: String
+
+        // Convenience init pour préserver les appels existants qui n'ont pas
+        // encore migré vers la nouvelle API.
+        init(
+            child: ChildProfile?,
+            periodStart: Date,
+            periodEnd: Date,
+            seizures: [SeizureEvent],
+            medications: [Medication],
+            logs: [MedicationLog],
+            moods: [MoodEntry],
+            observations: [DailyObservation],
+            symptoms: [SymptomEvent],
+            medicationRevisions: [MedicationRevision] = [],
+            parentNotes: String
+        ) {
+            self.child = child
+            self.periodStart = periodStart
+            self.periodEnd = periodEnd
+            self.seizures = seizures
+            self.medications = medications
+            self.logs = logs
+            self.moods = moods
+            self.observations = observations
+            self.symptoms = symptoms
+            self.medicationRevisions = medicationRevisions
+            self.parentNotes = parentNotes
+        }
     }
 
     @MainActor
@@ -86,9 +118,17 @@ enum MedicalReportGenerator {
             drawStatsSection(input: input, overall: overall, granularity: granularity,
                              buckets: seizureBuckets, ctx: &ctx, context: context)
 
-            drawCorrelationsSection(correlations: correlations, ctx: &ctx, context: context)
+            drawCorrelationsSection(
+                correlations: correlations,
+                planChangesInPeriod: planChangesCount(input: input),
+                ctx: &ctx, context: context
+            )
 
             drawMedicationAnalysis(analysis: medAnalysis, ctx: &ctx, context: context)
+
+            drawMedicationEvolutions(input: input, ctx: &ctx, context: context)
+            drawPlanChangeImpacts(input: input, ctx: &ctx, context: context)
+            drawSegmentedCorrelations(input: input, ctx: &ctx, context: context)
 
             drawSymptomAnalysis(analysis: symptomAnalysis, ctx: &ctx, context: context)
 
@@ -311,11 +351,24 @@ enum MedicalReportGenerator {
 
     private static func drawCorrelationsSection(
         correlations: [MedicalReportAnalysis.Correlation],
+        planChangesInPeriod: Int,
         ctx: inout DrawContext, context: UIGraphicsPDFRendererContext
     ) {
         ctx.ensureSpace(120, context: context)
         drawSectionTitle("Étude exploratoire des corrélations", ctx: &ctx)
         drawText("Coefficients de Pearson (r ∈ [-1, +1]) calculés sur les jours où les deux signaux sont renseignés. Force interprétée selon les conventions usuelles : faible (|r|<0,2), modérée (0,2-0,4), forte (>0,4). Ces résultats sont exploratoires et ne démontrent pas de causalité.", italic: true, ctx: &ctx)
+
+        // Avertissement quand le plan a été modifié sur la période — une
+        // corrélation calculée sur un plan instable peut refléter un effet
+        // d'un changement de dose plutôt qu'un signal continu.
+        if planChangesInPeriod > 0 {
+            let strength = planChangesInPeriod >= 3
+                ? "Attention : "
+                : "À noter : "
+            let warning = "\(strength)le plan médicamenteux a été modifié \(planChangesInPeriod) fois pendant la période. Les corrélations ci-dessous mélangent plusieurs régimes de traitement — un signal peut être l'effet d'un changement de dose. La section « Impact estimé des changements du plan » plus bas isole les fenêtres avant / après chaque modification."
+            drawText(warning, italic: true, ctx: &ctx)
+            ctx.y += 2
+        }
 
         if correlations.isEmpty {
             drawText("Données insuffisantes : il faut au moins 5 jours communs avec un signal renseigné pour calculer une corrélation.", italic: true, ctx: &ctx)
@@ -413,6 +466,258 @@ enum MedicalReportGenerator {
         }
     }
 
+    // MARK: - Évolutions du plan médicamenteux (Phase 2 versioning)
+
+    /// Liste chronologique des changements appliqués au plan pendant la
+    /// période. Pour chaque révision dans `[periodStart, periodEnd]`, on
+    /// compare au snapshot antérieur (dernière révision avant ou la création
+    /// du Medication) et on affiche un diff lisible — nouveau médicament,
+    /// changement de dose, modification des horaires, activation/désactivation,
+    /// activation/désactivation des rappels.
+    private static func drawMedicationEvolutions(
+        input: Input,
+        ctx: inout DrawContext,
+        context: UIGraphicsPDFRendererContext
+    ) {
+        let allRevs = input.medicationRevisions.sorted { $0.effectiveFrom < $1.effectiveFrom }
+        // Révisions dont la date d'effet tombe dans la période
+        let inPeriod = allRevs.filter {
+            $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd
+        }
+        guard !inPeriod.isEmpty else { return }
+
+        ctx.ensureSpace(120, context: context)
+        drawSectionTitle("Évolutions du plan médicamenteux", ctx: &ctx)
+        drawText("Modifications appliquées au plan pendant la période. Les changements de dosage doivent être lus en regard de la section adhérence ci-dessus.",
+                 italic: true, ctx: &ctx)
+        ctx.y += 4
+
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM/yyyy HH:mm"
+
+        // Pour chaque révision en période, identifier la précédente (sinon
+        // c'est la création du médicament : tout est « nouveau »).
+        struct Diff {
+            let date: Date
+            let medName: String
+            let bullets: [String]
+        }
+        var diffs: [Diff] = []
+        for rev in inPeriod {
+            let revID = rev.medicationId
+            let revDate = rev.effectiveFrom
+            let previous = allRevs.last { other in
+                other.medicationId == revID && other.effectiveFrom < revDate
+            }
+            let bullets = diffBullets(previous: previous, current: rev)
+            if !bullets.isEmpty {
+                diffs.append(Diff(date: rev.effectiveFrom, medName: rev.name, bullets: bullets))
+            }
+        }
+        guard !diffs.isEmpty else { return }
+
+        let headers = ["Date", "Médicament", "Modifications"]
+        let widths: [CGFloat] = [95, 110, 310]
+        let rows: [[String]] = diffs.map { diff in
+            let body = "• " + diff.bullets.joined(separator: "\n• ")
+            return [df.string(from: diff.date), diff.medName, body]
+        }
+        drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
+        ctx.y += 8
+    }
+
+    /// Calcule un diff lisible entre deux snapshots de médicament. Renvoie
+    /// `[]` si aucun changement notable.
+    private static func diffBullets(
+        previous: MedicationRevision?,
+        current: MedicationRevision
+    ) -> [String] {
+        // Pas de précédent → c'est la première révision (= création du
+        // médicament dans le plan).
+        guard let previous else {
+            var bullets = ["Ajout au plan"]
+            let dose = MedicationIntake.doseLabel(current.doseAmount, unit: current.doseUnit)
+            bullets.append("Dose initiale : \(dose)")
+            if current.kind == .regular {
+                bullets.append("\(current.intakes.count) prise(s) planifiée(s) par jour")
+            }
+            if !current.isActive { bullets.append("Statut : inactif") }
+            return bullets
+        }
+
+        var bullets: [String] = []
+        if previous.name != current.name {
+            bullets.append("Renommé : « \(previous.name) » → « \(current.name) »")
+        }
+        if previous.doseAmount != current.doseAmount || previous.doseUnitRaw != current.doseUnitRaw {
+            let was = MedicationIntake.doseLabel(previous.doseAmount, unit: previous.doseUnit)
+            let now = MedicationIntake.doseLabel(current.doseAmount, unit: current.doseUnit)
+            bullets.append("Dose : \(was) → \(now)")
+        }
+        if previous.kind != current.kind {
+            bullets.append("Type : \(previous.kind.label) → \(current.kind.label)")
+        }
+        if previous.isActive != current.isActive {
+            bullets.append(current.isActive ? "Réactivé" : "Désactivé (mis en pause)")
+        }
+        if previous.notifyEnabled != current.notifyEnabled {
+            bullets.append(current.notifyEnabled ? "Notifications réactivées" : "Notifications désactivées")
+        }
+        // Comparaison des intakes (heures + dose par prise)
+        let prevKey = previous.intakes.map { "\($0.hour):\($0.minute)@\($0.dose)/\($0.weekdaysRaw)" }.sorted()
+        let currKey = current.intakes.map  { "\($0.hour):\($0.minute)@\($0.dose)/\($0.weekdaysRaw)" }.sorted()
+        if prevKey != currKey {
+            let prevSummary = summarizeIntakes(previous.intakes, unit: previous.doseUnit)
+            let currSummary = summarizeIntakes(current.intakes,  unit: current.doseUnit)
+            bullets.append("Prises : \(prevSummary) → \(currSummary)")
+        }
+        return bullets
+    }
+
+    private static func summarizeIntakes(_ intakes: [MedicationIntake], unit: DoseUnit) -> String {
+        guard !intakes.isEmpty else { return "aucune" }
+        return intakes
+            .sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+            .map { intake -> String in
+                let dose = MedicationIntake.doseLabel(intake.dose, unit: unit)
+                let days = intake.isEveryDay ? "" : " [\(intake.weekdaySummary)]"
+                return "\(intake.formattedTime) \(dose)\(days)"
+            }
+            .joined(separator: ", ")
+    }
+
+    // MARK: - Impact des changements du plan (corrélation-conscient)
+
+    /// Compte le nombre de révisions tombées dans la période — utilisé
+    /// pour l'avertissement dans la section corrélations.
+    private static func planChangesCount(input: Input) -> Int {
+        input.medicationRevisions.filter {
+            $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd
+        }.count
+    }
+
+    /// Pour chaque modification du plan, présente côte à côte les stats des
+    /// 14 jours avant et après. Aide le médecin à juger l'effet visible
+    /// d'un changement de dose, sans inférer de causalité — c'est une
+    /// observation, pas un test statistique.
+    private static func drawPlanChangeImpacts(
+        input: Input,
+        ctx: inout DrawContext,
+        context: UIGraphicsPDFRendererContext
+    ) {
+        let analysisInput = MedicalReportAnalysis.Input(
+            periodStart: input.periodStart, periodEnd: input.periodEnd,
+            seizures: input.seizures, medications: input.medications,
+            logs: input.logs, moods: input.moods, observations: input.observations,
+            symptoms: input.symptoms
+        )
+        let impacts = MedicalReportAnalysis.planChangeImpacts(
+            analysisInput,
+            revisions: input.medicationRevisions
+        )
+        guard !impacts.isEmpty else { return }
+
+        ctx.ensureSpace(140, context: context)
+        drawSectionTitle("Impact estimé des changements du plan", ctx: &ctx)
+        drawText("Pour chaque modification, comparaison des 14 jours avant et après. Les fenêtres sont tronquées par les bornes de la période. Lecture purement observationnelle : une amélioration ne prouve pas la causalité du changement (effet placebo, évolution spontanée, saisonnalité, autres facteurs).",
+                 italic: true, ctx: &ctx)
+        ctx.y += 4
+
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM/yyyy"
+
+        let headers = ["Date", "Médicament", "Crises/j", "Min/j", "Humeur", "Sommeil"]
+        let widths: [CGFloat] = [70, 110, 75, 75, 80, 80]
+        let rows: [[String]] = impacts.map { imp in
+            [
+                df.string(from: imp.revisionDate),
+                imp.medicationName,
+                deltaCell(before: imp.before.seizuresPerDay, after: imp.after.seizuresPerDay, fmt: "%.1f"),
+                deltaCell(before: imp.before.seizureMinutesPerDay, after: imp.after.seizureMinutesPerDay, fmt: "%.1f"),
+                optionalDeltaCell(before: imp.before.moodAvg, after: imp.after.moodAvg),
+                optionalDeltaCell(before: imp.before.sleepRatingAvg, after: imp.after.sleepRatingAvg)
+            ]
+        }
+        drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
+        ctx.y += 4
+        drawText("Légende : « avant → après » avec écart entre parenthèses. Crises/j et Min/j = moyennes journalières sur la fenêtre. Humeur et Sommeil = échelles 1-5 (vide si non renseigné dans la fenêtre).",
+                 italic: true, ctx: &ctx)
+        ctx.y += 8
+    }
+
+    private static func deltaCell(before: Double, after: Double, fmt: String) -> String {
+        let b = String(format: fmt, before)
+        let a = String(format: fmt, after)
+        let delta = after - before
+        let sign = delta >= 0 ? "+" : ""
+        let d = String(format: fmt, delta)
+        return "\(b)→\(a)\n(\(sign)\(d))"
+    }
+
+    private static func optionalDeltaCell(before: Double?, after: Double?) -> String {
+        guard let b = before, let a = after else { return "—" }
+        let bStr = String(format: "%.1f", b)
+        let aStr = String(format: "%.1f", a)
+        let delta = a - b
+        let sign = delta >= 0 ? "+" : ""
+        return "\(bStr)→\(aStr)\n(\(sign)\(String(format: "%.1f", delta)))"
+    }
+
+    // MARK: - Corrélations par segment
+
+    /// Re-calcule les corrélations sur chaque sous-période bornée par un
+    /// changement de plan. Le médecin peut ainsi voir si une corrélation
+    /// observée sur l'ensemble du rapport tient à travers les régimes de
+    /// traitement ou si elle est portée par un seul.
+    ///
+    /// Skip silencieusement si la période n'a connu aucun changement
+    /// (auquel cas la section corrélations classique suffit) ou si aucun
+    /// segment n'atteint le seuil de 5 jours communs nécessaires pour
+    /// Pearson.
+    private static func drawSegmentedCorrelations(
+        input: Input,
+        ctx: inout DrawContext,
+        context: UIGraphicsPDFRendererContext
+    ) {
+        let analysisInput = MedicalReportAnalysis.Input(
+            periodStart: input.periodStart, periodEnd: input.periodEnd,
+            seizures: input.seizures, medications: input.medications,
+            logs: input.logs, moods: input.moods, observations: input.observations,
+            symptoms: input.symptoms
+        )
+        let segments = MedicalReportAnalysis.segmentedCorrelations(
+            analysisInput, revisions: input.medicationRevisions
+        )
+        guard segments.count >= 2 else { return } // pas de segmentation utile
+
+        ctx.ensureSpace(140, context: context)
+        drawSectionTitle("Corrélations recalculées par régime de traitement", ctx: &ctx)
+        drawText("La période est découpée en sous-segments bornés par chaque modification du plan. Les corrélations sont recalculées sur chaque segment de plus de 5 jours. Une corrélation qui change de signe ou s'atténue entre segments suggère qu'elle est portée par un seul régime — utile pour départager un effet du traitement d'un effet d'un autre facteur.",
+                 italic: true, ctx: &ctx)
+        ctx.y += 4
+
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM"
+
+        // Une ligne par segment : Période | n jours | les corrélations
+        // significatives séparées par ' · '.
+        let headers = ["Segment", "Jours", "Corrélations (signal : r, n)"]
+        let widths: [CGFloat] = [110, 50, 355]
+        let rows: [[String]] = segments.map { seg in
+            let label = "Du \(df.string(from: seg.start)) au \(df.string(from: seg.end))"
+            let body = seg.correlations
+                .sorted { abs($0.r) > abs($1.r) }
+                .map { "\($0.signal) : \(String(format: "%+.2f", $0.r)) (\($0.n))" }
+                .joined(separator: " · ")
+            return [label, "\(seg.durationDays)", body.isEmpty ? "—" : body]
+        }
+        drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
+        ctx.y += 8
+    }
+
     private static func drawSynthesis(
         input: Input, overall: MedicalReportAnalysis.OverallStats,
         correlations: [MedicalReportAnalysis.Correlation],
@@ -422,11 +727,26 @@ enum MedicalReportGenerator {
     ) {
         ctx.ensureSpace(80, context: context)
         drawSectionTitle("Synthèse pour le médecin", ctx: &ctx)
+        let planChangesInPeriod = input.medicationRevisions.filter {
+            $0.effectiveFrom >= input.periodStart && $0.effectiveFrom <= input.periodEnd
+        }.count
+        let analysisInput = MedicalReportAnalysis.Input(
+            periodStart: input.periodStart, periodEnd: input.periodEnd,
+            seizures: input.seizures, medications: input.medications,
+            logs: input.logs, moods: input.moods, observations: input.observations,
+            symptoms: input.symptoms
+        )
+        let impacts = MedicalReportAnalysis.planChangeImpacts(
+            analysisInput, revisions: input.medicationRevisions
+        )
+        let mostImpactful = MedicalReportAnalysis.mostImpactfulPlanChange(impacts: impacts)
         let text = MedicalReportAnalysis.synthesisText(
             overall: overall,
             correlations: correlations,
             medicationAnalysis: medAnalysis,
             symptomAnalysis: symptomAnalysis,
+            planChangesInPeriod: planChangesInPeriod,
+            mostImpactfulChange: mostImpactful,
             childFirstName: input.child?.firstName ?? ""
         )
         drawText(text, italic: false, ctx: &ctx)
