@@ -84,6 +84,34 @@ final class CloudSyncTests: XCTestCase {
         XCTAssertFalse(SyncConflictResolver.shouldAcceptIncoming(local: local, incoming: incoming))
     }
 
+    // MARK: - MedicationLog.stableId
+
+    /// Régression : deux parents doivent générer le MÊME UUID pour une même
+    /// prise planifiée `(medicationId, scheduledTime)`. Sans cette propriété,
+    /// CloudKit crée deux records concurrents et l'app affiche des doublons
+    /// dont un reste « non pris » côté second parent.
+    func test_medicationLog_stableId_isDeterministic() {
+        let medId = UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!
+        let time = Date(timeIntervalSince1970: 1_700_000_000)
+        let a = MedicationLog.stableId(medicationId: medId, scheduledTime: time)
+        let b = MedicationLog.stableId(medicationId: medId, scheduledTime: time)
+        XCTAssertEqual(a, b)
+    }
+
+    func test_medicationLog_stableId_isDiscriminantByMedAndTime() {
+        let medA = UUID()
+        let medB = UUID()
+        let t1 = Date(timeIntervalSince1970: 1_700_000_000)
+        let t2 = Date(timeIntervalSince1970: 1_700_003_600) // +1h
+
+        let idA_t1 = MedicationLog.stableId(medicationId: medA, scheduledTime: t1)
+        let idA_t2 = MedicationLog.stableId(medicationId: medA, scheduledTime: t2)
+        let idB_t1 = MedicationLog.stableId(medicationId: medB, scheduledTime: t1)
+
+        XCTAssertNotEqual(idA_t1, idA_t2, "un décalage horaire doit changer l'id")
+        XCTAssertNotEqual(idA_t1, idB_t1, "un autre médicament doit changer l'id")
+    }
+
     func test_conflictResolver_acceptsOnExactEquality() {
         // Égalité : on accepte. C'est sûr (les deux côtés convergent vers
         // la même valeur) et ça évite un freeze visible quand deux clients

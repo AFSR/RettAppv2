@@ -29,7 +29,13 @@ final class MedicationViewModel {
                 guard let scheduled = cal.date(from: comps) else { continue }
                 let key = "\(med.id)|\(Int(scheduled.timeIntervalSince1970))"
                 if !existingKeys.contains(key) {
+                    // UUID déterministe → l'autre parent, en régénérant ses propres
+                    // logs du jour à partir du plan partagé, produira le MÊME id.
+                    // CloudKit fait alors un merge (record.upsert) au lieu d'ajouter
+                    // un doublon.
+                    let stableId = MedicationLog.stableId(medicationId: med.id, scheduledTime: scheduled)
                     let log = MedicationLog(
+                        id: stableId,
                         medicationId: med.id,
                         medicationName: med.name,
                         scheduledTime: scheduled,

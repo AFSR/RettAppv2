@@ -156,7 +156,13 @@ enum MedicationLogImporter {
                 existing.adhocReason = adhocReason
                 existing.childProfileId = childProfile?.id
             } else {
+                // Prises planifiées : UUID déterministe pour converger avec l'autre parent
+                // via CloudKit. Prises ad-hoc : UUID aléatoire (pas d'équivalent côté second parent).
+                let newId: UUID = isAdHoc
+                    ? UUID()
+                    : MedicationLog.stableId(medicationId: medicationId, scheduledTime: scheduledTime)
                 let log = MedicationLog(
+                    id: newId,
                     medicationId: medicationId,
                     medicationName: resolvedName,
                     scheduledTime: scheduledTime,

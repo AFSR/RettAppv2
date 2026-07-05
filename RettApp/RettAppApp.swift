@@ -110,6 +110,10 @@ struct RettAppApp: App {
                     // utilisateurs qui passent depuis une version antérieure
                     // à cette feature. Idempotent.
                     MedicationRevision.backfillIfNeeded(in: sharedModelContainer.mainContext)
+                    // Migration one-shot : collapse les logs planifiés en doublon
+                    // (UUID aléatoire par parent avant fix de la sync). Prend
+                    // effet une seule fois puis reste no-op.
+                    MedicationLog.dedupeScheduledLogsIfNeeded(in: sharedModelContainer.mainContext)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.cloudKitRemoteChange)) { _ in
                     Task { @MainActor in
