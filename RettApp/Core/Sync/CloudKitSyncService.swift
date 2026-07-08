@@ -676,6 +676,24 @@ final class CloudKitSyncService {
         lastSyncedAt = Date()
         Self.log.info("pullChanges OK : \(totalUpserted) upsertés, \(totalDeleted) supprimés")
 
+        // Dedup post-pull : quand l'autre parent pousse un log planifié dont le
+        // recordName (UUID) ne correspond pas au nôtre (cas hérité pré-stableId),
+        // le fallback dans `MedicationLog.upsert(from:)` fusionne dans le local.
+        // Si pour une raison quelconque un doublon s'est glissé quand même
+        // (pull concurrent avec `ensureLogsExist` par exemple), on collapse ici.
+        // Les CKRecord des « perdants » sont ensuite supprimés côté serveur.
+        do {
+            let merged = try MedicationLog.dedupeScheduledLogs(in: context)
+            if merged > 0 {
+                let losers = MedicationLog.drainDeletedIdsFromDedup()
+                if !losers.isEmpty {
+                    await deleteLogRecordsInCloudKit(losers)
+                }
+            }
+        } catch {
+            Self.log.error("dedup post-pull KO : \(error.localizedDescription)")
+        }
+
         // Détection des changements distants. On limite aux pulls côté
         // participant (scope == .shared) pour ne pas notifier pour ses propres
         // pushes qui reviendraient via l'echo serveur côté propriétaire.
@@ -869,6 +887,33 @@ final class CloudKitSyncService {
 
     private func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
         Self.deleteLocal(recordID: recordID, in: context)
+    }
+
+    /// Supprime côté serveur les CKRecord des logs « perdants » fusionnés par la
+    /// dedup post-pull. Sans cette étape, chaque prochain pull ré-injecterait
+    /// le doublon dans SwiftData et la boucle continuerait indéfiniment.
+    /// Best-effort : les échecs sont loggés sans casser le flux principal, la
+    /// dedup finit toujours par converger côté local.
+    func deleteLogRecordsInCloudKit(_ ids: [UUID]) async {
+        guard !ids.isEmpty else { return }
+        let database = appropriateDatabase()
+        // On liste toutes les zones dispo pour être robuste au cas participant/owner.
+        let zoneIDs: [CKRecordZone.ID]
+        if appropriateDatabaseScope() == .private {
+            guard let zone = try? await ensureZone() else { return }
+            zoneIDs = [zone.zoneID]
+        } else {
+            zoneIDs = (try? await database.allRecordZones().map { $0.zoneID }) ?? []
+        }
+        for zoneID in zoneIDs {
+            let recordIDs = ids.map { CKRecord.ID(recordName: $0.uuidString, zoneID: zoneID) }
+            do {
+                _ = try await database.modifyRecords(saving: [], deleting: recordIDs)
+                Self.log.info("Supprimé \(recordIDs.count) CKRecord(s) MedicationLog perdants dans \(zoneID.zoneName)")
+            } catch {
+                Self.log.error("deleteLogRecordsInCloudKit KO (\(zoneID.zoneName)) : \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Acceptance
