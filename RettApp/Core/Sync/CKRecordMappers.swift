@@ -236,11 +236,6 @@ extension MedicationLog {
 
     static func upsert(from record: CKRecord, in context: ModelContext) {
         guard let id = UUID(uuidString: record.recordID.recordName) else { return }
-        let existing = (try? context.fetch(FetchDescriptor<MedicationLog>(
-            predicate: #Predicate { $0.id == id }
-        )).first)
-
-        guard shouldApplyIncoming(local: existing, record: record) else { return }
 
         guard let medIDStr = record["medicationId"] as? String,
               let medicationId = UUID(uuidString: medIDStr) else { return }
@@ -254,6 +249,29 @@ extension MedicationLog {
         let adhocReason = record["adhocReason"] as? String ?? ""
         let childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
         let unit = DoseUnit(rawValue: doseUnitRaw) ?? .mg
+
+        // 1) Lookup principal par UUID de record.
+        var existing = (try? context.fetch(FetchDescriptor<MedicationLog>(
+            predicate: #Predicate { $0.id == id }
+        )).first)
+
+        // 2) Fallback : pour les prises planifiées (non-adhoc), on peut avoir
+        // un log local avec un UUID différent — soit hérité d'avant la fix de
+        // sync (UUID aléatoire par device), soit créé localement pendant que
+        // l'autre parent poussait déjà sa version. On matche alors par la
+        // clé métier `(medicationId, scheduledTime)` pour fusionner au lieu
+        // de dupliquer.
+        if existing == nil && !isAdHoc {
+            existing = (try? context.fetch(FetchDescriptor<MedicationLog>(
+                predicate: #Predicate<MedicationLog> { log in
+                    log.medicationId == medicationId
+                    && log.scheduledTime == scheduledTime
+                    && log.isAdHoc == false
+                }
+            )).first)
+        }
+
+        guard shouldApplyIncoming(local: existing, record: record) else { return }
 
         let lastModified = record.incomingLastModified ?? Date()
         if let existing {

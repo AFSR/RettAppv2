@@ -90,29 +90,32 @@ final class MedicationLog {
 
 extension MedicationLog: SyncTimestamped {}
 
-// MARK: - Dedup migration
+// MARK: - Dedup
 
 extension MedicationLog {
-    private static let dedupFlagKey = "afsr.medlog.stableIdDedupDone.v1"
+    /// UUIDs des « perdants » supprimés par le dernier passage de dedup —
+    /// utile pour supprimer les CKRecord correspondants dans CloudKit et
+    /// éviter qu'ils ne réapparaissent au prochain pull.
+    private static let deletedIdsBufferKey = "afsr.medlog.dedup.deletedIds.v1"
 
-    /// Migration one-shot : les versions antérieures créaient les prises planifiées
-    /// avec un UUID aléatoire côté chaque parent, ce qui produisait des doublons
-    /// via CloudKit. On collapse ici les prises qui partagent
-    /// `(medicationId, scheduledTime, isAdHoc=false)` en gardant la plus significative
-    /// (« prise » l'emporte, puis la plus récemment modifiée), puis on la ré-idente
-    /// avec l'UUID déterministe pour converger avec l'autre parent au prochain sync.
+    /// Version « premier lancement » : appelée depuis `RettAppApp.task`, elle
+    /// est aussi idempotente pour être ré-appelée à volonté après un pull.
+    /// L'ancien flag one-shot est retiré : les doublons peuvent réapparaître à
+    /// tout moment via un pull CloudKit d'un log hérité (UUID aléatoire), donc
+    /// on veut pouvoir re-collapser.
     static func dedupeScheduledLogsIfNeeded(in context: ModelContext) {
-        let defaults = UserDefaults.standard
-        if defaults.bool(forKey: dedupFlagKey) { return }
         do {
             try dedupeScheduledLogs(in: context)
-            defaults.set(true, forKey: dedupFlagKey)
         } catch {
             print("⚠️ dedupeScheduledLogs a échoué : \(error.localizedDescription)")
         }
     }
 
-    static func dedupeScheduledLogs(in context: ModelContext) throws {
+    /// Collapse les prises planifiées qui partagent `(medicationId, scheduledTime)`
+    /// en gardant celle qui compte le plus (prise > récente > id lexicographique).
+    /// Retourne le nombre de logs fusionnés.
+    @discardableResult
+    static func dedupeScheduledLogs(in context: ModelContext) throws -> Int {
         let descriptor = FetchDescriptor<MedicationLog>(
             predicate: #Predicate { $0.isAdHoc == false }
         )
@@ -124,6 +127,7 @@ extension MedicationLog {
             groups[key, default: []].append(log)
         }
         var merged = 0
+        var deletedIds: [String] = []
         for (_, logs) in groups where logs.count > 1 {
             // On garde le survivant : priorité à « pris », puis au plus récent
             // (lastModifiedAt), puis au plus vieux id (déterministe).
@@ -133,13 +137,33 @@ extension MedicationLog {
                 return lhs.id.uuidString < rhs.id.uuidString
             }!
             for log in logs where log !== survivor {
+                deletedIds.append(log.id.uuidString)
                 context.delete(log)
                 merged += 1
             }
         }
         if merged > 0 {
             try context.save()
+            appendDeletedIdsBuffer(deletedIds)
             print("ℹ️ MedicationLog dedup : \(merged) doublon(s) fusionné(s)")
         }
+        return merged
+    }
+
+    /// Récupère et vide la liste des UUIDs supprimés par les derniers passages
+    /// de dedup, pour que le service de sync les supprime aussi côté CloudKit.
+    static func drainDeletedIdsFromDedup() -> [UUID] {
+        let defaults = UserDefaults.standard
+        let raw = (defaults.stringArray(forKey: deletedIdsBufferKey) ?? [])
+        defaults.removeObject(forKey: deletedIdsBufferKey)
+        return raw.compactMap(UUID.init(uuidString:))
+    }
+
+    private static func appendDeletedIdsBuffer(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        let defaults = UserDefaults.standard
+        var current = defaults.stringArray(forKey: deletedIdsBufferKey) ?? []
+        current.append(contentsOf: ids)
+        defaults.set(current, forKey: deletedIdsBufferKey)
     }
 }
