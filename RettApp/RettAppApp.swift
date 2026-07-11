@@ -6,6 +6,7 @@ import CloudKit
 struct RettAppApp: App {
     @UIApplicationDelegateAdaptor(RettAppDelegate.self) private var appDelegate
     @State private var syncService = CloudKitSyncService()
+    @State private var updateService = UpdateAvailabilityService()
     @Environment(\.scenePhase) private var scenePhase
 
     var sharedModelContainer: ModelContainer = {
@@ -99,6 +100,7 @@ struct RettAppApp: App {
         WindowGroup {
             RootView()
                 .environment(syncService)
+                .environment(updateService)
                 .tint(.afsrPurpleAdaptive)
                 .task {
                     await syncService.refreshAccountStatus()
@@ -114,6 +116,9 @@ struct RettAppApp: App {
                     // (UUID aléatoire par parent avant fix de la sync). Prend
                     // effet une seule fois puis reste no-op.
                     MedicationLog.dedupeScheduledLogsIfNeeded(in: sharedModelContainer.mainContext)
+                    // Bandeau de mise à jour App Store. Cache 24 h, silencieux
+                    // en cas d'échec réseau — jamais bloquant.
+                    await updateService.checkForUpdate()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.cloudKitRemoteChange)) { _ in
                     Task { @MainActor in
@@ -141,6 +146,7 @@ struct RettAppApp: App {
                             await syncService.refreshAccountStatus()
                             await syncService.refreshShareStatus()
                             await syncService.quickPull(context: sharedModelContainer.mainContext)
+                            await updateService.checkForUpdate()
                         }
                     }
                 }

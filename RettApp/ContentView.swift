@@ -4,6 +4,7 @@ import SwiftData
 struct ContentView: View {
     @Query private var profiles: [ChildProfile]
     @Query(sort: \SeizureEvent.startTime, order: .reverse) private var seizures: [SeizureEvent]
+    @Environment(UpdateAvailabilityService.self) private var updateService
 
     private var currentMonthSeizureCount: Int {
         let cal = Calendar.current
@@ -36,10 +37,23 @@ struct ContentView: View {
             NavigationStack { SettingsView() }
                 .tabItem { Label("Réglages", systemImage: "gear") }
         }
+        // Bandeau de mise à jour en overlay : reste au-dessus du TabView, sans
+        // pousser le contenu vers le bas, et animé pour ne pas surgir sèchement.
+        .safeAreaInset(edge: .top) {
+            if let info = updateService.availableUpdate {
+                UpdateAvailabilityBanner(info: info) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        updateService.dismissCurrentBanner()
+                    }
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: updateService.availableUpdate)
     }
 }
 
 #Preview {
     ContentView()
         .modelContainer(PreviewData.container)
+        .environment(UpdateAvailabilityService())
 }
