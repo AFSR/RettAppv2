@@ -48,21 +48,23 @@ struct DashboardView: View {
     /// et les colonnes de dates se décaleraient de plusieurs pixels.
     private static let yAxisLabelWidth: CGFloat = 44
 
-    /// Paramètres calculés pour l'axe des durées de crises : un pas
-    /// « humain » (5 s / 15 s / 1 min / 2 min / 5 min / 10 min) déduit de
-    /// la valeur max observée sur la période, plus une borne supérieure
-    /// arrondie à ce pas pour que Chart place des ticks propres.
+    /// Ticks explicites [Int] pour l'axe des durées de crises + borne
+    /// supérieure du domaine.
     ///
-    /// Historique : la première version passait directement une `[Int]`
-    /// à `AxisMarks(values:)`. Swift Charts tolérait la signature mais ne
-    /// respectait pas systématiquement le tableau (fallback silencieux
-    /// sur `.automatic` → 16 labels qui s'empilent). `.stride(by:)` est
-    /// l'API officielle pour "ticks régulièrement espacés", elle est
-    /// fiable dans tous les cas.
-    private var durationYAxisConfig: (step: Int, upperBound: Int) {
+    /// Historique de la mécanique :
+    ///  - `AxisMarks(values: .automatic(desiredCount: 4))` → Chart ignorait
+    ///    le desiredCount et générait ~16 labels qui s'empilaient.
+    ///  - `AxisMarks(values: .stride(by: Double(60)))` → même problème,
+    ///    Charts ne respectait pas non plus le stride sur un axe Int.
+    ///  - `AxisMarks(values: [Int])` avec `chartYScale(domain: 0...upperBound)` :
+    ///    même pattern que l'observance qui marche → **fiable**. On l'utilise.
+    ///
+    /// Pas humains : 5 s / 15 s / 1 min / 2 min / 5 min / 10 min selon la
+    /// valeur max observée.
+    private var durationYAxisTicks: (ticks: [Int], upperBound: Int) {
         let buckets = viewModel.buckets(for: seizures)
         let maxV = buckets.map(\.totalDurationSec).max() ?? 0
-        guard maxV > 0 else { return (60, 60) }
+        guard maxV > 0 else { return ([0, 60], 60) }
         let step: Int
         switch maxV {
         case ..<30:     step = 5
@@ -72,9 +74,9 @@ struct DashboardView: View {
         case ..<3600:   step = 300          // 5 min
         default:        step = 600          // 10 min
         }
-        // Arrondi au step supérieur pour que le dernier tick soit au-dessus du max.
         let upperBound = ((maxV + step - 1) / step) * step
-        return (step, upperBound)
+        let ticks = Array(stride(from: 0, through: upperBound, by: step))
+        return (ticks, upperBound)
     }
 
     /// Format compact pour les labels d'axe : « 45s », « 3min », « 3m30 ».
@@ -275,15 +277,14 @@ struct DashboardView: View {
                     }
                 }
                 .frame(height: 180)
-                .chartYScale(domain: 0...max(durationYAxisConfig.upperBound, durationYAxisConfig.step))
+                .chartYScale(domain: 0...durationYAxisTicks.upperBound)
                 .chartYAxis {
-                    // Cast en Double obligatoire : `stride(by:)` a une surcharge
-                    // `Calendar.Component` qui prend la main sur `Int` sans le cast.
-                    // `value.as(Int.self)` marche parce que la valeur plottée
-                    // reste un Int (totalDurationSec) même si le stride est Double.
-                    AxisMarks(position: .leading, values: .stride(by: Double(durationYAxisConfig.step))) { value in
-                        let intValue: Int? = value.as(Int.self) ?? value.as(Double.self).map { Int($0.rounded()) }
-                        if let v = intValue {
+                    // Même pattern que l'observance (values: [Int] littéral +
+                    // chartYScale ClosedRange<Int>) : Charts honore ce format
+                    // de manière déterministe. Ne PAS passer par `.stride(by:)`
+                    // ou `.automatic(desiredCount:)` ici — ça fallback silencieusement.
+                    AxisMarks(position: .leading, values: durationYAxisTicks.ticks) { value in
+                        if let v = value.as(Int.self) {
                             AxisValueLabel {
                                 Text(Self.formatDurationAxis(v))
                                     .font(.caption2)
