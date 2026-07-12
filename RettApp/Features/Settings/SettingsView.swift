@@ -363,9 +363,21 @@ struct SettingsView: View {
     }
 
     private func eraseAll() {
+        // Cascade SwiftData ne populate PAS deletedModelsArray (cf. audit
+        // sync). On énumère tous les types pour que chaque delete parvienne
+        // au PendingWriteStore et soit propagé à CloudKit.
+        let moods = (try? modelContext.fetch(FetchDescriptor<MoodEntry>())) ?? []
+        let observations = (try? modelContext.fetch(FetchDescriptor<DailyObservation>())) ?? []
+        let symptoms = (try? modelContext.fetch(FetchDescriptor<SymptomEvent>())) ?? []
+        let revisions = (try? modelContext.fetch(FetchDescriptor<MedicationRevision>())) ?? []
+
         for e in seizures { modelContext.delete(e) }
         for l in logs { modelContext.delete(l) }
+        for r in revisions { modelContext.delete(r) }
         for m in medications { modelContext.delete(m) }
+        for mood in moods { modelContext.delete(mood) }
+        for o in observations { modelContext.delete(o) }
+        for s in symptoms { modelContext.delete(s) }
         for p in profiles { modelContext.delete(p) }
         try? modelContext.saveTouching()
         Task { await MedicationViewModel().cancelAllNotifications() }

@@ -43,14 +43,24 @@ actor SyncGate {
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             waiters.append(cont)
         }
-        isBusy = true
+        // IMPORTANT — pattern baton-passing :
+        // Quand on est resumé, la porte NOUS a été passée directement par
+        // `release()` (isBusy est resté true entre-temps). Ne PAS refaire
+        // `isBusy = true` — ne rien faire ici. Sans ce pattern, un nouveau
+        // caller pourrait voir isBusy=false entre le point où release() le
+        // remet à false et le point où le waiter reset, et deux `run { ... }`
+        // s'exécuteraient concurremment sur le même ModelContext.
     }
 
     private func release() {
-        isBusy = false
-        if !waiters.isEmpty {
-            let next = waiters.removeFirst()
+        if let next = waiters.first {
+            // On passe le baton : la porte reste "occupée" et on réveille le
+            // suivant. Il n'y a JAMAIS de fenêtre où isBusy=false alors qu'un
+            // waiter est en train de se réveiller.
+            waiters.removeFirst()
             next.resume()
+        } else {
+            isBusy = false
         }
     }
 }
