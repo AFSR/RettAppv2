@@ -277,8 +277,13 @@ struct DashboardView: View {
                 .frame(height: 180)
                 .chartYScale(domain: 0...max(durationYAxisConfig.upperBound, durationYAxisConfig.step))
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .stride(by: durationYAxisConfig.step)) { value in
-                        if let v = value.as(Int.self) {
+                    // Cast en Double obligatoire : `stride(by:)` a une surcharge
+                    // `Calendar.Component` qui prend la main sur `Int` sans le cast.
+                    // `value.as(Int.self)` marche parce que la valeur plottée
+                    // reste un Int (totalDurationSec) même si le stride est Double.
+                    AxisMarks(position: .leading, values: .stride(by: Double(durationYAxisConfig.step))) { value in
+                        let intValue: Int? = value.as(Int.self) ?? value.as(Double.self).map { Int($0.rounded()) }
+                        if let v = intValue {
                             AxisValueLabel {
                                 Text(Self.formatDurationAxis(v))
                                     .font(.caption2)
