@@ -40,6 +40,14 @@ struct DashboardView: View {
         }
     }
 
+    /// Largeur fixe imposée à chaque `AxisValueLabel` côté ordonnée pour que
+    /// TOUS les graphiques partagent la même marge gauche de plot area →
+    /// l'axe des dates s'aligne verticalement d'un chart à l'autre. Sans ça,
+    /// « Humeur » (emoji), « Observance » (« 100 % ») et « Durée totale »
+    /// (« 1 min 30 s ») auraient chacun une largeur d'étiquette différente,
+    /// et les colonnes de dates se décaleraient de plusieurs pixels.
+    private static let yAxisLabelWidth: CGFloat = 44
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -173,7 +181,16 @@ struct DashboardView: View {
                 }
                 .frame(height: 180)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4))
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                        if let v = value.as(Int.self) {
+                            AxisValueLabel {
+                                Text("\(v)")
+                                    .font(.caption2)
+                                    .frame(width: Self.yAxisLabelWidth, alignment: .trailing)
+                            }
+                        }
+                        AxisGridLine()
+                    }
                 }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 6)) { value in
@@ -222,7 +239,11 @@ struct DashboardView: View {
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                         if let v = value.as(Int.self) {
-                            AxisValueLabel { Text(formatDuration(v)).font(.caption2) }
+                            AxisValueLabel {
+                                Text(formatDuration(v))
+                                    .font(.caption2)
+                                    .frame(width: Self.yAxisLabelWidth, alignment: .trailing)
+                            }
                         }
                         AxisGridLine()
                     }
@@ -275,7 +296,11 @@ struct DashboardView: View {
                 .chartYAxis {
                     AxisMarks(position: .leading, values: [1, 2, 3, 4, 5]) { value in
                         if let v = value.as(Int.self), let m = MoodLevel(rawValue: v) {
-                            AxisValueLabel { Text(m.emoji).font(.caption2) }
+                            AxisValueLabel {
+                                Text(m.emoji)
+                                    .font(.caption2)
+                                    .frame(width: Self.yAxisLabelWidth, alignment: .trailing)
+                            }
                         }
                         AxisGridLine()
                     }
@@ -322,7 +347,11 @@ struct DashboardView: View {
                 .chartYAxis {
                     AxisMarks(position: .leading, values: [0, 50, 100]) { value in
                         if let v = value.as(Int.self) {
-                            AxisValueLabel { Text("\(v) %").font(.caption2) }
+                            AxisValueLabel {
+                                Text("\(v) %")
+                                    .font(.caption2)
+                                    .frame(width: Self.yAxisLabelWidth, alignment: .trailing)
+                            }
                         }
                         AxisGridLine()
                     }
@@ -434,7 +463,16 @@ struct DashboardView: View {
                 }
                 .frame(height: 110)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 3))
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                        if let v = value.as(Int.self) {
+                            AxisValueLabel {
+                                Text("\(v)")
+                                    .font(.caption2)
+                                    .frame(width: Self.yAxisLabelWidth, alignment: .trailing)
+                            }
+                        }
+                        AxisGridLine()
+                    }
                 }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) { value in
@@ -480,7 +518,16 @@ struct DashboardView: View {
                     .frame(height: 110)
                     .chartYScale(domain: 1...5)
                     .chartYAxis {
-                        AxisMarks(position: .leading, values: [1, 3, 5])
+                        AxisMarks(position: .leading, values: [1, 3, 5]) { value in
+                            if let v = value.as(Int.self) {
+                                AxisValueLabel {
+                                    Text("\(v)")
+                                        .font(.caption2)
+                                        .frame(width: Self.yAxisLabelWidth, alignment: .trailing)
+                                }
+                            }
+                            AxisGridLine()
+                        }
                     }
                     .chartXAxis {
                         AxisMarks(values: .automatic(desiredCount: 5)) { value in
@@ -534,6 +581,17 @@ struct DashboardView: View {
 
     /// Overlay transparent : capture le tap n'importe où dans le chart, projette
     /// la position X en Date, met à jour le binding partagé.
+    ///
+    /// **Bug historique** : le `DragGesture(minimumDistance: 0)` d'origine
+    /// interceptait chaque touchDown, donc quand l'utilisateur glissait
+    /// verticalement pour scroller le Bilan, le doigt qui passait sur un
+    /// graphique en changeait le curseur → date « d'origine » ressentie
+    /// comme changée. Deux garde-fous ici :
+    ///   1. `minimumDistance: 10` laisse le `ScrollView` gagner le tir
+    ///      pour tout mouvement de faible amplitude.
+    ///   2. On ne met à jour le curseur que si le mouvement est majoritairement
+    ///      horizontal (`|Δx| > |Δy|`). Un scroll vertical qui aurait franchi
+    ///      les 10 pt est laissé au ScrollView.
     @ViewBuilder
     private func crosshairCapture(proxy: ChartProxy) -> some View {
         GeometryReader { geo in
@@ -547,8 +605,9 @@ struct DashboardView: View {
                         }
                 )
                 .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    DragGesture(minimumDistance: 10, coordinateSpace: .local)
                         .onChanged { value in
+                            guard abs(value.translation.width) > abs(value.translation.height) else { return }
                             updateCrosshair(at: value.location, proxy: proxy, geo: geo)
                         }
                 )

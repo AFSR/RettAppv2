@@ -57,9 +57,10 @@ struct ConfigurationSubView: View {
                 Text("Notifications")
             }
 
-            // Section Apple Santé uniquement en mode enfant — la lecture
-            // des données Santé n'a de sens que sur l'iPhone de l'enfant.
-            // Sur l'iPhone d'un parent, l'app n'utilise pas HealthKit.
+            // Section Apple Santé : présente dans les deux modes pour que
+            // l'utilisateur sache toujours où trouver l'intégration, mais
+            // adaptée selon qu'on est en mode parent (info seulement) ou
+            // enfant (accès complet aux données).
             if DeviceRoleStore.shared.role == .child {
                 Section {
                     HStack {
@@ -70,19 +71,33 @@ struct ConfigurationSubView: View {
                             .font(AFSRFont.caption())
                             .foregroundStyle(.secondary)
                     }
+                    NavigationLink {
+                        HealthDataView()
+                    } label: {
+                        Label("Données Apple Santé", systemImage: "heart.text.square")
+                    }
                     Button {
                         if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
                     } label: {
                         Label("Ouvrir l'app Santé", systemImage: "arrow.up.forward.app")
                     }
                 } header: {
-                    Text("Santé")
+                    Text("Apple Santé")
                 } footer: {
-                    Text("Choix des types de données et activation depuis Réglages → Données Apple Santé.")
+                    Text("Sommeil, hydratation, repas, rythme cardiaque, activité — lus depuis l'iPhone de l'enfant. L'autorisation est demandée à l'ouverture de l'écran Données Apple Santé.")
+                }
+            } else {
+                Section {
+                    Label("Réservé au mode enfant", systemImage: "heart.slash")
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Apple Santé")
+                } footer: {
+                    Text("L'intégration HealthKit n'a de sens que sur l'iPhone effectivement utilisé par l'enfant. Basculez cet iPhone en mode enfant depuis Réglages → Cet appareil pour l'activer.")
                 }
             }
         }
-        .navigationTitle("Configuration")
+        .navigationTitle("Suivi & rappels")
         .navigationBarTitleDisplayMode(.inline)
         .task { await refresh() }
         .sheet(isPresented: $showMedicationPlan) {
@@ -197,7 +212,7 @@ struct DataSubView: View {
                 Text("Action irréversible : profil, crises, médicaments, prises, humeurs et observations seront supprimés.")
             }
         }
-        .navigationTitle("Données")
+        .navigationTitle("Mes données")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showShareSheet) {
             if let url = exportURL { ShareSheet(items: [url]) }
