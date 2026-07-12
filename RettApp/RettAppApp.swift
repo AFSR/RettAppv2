@@ -107,7 +107,9 @@ struct RettAppApp: App {
                     await syncService.refreshShareStatus()
                     // Enregistre les CKDatabaseSubscription pour recevoir des
                     // pushes silencieux quand l'autre parent modifie un record.
-                    await syncService.ensureSubscriptions()
+                    // `auditSubscriptionsIfDue()` prend en compte le rate-limit
+                    // mou (1×/h) et ré-enregistre ce que CloudKit aurait purgé.
+                    await syncService.auditSubscriptionsIfDue()
                     // Backfill des révisions de plan médicamenteux pour les
                     // utilisateurs qui passent depuis une version antérieure
                     // à cette feature. Idempotent.
@@ -116,13 +118,16 @@ struct RettAppApp: App {
                     // (UUID aléatoire par parent avant fix de la sync). Prend
                     // effet une seule fois puis reste no-op.
                     MedicationLog.dedupeScheduledLogsIfNeeded(in: sharedModelContainer.mainContext)
+                    // Draine tout ce qui est resté dans le buffer d'écriture
+                    // depuis la dernière session (offline, crash, kill app…).
+                    await syncService.performCycle(context: sharedModelContainer.mainContext, reason: "launch")
                     // Bandeau de mise à jour App Store. Cache 24 h, silencieux
                     // en cas d'échec réseau — jamais bloquant.
                     await updateService.checkForUpdate()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.cloudKitRemoteChange)) { _ in
                     Task { @MainActor in
-                        await syncService.quickPull(context: sharedModelContainer.mainContext)
+                        await syncService.performCycle(context: sharedModelContainer.mainContext, reason: "silent-push")
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.didReceiveShareMetadata)) { note in
@@ -145,7 +150,8 @@ struct RettAppApp: App {
                         Task { @MainActor in
                             await syncService.refreshAccountStatus()
                             await syncService.refreshShareStatus()
-                            await syncService.quickPull(context: sharedModelContainer.mainContext)
+                            await syncService.auditSubscriptionsIfDue()
+                            await syncService.performCycle(context: sharedModelContainer.mainContext, reason: "foreground")
                             await updateService.checkForUpdate()
                         }
                     }

@@ -136,9 +136,11 @@ final class MedicationRevision {
             }
         }
         if insertedCount > 0 {
-            try? context.save()
+            try? context.saveTouching()
         }
     }
 }
 
-extension MedicationRevision: SyncTimestamped {}
+extension MedicationRevision: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.medicationRevision }
+}

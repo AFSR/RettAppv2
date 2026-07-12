@@ -144,4 +144,6 @@ final class Medication {
     }
 }
 
-extension Medication: SyncTimestamped {}
+extension Medication: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.medication }
+}

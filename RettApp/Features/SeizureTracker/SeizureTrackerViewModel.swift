@@ -96,7 +96,7 @@ final class SeizureTrackerViewModel {
         do {
             try await healthKit.writeSeizure(event: event, childFirstName: childProfile?.firstName ?? "")
             event.exportedToHealthKit = true
-            try? context.save()
+            try? context.saveTouching()
         } catch {
             // Permission refusée ou indisponible : on conserve l'événement local
             print("HealthKit non enregistré : \(error.localizedDescription)")

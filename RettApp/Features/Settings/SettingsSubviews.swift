@@ -247,7 +247,7 @@ struct DataSubView: View {
         for l in logs { modelContext.delete(l) }
         for m in medications { modelContext.delete(m) }
         for p in profiles { modelContext.delete(p) }
-        try? modelContext.save()
+        try? modelContext.saveTouching()
         Task { await MedicationViewModel().cancelAllNotifications() }
     }
 

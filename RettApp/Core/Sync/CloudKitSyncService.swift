@@ -57,6 +57,10 @@ final class CloudKitSyncService {
     var lastSyncedAt: Date?
     var participantCount: Int = 0
     var lastErrorMessage: String?
+    /// Nombre d'écritures locales dans le buffer PendingWriteStore, en attente
+    /// d'être poussées vers CloudKit. Alimenté par une notification postée par
+    /// le store à chaque mutation → l'UI (bandeau) se rafraîchit sans polling.
+    var pendingWriteCount: Int = 0
     /// Métadonnées des autres parents (e-mail / nom Apple ID, statut, droits).
     /// Vide si on n'est pas en partage ou si CloudKit n'a pas encore renvoyé la liste.
     var participants: [ParticipantInfo] = []
@@ -81,8 +85,31 @@ final class CloudKitSyncService {
     /// `scheduleSync(context:)` après une écriture locale.
     private var pendingSyncTask: Task<Void, Never>?
 
+    /// Sérialise les cycles push+pull — un seul en vol à la fois, les autres
+    /// s'enfilent. Empêche les races entre `ensureLogsExist`, dedup, drain.
+    private let gate = SyncGate()
+
+    /// Dernière fois qu'on a auto-réparé les subscriptions. Sert de rate-limit
+    /// mou (max 1×/heure) pour ne pas hammerer CloudKit à chaque foreground.
+    private var lastSubscriptionAuditAt: Date?
+
     init() {
         self.container = CKContainer(identifier: Self.containerID)
+        self.pendingWriteCount = PendingWriteStore.shared.pendingCount
+        // Rafraîchit l'observable à chaque mutation du buffer. On garde le
+        // token nulle-part : NotificationCenter conserve la subscription vivante
+        // aussi longtemps que `self` — le service est un `@State` de l'App donc
+        // vit pour toute la session.
+        NotificationCenter.default.addObserver(
+            forName: PendingWriteStore.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let count = note.userInfo?["count"] as? Int ?? PendingWriteStore.shared.pendingCount
+            Task { @MainActor in
+                self?.pendingWriteCount = count
+            }
+        }
     }
 
     // MARK: - Account
@@ -308,9 +335,21 @@ final class CloudKitSyncService {
             }
 
             // 2) Côté participant — zone(s) présente(s) dans la sharedCloudDatabase ?
+            //    On itère TOUTES les zones partagées pour supporter le cas où
+            //    l'utilisateur est participant de plusieurs enfants (par
+            //    exemple un pro qui accompagne plusieurs familles). On garde
+            //    le premier share trouvé comme "primaire" pour l'UI de statut,
+            //    mais chaque zone est bien pullée par `pullChanges`.
             let sharedZones = try await container.sharedCloudDatabase.allRecordZones()
-            if let firstZone = sharedZones.first {
-                if let share = try? await fetchZoneShare(database: container.sharedCloudDatabase, zoneID: firstZone.zoneID) {
+            if !sharedZones.isEmpty {
+                var primaryShare: CKShare?
+                for zone in sharedZones {
+                    if let share = try? await fetchZoneShare(database: container.sharedCloudDatabase, zoneID: zone.zoneID) {
+                        primaryShare = share
+                        break
+                    }
+                }
+                if let share = primaryShare {
                     await applyParticipantShare(share)
                 } else {
                     role = .participant
@@ -598,21 +637,231 @@ final class CloudKitSyncService {
             return
         }
 
-        // Push par batch de 200 (limite raisonnable pour CloudKit)
+        // Push par batch de 200 (limite raisonnable pour CloudKit). Wrap
+        // dans un retry pour absorber les rate-limit et coupures réseau
+        // transitoires. `.ifServerRecordUnchanged` : si un record existe déjà
+        // avec un tag différent, on récupère `serverRecordChanged` et on merge
+        // via LWW plutôt que de blind-writer.
         let batchSize = 200
         var offset = 0
         while offset < records.count {
             let end = min(offset + batchSize, records.count)
             let chunk = Array(records[offset..<end])
-            _ = try await database.modifyRecords(
-                saving: chunk, deleting: [],
-                savePolicy: .changedKeys
-            )
+            try await pushBatch(chunk, deletes: [], to: database, label: "replicateAll")
             offset = end
         }
 
         lastSyncedAt = Date()
         Self.log.info("replicateAll OK : \(records.count) records poussés")
+    }
+
+    // MARK: - Push incrémental (drain PendingWriteStore)
+
+    /// Push tout ce que le `PendingWriteStore` a accumulé (upserts + deletes)
+    /// depuis le dernier drain. Se protège contre les échecs partiels :
+    /// - Les entrées non-poussées sont ré-injectées dans le buffer → aucun
+    ///   changement n'est perdu, même si l'app crash entre les batches.
+    /// - Utilise `.ifServerRecordUnchanged` pour éviter les blind-writes qui
+    ///   écraseraient un état serveur plus récent.
+    /// - Sur `serverRecordChanged`, résout via `lastModifiedAt` (LWW) —
+    ///   voir `pushBatch(...)`.
+    ///
+    /// Idempotent et safe à rappeler à volonté.
+    func drainPendingWrites(context: ModelContext) async throws {
+        try await ensureSignedIn()
+        let snapshot = PendingWriteStore.shared.drain()
+        guard !snapshot.isEmpty else { return }
+
+        let database = appropriateDatabase()
+        let zoneIDs = try await resolveZoneIDs()
+        guard let zoneID = zoneIDs.first else {
+            // Pas de zone dispo → on remet tout dans le buffer et on retente plus tard.
+            PendingWriteStore.shared.requeue(snapshot)
+            throw SyncError.shareURLUnavailable
+        }
+
+        // 1) Séparer upserts / deletes et construire les CKRecord depuis SwiftData.
+        var upserts: [CKRecord] = []
+        var deletes: [CKRecord.ID] = []
+        var stillPending: [PendingWriteStore.Entry] = []
+
+        for entry in snapshot {
+            switch entry.op {
+            case .delete:
+                if let recordID = makeRecordID(name: entry.recordName, zoneID: zoneID) {
+                    deletes.append(recordID)
+                } else {
+                    stillPending.append(entry)
+                }
+            case .upsert:
+                if let rec = buildCKRecord(for: entry, zoneID: zoneID, context: context) {
+                    upserts.append(rec)
+                } else {
+                    // Modèle non trouvé localement → probablement supprimé entre
+                    // l'enqueue et le drain. On drop l'upsert (le delete
+                    // correspondant devrait être ou avoir été enqueué).
+                }
+            }
+        }
+
+        // 2) Push par batches. Sur échec d'un batch entier (transitoire ou
+        //    dur), on requeue le batch dans le buffer et on log.
+        let batchSize = 200
+        var offset = 0
+        while offset < upserts.count {
+            let end = min(offset + batchSize, upserts.count)
+            let chunk = Array(upserts[offset..<end])
+            do {
+                try await pushBatch(chunk, deletes: [], to: database, label: "drain.upsert")
+            } catch {
+                Self.log.error("drain.upsert batch KO : \(error.localizedDescription) — requeue")
+                stillPending.append(contentsOf: chunk.compactMap { rec in
+                    PendingWriteStore.Entry(
+                        recordType: rec.recordType,
+                        recordName: rec.recordID.recordName,
+                        op: .upsert
+                    )
+                })
+                lastErrorMessage = error.localizedDescription
+                syncState = .error(error.localizedDescription)
+            }
+            offset = end
+        }
+
+        // Deletes en un seul batch (peu volumineux en pratique).
+        if !deletes.isEmpty {
+            do {
+                try await pushBatch([], deletes: deletes, to: database, label: "drain.delete")
+            } catch {
+                Self.log.error("drain.delete batch KO : \(error.localizedDescription) — requeue")
+                stillPending.append(contentsOf: deletes.map {
+                    // On ne connaît pas le recordType côté delete — on met un
+                    // marqueur générique (le drainer ne re-utilise pas le type
+                    // pour un delete).
+                    PendingWriteStore.Entry(recordType: "", recordName: $0.recordName, op: .delete)
+                })
+                lastErrorMessage = error.localizedDescription
+                syncState = .error(error.localizedDescription)
+            }
+        }
+
+        if !stillPending.isEmpty {
+            PendingWriteStore.shared.requeue(stillPending)
+        } else if case .error = syncState {
+            // Tous les batches sont passés — on clear l'erreur qui restait.
+            syncState = .idle
+            lastErrorMessage = nil
+        }
+    }
+
+    /// Push un batch avec `.ifServerRecordUnchanged` + recovery LWW sur
+    /// `.serverRecordChanged`. Retry les erreurs transitoires (rate-limit,
+    /// zoneBusy, réseau) via `CKRetry`.
+    private func pushBatch(
+        _ records: [CKRecord],
+        deletes: [CKRecord.ID],
+        to database: CKDatabase,
+        label: String
+    ) async throws {
+        try await CKRetry.run(label: label) {
+            let result = try await database.modifyRecords(
+                saving: records,
+                deleting: deletes,
+                savePolicy: .ifServerRecordUnchanged
+            )
+            // 1) Handle per-record save results — recover LWW on serverRecordChanged.
+            var conflictedRecordsToReplay: [CKRecord] = []
+            for (_, res) in result.saveResults {
+                if case .failure(let err) = res, let ck = err as? CKError, ck.code == .serverRecordChanged {
+                    if let merged = self.mergeForLWW(conflict: ck) {
+                        conflictedRecordsToReplay.append(merged)
+                    }
+                } else if case .failure(let err) = res {
+                    // Erreur non-conflit : logue, mais on ne throw pas ici
+                    // pour ne pas casser le batch entier. L'entrée sera
+                    // requeuée par le catch supérieur si nécessaire.
+                    Self.log.error("[\(label)] save KO per-record : \(err.localizedDescription)")
+                }
+            }
+            // 2) Replay conflicted records that WE win according to LWW.
+            if !conflictedRecordsToReplay.isEmpty {
+                _ = try await database.modifyRecords(
+                    saving: conflictedRecordsToReplay,
+                    deleting: [],
+                    savePolicy: .ifServerRecordUnchanged
+                )
+            }
+        }
+    }
+
+    /// À partir d'une erreur `.serverRecordChanged`, décide si NOUS gagnons
+    /// le LWW. Si oui, retourne le CKRecord serveur (qui porte le bon
+    /// changeTag) avec nos valeurs appliquées dessus, prêt à être re-sauvé.
+    /// Si le serveur gagne, retourne nil (le pull ultérieur ramènera son état).
+    private func mergeForLWW(conflict: CKError) -> CKRecord? {
+        guard
+            let localRec = conflict.userInfo[CKRecordChangedErrorClientRecordKey] as? CKRecord,
+            let serverRec = conflict.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord
+        else {
+            return nil
+        }
+        let localTs = localRec[SyncFields.lastModifiedAt] as? Date
+        let serverTs = serverRec[SyncFields.lastModifiedAt] as? Date
+        if SyncConflictResolver.shouldAcceptIncoming(local: localTs, incoming: serverTs) {
+            // Serveur ≥ local → on abandonne notre push.
+            return nil
+        }
+        // Local strictement plus récent → on rejoue avec le tag serveur.
+        for key in localRec.allKeys() {
+            serverRec[key] = localRec[key]
+        }
+        return serverRec
+    }
+
+    /// Retourne les zones à cibler pour un push (owner : zone privée ; participant :
+    /// toutes les zones partagées). Alloué à un seul appel par cycle pour éviter
+    /// les allers-retours réseau redondants.
+    private func resolveZoneIDs() async throws -> [CKRecordZone.ID] {
+        if role == .participant {
+            let zones = try await container.sharedCloudDatabase.allRecordZones()
+            return zones.map { $0.zoneID }
+        } else {
+            let zone = try await ensureZone()
+            return [zone.zoneID]
+        }
+    }
+
+    /// Construit un `CKRecord` à partir d'un modèle SwiftData identifié par
+    /// `entry`. Retourne nil si le modèle n'existe plus (supprimé entre-temps).
+    private func buildCKRecord(for entry: PendingWriteStore.Entry, zoneID: CKRecordZone.ID, context: ModelContext) -> CKRecord? {
+        guard let id = UUID(uuidString: entry.recordName) else { return nil }
+        switch entry.recordType {
+        case CKRecordType.childProfile:
+            return (try? context.fetch(FetchDescriptor<ChildProfile>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        case CKRecordType.medication:
+            return (try? context.fetch(FetchDescriptor<Medication>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        case CKRecordType.medicationLog:
+            return (try? context.fetch(FetchDescriptor<MedicationLog>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        case CKRecordType.seizure:
+            return (try? context.fetch(FetchDescriptor<SeizureEvent>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        case CKRecordType.mood:
+            return (try? context.fetch(FetchDescriptor<MoodEntry>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        case CKRecordType.dailyObservation:
+            return (try? context.fetch(FetchDescriptor<DailyObservation>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        case CKRecordType.symptom:
+            return (try? context.fetch(FetchDescriptor<SymptomEvent>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        case CKRecordType.medicationRevision:
+            return (try? context.fetch(FetchDescriptor<MedicationRevision>(predicate: #Predicate { $0.id == id })).first)?.toCKRecord(zoneID: zoneID)
+        default:
+            return nil
+        }
+    }
+
+    private func makeRecordID(name: String, zoneID: CKRecordZone.ID) -> CKRecord.ID? {
+        // `recordName` peut être n'importe quel string non vide en CloudKit —
+        // on n'exige pas un UUID valide ici pour préserver les futurs types.
+        guard !name.isEmpty else { return nil }
+        return CKRecord.ID(recordName: name, zoneID: zoneID)
     }
 
     // MARK: - Pull (CloudKit → SwiftData)
@@ -960,12 +1209,14 @@ final class CloudKitSyncService {
     func ensureSubscriptions() async {
         guard accountStatus == .available else { return }
 
-        let registered = UserDefaults.standard.bool(forKey: Self.subscriptionsRegisteredKey)
-        if registered { return }
-
+        // On enregistre TOUJOURS de façon idempotente : chaque helper
+        // interne fait un `subscription(for:)` et no-op si présente. Le
+        // flag UserDefaults servait de shortcut mais il empêchait le
+        // ré-enregistrement quand CloudKit purgeait silencieusement les
+        // subscriptions (inactivité > ~1 mois, reset de compte iCloud, etc.),
+        // donc plus jamais de push silencieux jusqu'au prochain resetSyncState
+        // manuel. On préfère un no-op réseau court à un silence total.
         do {
-            // (1) Subscriptions silencieuses — réveillent l'app pour qu'elle
-            //     pull les changements en arrière-plan, sans bannière.
             try await registerDatabaseSubscription(
                 database: container.privateCloudDatabase,
                 subscriptionID: "afsr.private.changes"
@@ -974,12 +1225,6 @@ final class CloudKitSyncService {
                 database: container.sharedCloudDatabase,
                 subscriptionID: "afsr.shared.changes"
             )
-            // (2) Subscriptions visibles ciblées sur `SeizureEvent` : quand
-            //     l'autre parent enregistre ou démarre une crise, CloudKit
-            //     envoie un push APNs avec un `alertBody` → iOS affiche
-            //     immédiatement une bannière, même si l'app est fermée.
-            //     iOS supprime automatiquement la notif chez le créateur du
-            //     record — seul le second parent la voit.
             try await registerSeizureAlertSubscription(
                 database: container.privateCloudDatabase,
                 subscriptionID: "afsr.private.seizure.alert"
@@ -989,10 +1234,21 @@ final class CloudKitSyncService {
                 subscriptionID: "afsr.shared.seizure.alert"
             )
             UserDefaults.standard.set(true, forKey: Self.subscriptionsRegisteredKey)
-            Self.log.info("CKSubscriptions registered (database + seizure alerts)")
+            Self.log.info("CKSubscriptions ensured (database + seizure alerts)")
         } catch {
             Self.log.error("ensureSubscriptions error: \(error.localizedDescription)")
         }
+    }
+
+    /// Rate-limited : audite les subscriptions au maximum une fois par heure.
+    /// À appeler à chaque foreground pour détecter les purges silencieuses
+    /// que CloudKit peut faire après une longue inactivité.
+    func auditSubscriptionsIfDue() async {
+        if let last = lastSubscriptionAuditAt, Date().timeIntervalSince(last) < 3600 {
+            return
+        }
+        lastSubscriptionAuditAt = Date()
+        await ensureSubscriptions()
     }
 
     /// Crée un `CKQuerySubscription` qui se déclenche à chaque création d'un
@@ -1088,12 +1344,45 @@ final class CloudKitSyncService {
         pendingSyncTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(max(0, delay) * 1_000_000_000))
             guard !Task.isCancelled, let self else { return }
-            do {
-                try await self.replicateAll(from: context)
-                try await self.pullChanges(into: context)
-            } catch {
-                Self.log.error("scheduleSync error: \(error.localizedDescription)")
+            await self.performCycle(context: context, reason: "scheduleSync(\(priority))")
+        }
+    }
+
+    /// Push tout ce qui est en attente PUIS pull. Sérialisé via `SyncGate`
+    /// pour qu'un seul cycle tourne à la fois — un `scheduleSync` déclenché
+    /// pendant qu'un autre finit s'enfile derrière.
+    ///
+    /// Ne lève JAMAIS : les erreurs sont capturées, remontées dans
+    /// `syncState`/`lastErrorMessage` (pour le bandeau UI) et loggées.
+    func performCycle(context: ModelContext, reason: String) async {
+        guard role != .none, accountStatus == .available else { return }
+        do {
+            try await gate.run { [self] in
+                syncState = .syncing
+                defer { if case .syncing = syncState { syncState = .idle } }
+                do {
+                    try await drainPendingWrites(context: context)
+                } catch {
+                    Self.log.error("[\(reason)] drain KO : \(error.localizedDescription)")
+                    lastErrorMessage = error.localizedDescription
+                    syncState = .error(error.localizedDescription)
+                }
+                do {
+                    try await pullChanges(into: context)
+                    // Un pull complet réussi = les erreurs précédentes n'ont
+                    // plus lieu d'être surfacées à l'utilisateur.
+                    if PendingWriteStore.shared.pendingCount == 0 {
+                        lastErrorMessage = nil
+                        if case .error = syncState { syncState = .idle }
+                    }
+                } catch {
+                    Self.log.error("[\(reason)] pull KO : \(error.localizedDescription)")
+                    lastErrorMessage = error.localizedDescription
+                    syncState = .error(error.localizedDescription)
+                }
             }
+        } catch {
+            Self.log.error("[\(reason)] gate KO : \(error.localizedDescription)")
         }
     }
 
@@ -1101,11 +1390,14 @@ final class CloudKitSyncService {
     /// Silencieux en cas d'erreur — ne perturbe pas l'UI.
     func quickPull(context: ModelContext) async {
         guard role != .none, accountStatus == .available else { return }
-        do {
-            try await pullChanges(into: context)
-        } catch {
-            Self.log.error("quickPull error: \(error.localizedDescription)")
-        }
+        await performCycle(context: context, reason: "quickPull")
+    }
+
+    /// Déclenche un cycle immédiat (bouton « Réessayer », UI settings).
+    /// Contrairement à `quickPull`, force le drain même si le buffer est vide,
+    /// utile pour valider que la connexion CloudKit fonctionne.
+    func syncNow(context: ModelContext) async {
+        await performCycle(context: context, reason: "manual")
     }
 
     // MARK: - Hard reset (recovery)

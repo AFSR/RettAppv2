@@ -62,4 +62,6 @@ final class MoodEntry {
     }
 }
 
-extension MoodEntry: SyncTimestamped {}
+extension MoodEntry: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.mood }
+}
