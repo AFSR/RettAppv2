@@ -48,28 +48,33 @@ struct DashboardView: View {
     /// et les colonnes de dates se décaleraient de plusieurs pixels.
     private static let yAxisLabelWidth: CGFloat = 44
 
-    /// Génère une échelle de valeurs "rondes" pour l'axe des durées de crises,
-    /// adaptée à l'ordre de grandeur observé sur la période. Les labels obtenus
-    /// (0, 60, 180, …) sont toujours un multiple d'un pas naturel (5 s, 15 s,
-    /// 1 min, 2 min, 5 min, 10 min) — ça évite les axes en secondes bruts type
-    /// « 233 s » qui ne veulent rien dire d'humain et déborderaient la marge.
-    private var durationYAxisValues: [Int] {
+    /// Paramètres calculés pour l'axe des durées de crises : un pas
+    /// « humain » (5 s / 15 s / 1 min / 2 min / 5 min / 10 min) déduit de
+    /// la valeur max observée sur la période, plus une borne supérieure
+    /// arrondie à ce pas pour que Chart place des ticks propres.
+    ///
+    /// Historique : la première version passait directement une `[Int]`
+    /// à `AxisMarks(values:)`. Swift Charts tolérait la signature mais ne
+    /// respectait pas systématiquement le tableau (fallback silencieux
+    /// sur `.automatic` → 16 labels qui s'empilent). `.stride(by:)` est
+    /// l'API officielle pour "ticks régulièrement espacés", elle est
+    /// fiable dans tous les cas.
+    private var durationYAxisConfig: (step: Int, upperBound: Int) {
         let buckets = viewModel.buckets(for: seizures)
         let maxV = buckets.map(\.totalDurationSec).max() ?? 0
-        guard maxV > 0 else { return [0] }
+        guard maxV > 0 else { return (60, 60) }
         let step: Int
         switch maxV {
-        case ..<30:     step = 5           // 0/5/10/15…
-        case ..<60:     step = 15          // 0/15/30/45/60
-        case ..<300:    step = 60          // 0/1min/2min…
-        case ..<900:    step = 120         // 0/2min/4min…
-        case ..<3600:   step = 300         // 0/5min/10min…
-        default:        step = 600         // 0/10min/20min…
+        case ..<30:     step = 5
+        case ..<60:     step = 15
+        case ..<300:    step = 60           // 1 min
+        case ..<900:    step = 120          // 2 min
+        case ..<3600:   step = 300          // 5 min
+        default:        step = 600          // 10 min
         }
-        var values: [Int] = []
-        var v = 0
-        while v <= maxV + step { values.append(v); v += step }
-        return values
+        // Arrondi au step supérieur pour que le dernier tick soit au-dessus du max.
+        let upperBound = ((maxV + step - 1) / step) * step
+        return (step, upperBound)
     }
 
     /// Format compact pour les labels d'axe : « 45s », « 3min », « 3m30 ».
@@ -270,8 +275,9 @@ struct DashboardView: View {
                     }
                 }
                 .frame(height: 180)
+                .chartYScale(domain: 0...max(durationYAxisConfig.upperBound, durationYAxisConfig.step))
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: durationYAxisValues) { value in
+                    AxisMarks(position: .leading, values: .stride(by: durationYAxisConfig.step)) { value in
                         if let v = value.as(Int.self) {
                             AxisValueLabel {
                                 Text(Self.formatDurationAxis(v))
