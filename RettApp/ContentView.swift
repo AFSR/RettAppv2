@@ -37,13 +37,17 @@ struct ContentView: View {
             NavigationStack { SettingsView() }
                 .tabItem { Label("Réglages", systemImage: "gear") }
         }
-        // Bandeau de mise à jour en overlay : reste au-dessus du TabView, sans
-        // pousser le contenu vers le bas, et animé pour ne pas surgir sèchement.
+        // Bandeaux en overlay : au-dessus du TabView, sans pousser le contenu
+        // vers le bas, animés pour ne pas surgir sèchement. On empile
+        // (erreur/pending) EN HAUT (plus critique) puis update dessous.
         .safeAreaInset(edge: .top) {
-            if let info = updateService.availableUpdate {
-                UpdateAvailabilityBanner(info: info) {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        updateService.dismissCurrentBanner()
+            VStack(spacing: 6) {
+                SyncStatusBanner()
+                if let info = updateService.availableUpdate {
+                    UpdateAvailabilityBanner(info: info) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            updateService.dismissCurrentBanner()
+                        }
                     }
                 }
             }

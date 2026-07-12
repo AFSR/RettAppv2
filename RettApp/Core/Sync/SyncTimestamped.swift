@@ -1,32 +1,78 @@
 import Foundation
 import SwiftData
 
-/// Modèles qui veulent participer à la résolution explicite de conflit
-/// last-writer-wins via CloudKit Sharing. Chaque write local doit toucher
-/// `lastModifiedAt` (idéalement via `ModelContext.saveTouching()`) ; le
-/// timestamp est répliqué dans le CKRecord et comparé côté pull pour
-/// arbitrer entre l'état local et l'état distant.
+/// Modèles qui participent à la synchronisation CloudKit.
+///
+/// - `lastModifiedAt` : timestamp last-writer-wins pour arbitrer les conflits
+///   entre local et distant côté pull.
+/// - `syncRecordName` / `syncRecordType` : identifient le CKRecord côté serveur.
+///   Utilisés par `saveTouching()` pour alimenter automatiquement le
+///   `PendingWriteStore` — plus besoin d'appeler `sync.markUpsert(...)` à la
+///   main sur chaque site d'écriture.
 protocol SyncTimestamped: AnyObject {
     var lastModifiedAt: Date { get set }
+    /// Identifiant CKRecord — par convention `id.uuidString` pour tous nos modèles.
+    var syncRecordName: String { get }
+    /// Type CKRecord — utilise les constantes de `CKRecordType`.
+    static var syncRecordType: String { get }
+}
+
+/// Modèles qui exposent un `id: UUID` (tous nos modèles synchronisés le font).
+/// Fournit une conformance par défaut à `syncRecordName`.
+protocol UUIDIdentified {
+    var id: UUID { get }
+}
+extension SyncTimestamped where Self: UUIDIdentified {
+    var syncRecordName: String { id.uuidString }
 }
 
 extension ModelContext {
-    /// Variante de `save()` qui met à jour `lastModifiedAt = Date()` sur tous
-    /// les modèles `SyncTimestamped` insérés ou modifiés depuis le dernier
-    /// save, avant de persister. C'est le point central de la résolution de
-    /// conflit : sans cet appel, les CKRecord poussés vers iCloud auraient
-    /// un timestamp obsolète et perdraient les arbitrages contre l'état
-    /// distant.
+    /// Save qui :
+    /// 1. Stampe `lastModifiedAt = now` sur tous les `SyncTimestamped` insérés/modifiés
+    ///    (base du LWW côté pull).
+    /// 2. Enregistre dans `PendingWriteStore` un upsert pour chaque
+    ///    inséré/modifié et un delete pour chaque supprimé (base du push
+    ///    fiable côté drain — survit crash/offline).
+    /// 3. Persiste réellement via `save()`.
     ///
-    /// À utiliser à la place de `try? modelContext.save()` partout où une
-    /// écriture doit propager via CloudKit Sharing.
+    /// **À utiliser à la place de `try? save()` partout** où l'écriture doit
+    /// propager via CloudKit Sharing. Si on oublie, la modif reste locale et
+    /// ne remontera pas chez l'autre parent.
     func saveTouching() throws {
         let now = Date()
-        for model in insertedModelsArray + changedModelsArray {
-            if let timestamped = model as? any SyncTimestamped {
-                timestamped.lastModifiedAt = now
+
+        // 1) Snapshot des modèles concernés AVANT save (deletedModelsArray
+        //    disparaît une fois le save appliqué).
+        let inserted = insertedModelsArray
+        let changed = changedModelsArray
+        let deleted = deletedModelsArray
+
+        // 2) Timestamp LWW sur les upserts.
+        for model in inserted + changed {
+            if let t = model as? any SyncTimestamped {
+                t.lastModifiedAt = now
             }
         }
+
+        // 3) Enqueue dans le buffer persistant. On ne push pas ici : c'est le
+        //    job du service de sync (drain + retry + back-off + LWW).
+        for model in inserted + changed {
+            if let t = model as? any SyncTimestamped {
+                PendingWriteStore.shared.markUpsert(
+                    recordType: type(of: t).syncRecordType,
+                    recordName: t.syncRecordName
+                )
+            }
+        }
+        for model in deleted {
+            if let t = model as? any SyncTimestamped {
+                PendingWriteStore.shared.markDelete(
+                    recordType: type(of: t).syncRecordType,
+                    recordName: t.syncRecordName
+                )
+            }
+        }
+
         try save()
     }
 }

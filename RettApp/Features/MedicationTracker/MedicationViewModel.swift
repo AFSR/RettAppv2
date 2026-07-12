@@ -47,13 +47,13 @@ final class MedicationViewModel {
                 }
             }
         }
-        try? context.save()
+        try? context.saveTouching()
     }
 
     func togglePrise(_ log: MedicationLog, in context: ModelContext) {
         log.taken.toggle()
         log.takenTime = log.taken ? Date() : nil
-        try? context.save()
+        try? context.saveTouching()
     }
 
     // MARK: - Notifications

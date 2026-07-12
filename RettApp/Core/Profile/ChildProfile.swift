@@ -113,4 +113,6 @@ final class ChildProfile {
     }
 }
 
-extension ChildProfile: SyncTimestamped {}
+extension ChildProfile: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.childProfile }
+}

@@ -88,7 +88,9 @@ final class MedicationLog {
     }
 }
 
-extension MedicationLog: SyncTimestamped {}
+extension MedicationLog: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.medicationLog }
+}
 
 // MARK: - Dedup
 
@@ -143,7 +145,9 @@ extension MedicationLog {
             }
         }
         if merged > 0 {
-            try context.save()
+            // saveTouching enqueue automatiquement les deletes dans
+            // PendingWriteStore → le prochain drain les propage à CloudKit.
+            try context.saveTouching()
             appendDeletedIdsBuffer(deletedIds)
             print("ℹ️ MedicationLog dedup : \(merged) doublon(s) fusionné(s)")
         }

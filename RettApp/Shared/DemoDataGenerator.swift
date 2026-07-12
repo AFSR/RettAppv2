@@ -108,7 +108,7 @@ enum DemoDataGenerator {
             }
         }
 
-        try? context.save()
+        try? context.saveTouching()
         return Result(seizuresCreated: seizureCount, medicationsCreated: medCount, logsCreated: logCount)
     }
 
@@ -129,7 +129,7 @@ enum DemoDataGenerator {
         for s in seizures where s.notes == "Données de démonstration" {
             context.delete(s); deleted += 1
         }
-        try? context.save()
+        try? context.saveTouching()
         return deleted
     }
 

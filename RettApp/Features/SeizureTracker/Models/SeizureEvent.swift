@@ -153,4 +153,6 @@ final class SeizureEvent {
     }
 }
 
-extension SeizureEvent: SyncTimestamped {}
+extension SeizureEvent: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.seizure }
+}

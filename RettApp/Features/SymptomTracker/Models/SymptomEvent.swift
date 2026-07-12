@@ -146,4 +146,6 @@ final class SymptomEvent {
     }
 }
 
-extension SymptomEvent: SyncTimestamped {}
+extension SymptomEvent: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.symptom }
+}

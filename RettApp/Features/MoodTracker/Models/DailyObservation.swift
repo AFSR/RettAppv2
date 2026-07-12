@@ -208,4 +208,6 @@ final class DailyObservation {
     }
 }
 
-extension DailyObservation: SyncTimestamped {}
+extension DailyObservation: SyncTimestamped, UUIDIdentified {
+    static var syncRecordType: String { CKRecordType.dailyObservation }
+}
