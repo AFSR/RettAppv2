@@ -258,9 +258,23 @@ struct DataSubView: View {
     }
 
     private func eraseAll() {
+        // Chaque type SwiftData doit être itéré explicitement : la cascade
+        // relationnelle (`.cascade` sur ChildProfile → Medication) ne renseigne
+        // PAS `deletedModelsArray` de SwiftData, donc les records cascadés ne
+        // sont pas propagés à CloudKit → orphelins re-tirés au prochain pull.
+        // On récupère à la volée les types que la vue ne @Query pas déjà.
+        let moods = (try? modelContext.fetch(FetchDescriptor<MoodEntry>())) ?? []
+        let observations = (try? modelContext.fetch(FetchDescriptor<DailyObservation>())) ?? []
+        let symptoms = (try? modelContext.fetch(FetchDescriptor<SymptomEvent>())) ?? []
+        let revisions = (try? modelContext.fetch(FetchDescriptor<MedicationRevision>())) ?? []
+
         for e in seizures { modelContext.delete(e) }
         for l in logs { modelContext.delete(l) }
+        for r in revisions { modelContext.delete(r) }
         for m in medications { modelContext.delete(m) }
+        for mood in moods { modelContext.delete(mood) }
+        for o in observations { modelContext.delete(o) }
+        for s in symptoms { modelContext.delete(s) }
         for p in profiles { modelContext.delete(p) }
         try? modelContext.saveTouching()
         Task { await MedicationViewModel().cancelAllNotifications() }

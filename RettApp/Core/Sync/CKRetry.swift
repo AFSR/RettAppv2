@@ -18,7 +18,11 @@ enum CKRetry {
     private static let log = Logger(subsystem: "fr.afsr.RettApp", category: "CKRetry")
 
     /// Exécute `operation` en la retentant jusqu'à `maxAttempts` fois, avec
-    /// back-off exponentiel plafonné à 30 s. La dernière erreur est propagée.
+    /// back-off exponentiel + jitter plafonné à 30 s. La dernière erreur est propagée.
+    ///
+    /// Le jitter (±25 %) évite le thundering-herd : quand deux devices d'un
+    /// même utilisateur se prennent le même rate-limit CloudKit, ils
+    /// retentent à des instants différents.
     static func run<T>(
         maxAttempts: Int = 5,
         baseDelaySeconds: Double = 1.0,
@@ -39,7 +43,10 @@ enum CKRetry {
                     }
                     throw error
                 }
-                let waitSeconds = hint ?? delay
+                let base = hint ?? delay
+                // Jitter uniforme dans [0.75x, 1.25x] du délai calculé.
+                let jitter = 1.0 + (Double.random(in: -0.25...0.25))
+                let waitSeconds = base * jitter
                 log.info("[\(label)] retryable error, attempt \(attempt)/\(maxAttempts), retry in \(String(format: "%.1f", waitSeconds))s : \(error.localizedDescription)")
                 try? await Task.sleep(nanoseconds: UInt64(waitSeconds * 1_000_000_000))
                 // Back-off exponentiel plafonné à 30s pour la prochaine itération.

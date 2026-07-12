@@ -653,6 +653,12 @@ final class CloudKitSyncService {
 
         lastSyncedAt = Date()
         Self.log.info("replicateAll OK : \(records.count) records poussés")
+        // Le buffer contient probablement des entrées correspondant aux
+        // records qu'on vient de push (setup initial du partage) — les
+        // vider évite un re-push redondant au premier drain.
+        // `.ifServerRecordUnchanged` protégerait, mais on économise un
+        // round-trip serveur inutile.
+        PendingWriteStore.shared.clear()
     }
 
     // MARK: - Push incrémental (drain PendingWriteStore)
@@ -667,88 +673,98 @@ final class CloudKitSyncService {
     ///   voir `pushBatch(...)`.
     ///
     /// Idempotent et safe à rappeler à volonté.
+    ///
+    /// Contrat CRITIQUE — anti-perte de données :
+    /// - On sort le snapshot du buffer AVANT de savoir si on va réussir.
+    /// - TOUT chemin de sortie (throw, early return, batch KO) qui n'a PAS
+    ///   confirmé le push d'une entrée doit la remettre dans le buffer.
+    /// - Le `defer` de fin de fonction est la ceinture de sécurité : quoi
+    ///   qu'il arrive dans la fonction, les entries non-marquées "pushées"
+    ///   retournent dans le PendingWriteStore.
     func drainPendingWrites(context: ModelContext) async throws {
         try await ensureSignedIn()
         let snapshot = PendingWriteStore.shared.drain()
         guard !snapshot.isEmpty else { return }
 
+        // Toutes les entries commencent dans "unresolved". On les enlève au
+        // fur et à mesure que leur push est confirmé. Le defer requeue ce
+        // qui reste → aucun exit path (throw, early return) ne perd de données.
+        var unresolved = Set(snapshot)
+        defer {
+            if !unresolved.isEmpty {
+                PendingWriteStore.shared.requeue(Array(unresolved))
+            }
+        }
+
         let database = appropriateDatabase()
         let zoneIDs = try await resolveZoneIDs()
         guard let zoneID = zoneIDs.first else {
-            // Pas de zone dispo → on remet tout dans le buffer et on retente plus tard.
-            PendingWriteStore.shared.requeue(snapshot)
+            // Pas de zone dispo → defer requeue tout, on lève une erreur.
             throw SyncError.shareURLUnavailable
         }
 
         // 1) Séparer upserts / deletes et construire les CKRecord depuis SwiftData.
-        var upserts: [CKRecord] = []
-        var deletes: [CKRecord.ID] = []
-        var stillPending: [PendingWriteStore.Entry] = []
+        //    On garde l'entry originale associée à chaque CKRecord pour pouvoir
+        //    la retirer de `unresolved` en cas de succès.
+        var upsertRecords: [(entry: PendingWriteStore.Entry, record: CKRecord)] = []
+        var deleteRecords: [(entry: PendingWriteStore.Entry, recordID: CKRecord.ID)] = []
 
         for entry in snapshot {
             switch entry.op {
             case .delete:
                 if let recordID = makeRecordID(name: entry.recordName, zoneID: zoneID) {
-                    deletes.append(recordID)
-                } else {
-                    stillPending.append(entry)
+                    deleteRecords.append((entry, recordID))
                 }
+                // Nom invalide → on abandonne l'entrée (elle n'est PAS retirée
+                // de `unresolved` donc elle sera requeuée — mais elle
+                // re-échouera la prochaine fois. C'est un état pathologique).
             case .upsert:
                 if let rec = buildCKRecord(for: entry, zoneID: zoneID, context: context) {
-                    upserts.append(rec)
+                    upsertRecords.append((entry, rec))
                 } else {
-                    // Modèle non trouvé localement → probablement supprimé entre
-                    // l'enqueue et le drain. On drop l'upsert (le delete
-                    // correspondant devrait être ou avoir été enqueué).
+                    // Modèle disparu de SwiftData entre l'enqueue et le drain
+                    // (delete cascadée, dedup, etc.). On marque l'entry résolue :
+                    // il n'y a plus rien à pousser pour ce record.
+                    unresolved.remove(entry)
                 }
             }
         }
 
-        // 2) Push par batches. Sur échec d'un batch entier (transitoire ou
-        //    dur), on requeue le batch dans le buffer et on log.
+        // 2) Push par batches. Un batch entier qui échoue n'invalide QUE
+        //    ses propres entries — les autres batches continuent. Les entries
+        //    de ce batch restent dans `unresolved` → requeue via defer.
         let batchSize = 200
         var offset = 0
-        while offset < upserts.count {
-            let end = min(offset + batchSize, upserts.count)
-            let chunk = Array(upserts[offset..<end])
+        while offset < upsertRecords.count {
+            let end = min(offset + batchSize, upsertRecords.count)
+            let chunk = Array(upsertRecords[offset..<end])
             do {
-                try await pushBatch(chunk, deletes: [], to: database, label: "drain.upsert")
+                try await pushBatch(chunk.map(\.record), deletes: [], to: database, label: "drain.upsert")
+                // Batch OK → toutes ces entries sont résolues.
+                for pair in chunk { unresolved.remove(pair.entry) }
             } catch {
-                Self.log.error("drain.upsert batch KO : \(error.localizedDescription) — requeue")
-                stillPending.append(contentsOf: chunk.compactMap { rec in
-                    PendingWriteStore.Entry(
-                        recordType: rec.recordType,
-                        recordName: rec.recordID.recordName,
-                        op: .upsert
-                    )
-                })
+                Self.log.error("drain.upsert batch KO : \(error.localizedDescription)")
                 lastErrorMessage = error.localizedDescription
                 syncState = .error(error.localizedDescription)
+                // Ces entries restent dans unresolved → requeue.
             }
             offset = end
         }
 
         // Deletes en un seul batch (peu volumineux en pratique).
-        if !deletes.isEmpty {
+        if !deleteRecords.isEmpty {
             do {
-                try await pushBatch([], deletes: deletes, to: database, label: "drain.delete")
+                try await pushBatch([], deletes: deleteRecords.map(\.recordID), to: database, label: "drain.delete")
+                for pair in deleteRecords { unresolved.remove(pair.entry) }
             } catch {
-                Self.log.error("drain.delete batch KO : \(error.localizedDescription) — requeue")
-                stillPending.append(contentsOf: deletes.map {
-                    // On ne connaît pas le recordType côté delete — on met un
-                    // marqueur générique (le drainer ne re-utilise pas le type
-                    // pour un delete).
-                    PendingWriteStore.Entry(recordType: "", recordName: $0.recordName, op: .delete)
-                })
+                Self.log.error("drain.delete batch KO : \(error.localizedDescription)")
                 lastErrorMessage = error.localizedDescription
                 syncState = .error(error.localizedDescription)
             }
         }
 
-        if !stillPending.isEmpty {
-            PendingWriteStore.shared.requeue(stillPending)
-        } else if case .error = syncState {
-            // Tous les batches sont passés — on clear l'erreur qui restait.
+        if unresolved.isEmpty, case .error = syncState {
+            // Tout est passé — on clear l'erreur qui restait.
             syncState = .idle
             lastErrorMessage = nil
         }
@@ -757,6 +773,11 @@ final class CloudKitSyncService {
     /// Push un batch avec `.ifServerRecordUnchanged` + recovery LWW sur
     /// `.serverRecordChanged`. Retry les erreurs transitoires (rate-limit,
     /// zoneBusy, réseau) via `CKRetry`.
+    ///
+    /// Ne throw QUE si le batch entier échoue au niveau réseau. Une erreur
+    /// per-record NON-résolvable (permission, quota, invalid data) lève
+    /// une `SyncError.perRecordPushFailed` pour que l'appelant requeue le
+    /// batch (sinon on perdrait silencieusement des enregistrements).
     private func pushBatch(
         _ records: [CKRecord],
         deletes: [CKRecord.ID],
@@ -769,27 +790,57 @@ final class CloudKitSyncService {
                 deleting: deletes,
                 savePolicy: .ifServerRecordUnchanged
             )
+
             // 1) Handle per-record save results — recover LWW on serverRecordChanged.
             var conflictedRecordsToReplay: [CKRecord] = []
-            for (_, res) in result.saveResults {
-                if case .failure(let err) = res, let ck = err as? CKError, ck.code == .serverRecordChanged {
+            var terminalFailures: [(recordID: CKRecord.ID, error: Error)] = []
+            for (recordID, res) in result.saveResults {
+                guard case .failure(let err) = res else { continue }
+                if let ck = err as? CKError, ck.code == .serverRecordChanged {
                     if let merged = self.mergeForLWW(conflict: ck) {
                         conflictedRecordsToReplay.append(merged)
                     }
-                } else if case .failure(let err) = res {
-                    // Erreur non-conflit : logue, mais on ne throw pas ici
-                    // pour ne pas casser le batch entier. L'entrée sera
-                    // requeuée par le catch supérieur si nécessaire.
-                    Self.log.error("[\(label)] save KO per-record : \(err.localizedDescription)")
+                    // Si merge nil (serveur gagne) → notre push est
+                    // délibérément abandonné, ce n'est pas une perte.
+                } else {
+                    terminalFailures.append((recordID, err))
                 }
             }
+
             // 2) Replay conflicted records that WE win according to LWW.
+            //    On check les résultats du replay aussi — si un record replayé
+            //    conflict encore (autre parent a poussé entre-temps), on le
+            //    remet comme échec terminal → appelant requeue.
             if !conflictedRecordsToReplay.isEmpty {
-                _ = try await database.modifyRecords(
+                let replayResult = try await database.modifyRecords(
                     saving: conflictedRecordsToReplay,
                     deleting: [],
                     savePolicy: .ifServerRecordUnchanged
                 )
+                for (recordID, res) in replayResult.saveResults {
+                    if case .failure(let err) = res {
+                        terminalFailures.append((recordID, err))
+                    }
+                }
+            }
+
+            // 3) Vérifie aussi les résultats de deletes — un delete échoué
+            //    non-idempotent (permission refusée) doit être remonté.
+            for (recordID, res) in result.deleteResults {
+                if case .failure(let err) = res {
+                    // `.unknownItem` sur un delete = record déjà supprimé côté
+                    // serveur, c'est un succès idempotent, on ignore.
+                    if let ck = err as? CKError, ck.code == .unknownItem { continue }
+                    terminalFailures.append((recordID, err))
+                }
+            }
+
+            if !terminalFailures.isEmpty {
+                Self.log.error("[\(label)] \(terminalFailures.count) échec(s) terminal(aux) per-record")
+                for (id, err) in terminalFailures {
+                    Self.log.error("  - \(id.recordName) : \(err.localizedDescription)")
+                }
+                throw SyncError.perRecordPushFailed(count: terminalFailures.count)
             }
         }
     }
@@ -1615,9 +1666,12 @@ enum SyncError: LocalizedError {
     case iCloudUnavailable(CloudKitSyncService.AccountStatus)
     case shareURLUnavailable
     case shareSaveFailed(underlying: Error)
+    case perRecordPushFailed(count: Int)
 
     var errorDescription: String? {
         switch self {
+        case .perRecordPushFailed(let count):
+            return "Impossible de pousser \(count) enregistrement(s) vers iCloud. Ils seront réessayés à la prochaine synchronisation."
         case .iCloudUnavailable(let status):
             switch status {
             case .noAccount: return "Aucun compte iCloud connecté. Activez iCloud dans Réglages iOS."

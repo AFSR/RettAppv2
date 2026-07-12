@@ -6,6 +6,7 @@ import SwiftData
 /// prises de médicaments planifiées et ponctuelles, crises du jour. Tout est saisi ici.
 struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
 
@@ -129,6 +130,9 @@ struct JournalView: View {
                             childProfile: profile,
                             healthKit: HealthKitManager.shared
                         )
+                        // Crise = événement médical prioritaire — sync immédiate
+                        // vers l'autre parent (délai debounce urgent = 0.5s).
+                        sync.scheduleSync(context: modelContext, priority: .urgent)
                         showSeizureQualification = false
                     }
                 }
