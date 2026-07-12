@@ -51,42 +51,47 @@ struct DashboardView: View {
     /// Ticks explicites [Int] pour l'axe des durées de crises + borne
     /// supérieure du domaine.
     ///
-    /// Historique de la mécanique :
-    ///  - `AxisMarks(values: .automatic(desiredCount: 4))` → Chart ignorait
-    ///    le desiredCount et générait ~16 labels qui s'empilaient.
-    ///  - `AxisMarks(values: .stride(by: Double(60)))` → même problème,
-    ///    Charts ne respectait pas non plus le stride sur un axe Int.
-    ///  - `AxisMarks(values: [Int])` avec `chartYScale(domain: 0...upperBound)` :
-    ///    même pattern que l'observance qui marche → **fiable**. On l'utilise.
-    ///
-    /// Pas humains : 5 s / 15 s / 1 min / 2 min / 5 min / 10 min selon la
-    /// valeur max observée.
+    /// Objectif : **exactement 4 à 5 ticks**, avec un pas "humain" (5 s,
+    /// 15 s, 30 s, 1 min, 2 min, 5 min, 10 min, 15 min, 30 min, 1 h, 2 h,
+    /// 4 h, 12 h, 24 h). Sur l'échelle Année où chaque bucket est un
+    /// mois entier, la durée totale peut atteindre plusieurs heures — le
+    /// vieil algorithme à pas fixe (10 min) produisait alors 20+ ticks
+    /// empilés. On cible ici `max / 4` puis on arrondit au pas humain
+    /// juste au-dessus.
     private var durationYAxisTicks: (ticks: [Int], upperBound: Int) {
         let buckets = viewModel.buckets(for: seizures)
         let maxV = buckets.map(\.totalDurationSec).max() ?? 0
         guard maxV > 0 else { return ([0, 60], 60) }
-        let step: Int
-        switch maxV {
-        case ..<30:     step = 5
-        case ..<60:     step = 15
-        case ..<300:    step = 60           // 1 min
-        case ..<900:    step = 120          // 2 min
-        case ..<3600:   step = 300          // 5 min
-        default:        step = 600          // 10 min
-        }
+
+        let humanSteps: [Int] = [
+            5, 10, 15, 30,                                // 5 s → 30 s
+            60, 120, 300, 600, 900, 1800,                 // 1 min → 30 min
+            3600, 7200, 14400, 21600, 43200,              // 1 h → 12 h
+            86400                                          // 24 h
+        ]
+        let targetStep = maxV / 4
+        let step = humanSteps.first(where: { $0 >= targetStep }) ?? humanSteps.last!
         let upperBound = ((maxV + step - 1) / step) * step
         let ticks = Array(stride(from: 0, through: upperBound, by: step))
         return (ticks, upperBound)
     }
 
-    /// Format compact pour les labels d'axe : « 45s », « 3min », « 3m30 ».
-    /// Volontairement plus court que `formatDuration` (utilisé dans la carte
-    /// de synthèse) pour tenir dans la marge de 44 pt de l'axe.
+    /// Format compact pour les labels d'axe : « 45s », « 3min », « 3m30 »,
+    /// « 2h », « 2h30 ». Bascule sur les heures dès 1 h pour ne pas se
+    /// retrouver avec « 240min » qui déborde la marge.
     private static func formatDurationAxis(_ seconds: Int) -> String {
         if seconds == 0 { return "0" }
         if seconds < 60 { return "\(seconds)s" }
-        if seconds % 60 == 0 { return "\(seconds / 60)min" }
-        return String(format: "%dm%02d", seconds / 60, seconds % 60)
+        let totalMinutes = seconds / 60
+        let s = seconds % 60
+        if totalMinutes < 60 {
+            if s == 0 { return "\(totalMinutes)min" }
+            return String(format: "%dm%02d", totalMinutes, s)
+        }
+        let h = totalMinutes / 60
+        let m = totalMinutes % 60
+        if m == 0 { return "\(h)h" }
+        return "\(h)h\(m)"
     }
 
     var body: some View {
