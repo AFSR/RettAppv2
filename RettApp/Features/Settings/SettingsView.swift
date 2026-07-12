@@ -33,6 +33,11 @@ struct SettingsView: View {
         // (l'Apple Santé conditionnel du root a disparu, il est intégré à
         // la sous-page Suivi & rappels).
         List {
+            // ── 0. SOUTIEN AFSR (haut de page, appel visuel fort — pas de
+            //    footer ici car le détail « loi 1901, don déductible… » est
+            //    déjà présenté dans la page de don elle-même)
+            supportSection
+
             // ── 1. PROFIL
             childSection
 
@@ -103,8 +108,6 @@ struct SettingsView: View {
                 Text("Aide et informations")
             }
 
-            // ── 8. SOUTIEN AFSR (call-to-action en bas, mis en couleur)
-            supportSection
         }
         .navigationTitle("Réglages")
         .task { await refreshAuthorizations() }
@@ -245,10 +248,6 @@ struct SettingsView: View {
                 Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
                     .foregroundStyle(.afsrEmergency)
             }
-        } header: {
-            Text("Soutenir l'association")
-        } footer: {
-            Text("L'AFSR est une association loi 1901 reconnue d'intérêt général. Vos dons sont déductibles à 66 % de votre impôt sur le revenu (dans la limite de 20 % du revenu imposable).")
         }
     }
 

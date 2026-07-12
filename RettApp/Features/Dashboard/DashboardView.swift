@@ -48,6 +48,40 @@ struct DashboardView: View {
     /// et les colonnes de dates se décaleraient de plusieurs pixels.
     private static let yAxisLabelWidth: CGFloat = 44
 
+    /// Génère une échelle de valeurs "rondes" pour l'axe des durées de crises,
+    /// adaptée à l'ordre de grandeur observé sur la période. Les labels obtenus
+    /// (0, 60, 180, …) sont toujours un multiple d'un pas naturel (5 s, 15 s,
+    /// 1 min, 2 min, 5 min, 10 min) — ça évite les axes en secondes bruts type
+    /// « 233 s » qui ne veulent rien dire d'humain et déborderaient la marge.
+    private var durationYAxisValues: [Int] {
+        let buckets = viewModel.buckets(for: seizures)
+        let maxV = buckets.map(\.totalDurationSec).max() ?? 0
+        guard maxV > 0 else { return [0] }
+        let step: Int
+        switch maxV {
+        case ..<30:     step = 5           // 0/5/10/15…
+        case ..<60:     step = 15          // 0/15/30/45/60
+        case ..<300:    step = 60          // 0/1min/2min…
+        case ..<900:    step = 120         // 0/2min/4min…
+        case ..<3600:   step = 300         // 0/5min/10min…
+        default:        step = 600         // 0/10min/20min…
+        }
+        var values: [Int] = []
+        var v = 0
+        while v <= maxV + step { values.append(v); v += step }
+        return values
+    }
+
+    /// Format compact pour les labels d'axe : « 45s », « 3min », « 3m30 ».
+    /// Volontairement plus court que `formatDuration` (utilisé dans la carte
+    /// de synthèse) pour tenir dans la marge de 44 pt de l'axe.
+    private static func formatDurationAxis(_ seconds: Int) -> String {
+        if seconds == 0 { return "0" }
+        if seconds < 60 { return "\(seconds)s" }
+        if seconds % 60 == 0 { return "\(seconds / 60)min" }
+        return String(format: "%dm%02d", seconds / 60, seconds % 60)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -237,10 +271,10 @@ struct DashboardView: View {
                 }
                 .frame(height: 180)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                    AxisMarks(position: .leading, values: durationYAxisValues) { value in
                         if let v = value.as(Int.self) {
                             AxisValueLabel {
-                                Text(formatDuration(v))
+                                Text(Self.formatDurationAxis(v))
                                     .font(.caption2)
                                     .frame(width: Self.yAxisLabelWidth, alignment: .trailing)
                             }
@@ -345,7 +379,11 @@ struct DashboardView: View {
                 .frame(height: 160)
                 .chartYScale(domain: 0...100)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: [0, 50, 100]) { value in
+                    // Granularité 25 % : donne une lecture beaucoup plus fine
+                    // qu'un simple 0/50/100 sans surcharger le chart. Un
+                    // parent voit tout de suite si la compliance passe la
+                    // barre des 75 %, seuil clinique courant.
+                    AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
                         if let v = value.as(Int.self) {
                             AxisValueLabel {
                                 Text("\(v) %")
