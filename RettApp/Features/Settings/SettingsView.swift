@@ -25,28 +25,34 @@ struct SettingsView: View {
     @State private var showShareSheet = false
 
     var body: some View {
+        // Organisation : ce que l'utilisateur consulte le plus souvent en
+        // haut (profil, suivi, partage, documents), les actions techniques
+        // (données, appareil) au milieu, l'aide et le soutien à l'AFSR au
+        // pied de la liste. Chaque groupe fonctionnel = une section avec
+        // un header + footer explicites — plus de bloc « surprise »
+        // (l'Apple Santé conditionnel du root a disparu, il est intégré à
+        // la sous-page Suivi & rappels).
         List {
-            // ── DON AFSR (en tête, priorité haute)
-            supportSection
-
-            // ── RÔLE DE L'APPAREIL (Parent / Enfant)
-            deviceRoleSection
-
-            // ── PROFIL ENFANT
+            // ── 1. PROFIL
             childSection
 
-            // ── CONFIGURATION DU SUIVI (sous-page hiérarchique)
+            // ── 2. SUIVI & RAPPELS
             Section {
                 NavigationLink {
                     ConfigurationSubView()
                 } label: {
-                    Label("Configuration du suivi", systemImage: "slider.horizontal.3")
+                    Label("Suivi & rappels", systemImage: "slider.horizontal.3")
                 }
+            } header: {
+                Text("Suivi médical")
             } footer: {
-                Text("Plan médicamenteux, jeu du regard, notifications, Apple Santé.")
+                Text("Plan médicamenteux, notifications de prises et intégration Apple Santé.")
             }
 
-            // ── DOCUMENTS MÉDICAUX
+            // ── 3. PARTAGE ENTRE PARENTS
+            sharingSection
+
+            // ── 4. DOCUMENTS MÉDICAUX
             Section {
                 NavigationLink {
                     MedicalReportView()
@@ -59,43 +65,29 @@ struct SettingsView: View {
                     Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
                 }
             } header: {
-                Text("Documents médicaux")
+                Text("Documents à imprimer")
+            } footer: {
+                Text("Deux PDF prêts à envoyer : bilan médical structuré et carnet de suivi pour l'équipe encadrante.")
             }
 
-            // ── DONNÉES APPLE SANTÉ — uniquement en mode enfant.
-            //    Apple Santé n'a de sens que sur l'iPhone effectivement
-            //    utilisé par l'enfant. Pour activer l'intégration, il faut
-            //    basculer cet iPhone en mode enfant via la section
-            //    « Cet iPhone est utilisé par » plus haut.
-            if DeviceRoleStore.shared.role == .child {
-                Section {
-                    NavigationLink {
-                        HealthDataView()
-                    } label: {
-                        Label("App Santé d'Apple (HealthKit)", systemImage: "heart.text.square")
-                    }
-                } header: {
-                    Text("Apple Santé")
-                } footer: {
-                    Text("RettApp utilise l'API HealthKit d'Apple pour lire les données Santé de cet iPhone (sommeil, hydratation, repas, rythme cardiaque, activité). L'autorisation est demandée à l'ouverture de l'écran.")
-                }
-            }
-
-            // ── DONNÉES (sous-page hiérarchique)
+            // ── 5. MES DONNÉES (sous-page)
             Section {
                 NavigationLink {
                     DataSubView()
                 } label: {
-                    Label("Données", systemImage: "internaldrive")
+                    Label("Mes données", systemImage: "internaldrive")
                 }
+            } header: {
+                Text("Données")
             } footer: {
-                Text("Export CSV, données de démonstration, effacement.")
+                Text("Import CSV, export complet, jeu de démonstration, effacement.")
             }
 
-            // ── PARTAGE ENTRE PARENTS
-            sharingSection
+            // ── 6. CET APPAREIL (mode parent / enfant — déplacé bas car
+            //    rarement modifié après le paramétrage initial)
+            deviceRoleSection
 
-            // ── LÉGAL & À PROPOS (sous-page hiérarchique)
+            // ── 7. AIDE & LÉGAL
             Section {
                 NavigationLink {
                     MedicalDisclaimerSubView()
@@ -105,11 +97,14 @@ struct SettingsView: View {
                 NavigationLink {
                     AboutSubView()
                 } label: {
-                    Label("À propos", systemImage: "info.circle.fill")
+                    Label("À propos et mentions légales", systemImage: "info.circle.fill")
                 }
             } header: {
-                Text("Légal")
+                Text("Aide et informations")
             }
+
+            // ── 8. SOUTIEN AFSR (call-to-action en bas, mis en couleur)
+            supportSection
         }
         .navigationTitle("Réglages")
         .task { await refreshAuthorizations() }
@@ -192,7 +187,7 @@ struct SettingsView: View {
                 )
             }
         } header: {
-            Text("Configuration de l'appareil")
+            Text("Cet appareil")
         } footer: {
             // Footer explicite sur ce que chaque mode débloque, en
             // particulier l'intégration Apple Santé (HealthKit) qui n'est
@@ -228,118 +223,6 @@ struct SettingsView: View {
         }
     }
 
-    private var medicationsSection: some View {
-        Section("Médicaments") {
-            Button { showMedicationPlan = true } label: {
-                Label("Plan médicamenteux", systemImage: "pills.fill")
-            }
-        }
-    }
-
-
-    private var healthSection: some View {
-        Section {
-            HStack {
-                Label("Apple Santé", systemImage: "heart.fill")
-                    .foregroundStyle(.pink)
-                Spacer()
-                Text(healthKitStatusLabel)
-                    .font(AFSRFont.caption())
-                    .foregroundStyle(.secondary)
-            }
-            Button {
-                if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
-            } label: {
-                Label("Gérer les permissions", systemImage: "gear")
-            }
-        } header: {
-            Text("Santé")
-        } footer: {
-            Text("Toutes les données (crises, médicaments, prises) sont stockées localement sur l'appareil. L'API publique HealthKit n'expose pas encore de type pour les crises d'épilepsie — utilisez l'export CSV pour partager les données avec un professionnel de santé.")
-        }
-    }
-
-    private var notificationsSection: some View {
-        Section {
-            Toggle(isOn: Binding(
-                get: { notificationsEnabled },
-                set: { newValue in
-                    Task {
-                        if newValue {
-                            let center = UNUserNotificationCenter.current()
-                            _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-                            await MedicationViewModel().rescheduleAllNotifications(
-                                medications: medications,
-                                childFirstName: profiles.first?.firstName ?? ""
-                            )
-                        } else {
-                            await MedicationViewModel().cancelAllNotifications()
-                        }
-                        await refreshAuthorizations()
-                    }
-                }
-            )) {
-                Label("Rappels médicaments", systemImage: "bell.badge.fill")
-            }
-
-            Button {
-                Task { await sendTestNotification() }
-            } label: {
-                Label("Envoyer une notification test", systemImage: "bell")
-            }
-        } header: {
-            Text("Notifications")
-        }
-    }
-
-    private var documentsSection: some View {
-        Section {
-            NavigationLink {
-                MedicalReportView()
-            } label: {
-                Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
-            }
-            NavigationLink {
-                FollowUpBookletView()
-            } label: {
-                Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
-            }
-        } header: {
-            Text("Documents médicaux")
-        } footer: {
-            Text("Le rapport médecin produit un PDF structuré (statistiques, corrélations, plan médicamenteux, calendrier en annexe). Le cahier de suivi est un PDF imprimable à confier à l'équipe encadrante.")
-        }
-    }
-
-    private var dataSection: some View {
-        Section {
-            Button {
-                exportAllCSV()
-            } label: {
-                Label("Exporter toutes les données (CSV)", systemImage: "square.and.arrow.up")
-            }
-            Button {
-                showDemoConfirm = true
-            } label: {
-                Label("Générer des données de démonstration", systemImage: "wand.and.stars")
-            }
-            Button(role: .destructive) {
-                showPurgeDemoConfirm = true
-            } label: {
-                Label("Supprimer les données de démonstration", systemImage: "wand.and.stars.inverse")
-            }
-            Button(role: .destructive) {
-                showEraseConfirm = true
-            } label: {
-                Label("Effacer toutes les données", systemImage: "trash")
-            }
-        } header: {
-            Text("Données")
-        } footer: {
-            Text("Vos données restent sur cet appareil. L'export CSV sert à les transmettre vous-même à un professionnel de santé.")
-        }
-    }
-
     private var sharingSection: some View {
         Section {
             NavigationLink {
@@ -369,62 +252,7 @@ struct SettingsView: View {
         }
     }
 
-    private var medicalDisclaimerSection: some View {
-        Section {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "exclamationmark.shield.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.afsrWarning)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("RettApp n'est pas un dispositif médical")
-                        .font(AFSRFont.headline(15))
-                    Text("Cette application est un outil de suivi destiné aux parents et aidants. Elle ne constitue pas un dispositif médical au sens du règlement européen 2017/745 (MDR) et ne remplace en aucun cas un avis, un diagnostic ou un traitement médical délivré par un professionnel de santé. En cas d'urgence, contactez le 15 ou le 112.")
-                        .font(AFSRFont.caption())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.vertical, 4)
-        } header: {
-            Text("Avertissement médical")
-        }
-    }
-
-    private var aboutSection: some View {
-        Section("À propos") {
-            HStack {
-                Text("Version")
-                Spacer()
-                Text(appVersion).foregroundStyle(.secondary)
-            }
-            Link(destination: URL(string: "https://www.afsr.fr")!) {
-                Label("Site de l'AFSR", systemImage: "safari")
-            }
-            Link(destination: URL(string: "https://rettapp.afsr.fr/mentions-legales.html")!) {
-                Label("Mentions légales", systemImage: "doc.text")
-            }
-            Link(destination: URL(string: "https://rettapp.afsr.fr/confidentialite.html")!) {
-                Label("Politique de confidentialité", systemImage: "lock.shield")
-            }
-        }
-    }
-
     // MARK: - Helpers
-
-    private var appVersion: String {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "\(v) (\(b))"
-    }
-
-    private var healthKitStatusLabel: String {
-        switch healthKitStatus {
-        case .notDetermined: return "Non demandé"
-        case .denied: return "Refusé"
-        case .authorized: return "Autorisé"
-        case .unavailable: return "Indisponible"
-        }
-    }
 
     private func refreshAuthorizations() async {
         let center = UNUserNotificationCenter.current()
