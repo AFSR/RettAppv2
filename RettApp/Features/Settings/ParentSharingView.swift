@@ -26,9 +26,9 @@ struct ParentSharingView: View {
                 activityTimelineSection
             }
             actionsSection
-            if sync.role != .none {
-                troubleshootSection
-            }
+            // Toujours affiché : même quand aucun partage n'est actif,
+            // le diagnostic reste précieux pour comprendre pourquoi.
+            troubleshootSection
             infoSection
         }
         .navigationTitle("Partage entre parents")
@@ -315,6 +315,11 @@ struct ParentSharingView: View {
 
     private var troubleshootSection: some View {
         Section {
+            NavigationLink {
+                SharingDiagnosticView()
+            } label: {
+                Label("Diagnostic sync", systemImage: "stethoscope")
+            }
             Button(role: .destructive) {
                 presentResetConfirm = true
             } label: {
@@ -328,7 +333,7 @@ struct ParentSharingView: View {
         } header: {
             Text("Dépannage")
         } footer: {
-            Text("À utiliser uniquement si la synchronisation semble bloquée. Cette action efface les marqueurs internes côté appareil (tokens de changement, abonnements push) puis pousse vos données locales et retire l'intégralité du contenu partagé depuis iCloud. Vos données restent intactes ; le partage et l'autre parent ne sont pas affectés.")
+            Text("Diagnostic : affiche l'état exact (rôle, zones, share) pour joindre en cas de blocage. Réinitialiser : efface les marqueurs internes côté appareil (tokens, abonnements) puis pousse et re-pull tout iCloud. Vos données locales sont intactes.")
         }
         .confirmationDialog(
             "Réinitialiser la synchronisation ?",
