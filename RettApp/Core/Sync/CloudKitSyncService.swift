@@ -1657,6 +1657,93 @@ final class CloudKitSyncService {
         try await replicateAll(from: context)
         try await pullChanges(into: context)
     }
+
+    // MARK: - Diagnostic (Support technique)
+
+    /// Snapshot en clair de l'état CloudKit à un instant T. Utilisé par la
+    /// page Réglages → Partage → Diagnostic pour que l'utilisateur puisse
+    /// screenshotter la config exacte et me l'envoyer en cas de blocage.
+    ///
+    /// Fait des appels réseau (fetch zones + share). À appeler à la demande,
+    /// pas en boucle. Chaque champ marqué `nil` explique pourquoi.
+    struct DiagnosticSnapshot {
+        var role: String
+        var accountStatus: String
+        var privateZoneExists: Bool
+        var privateZoneShareExists: Bool
+        var privateZoneShareURL: String?
+        var sharedZonesCount: Int
+        var sharedZones: [String]              // "zoneName / ownerName"
+        var sharedZoneShareExists: Bool
+        var currentShareURL: String?
+        var pendingWriteCount: Int
+        var lastSyncedAt: String?
+        var lastErrorMessage: String?
+        var subscriptionsRegistered: Bool
+    }
+
+    func diagnosticSnapshot() async -> DiagnosticSnapshot {
+        var snap = DiagnosticSnapshot(
+            role: describe(role),
+            accountStatus: describe(accountStatus),
+            privateZoneExists: false,
+            privateZoneShareExists: false,
+            privateZoneShareURL: nil,
+            sharedZonesCount: 0,
+            sharedZones: [],
+            sharedZoneShareExists: false,
+            currentShareURL: currentShare?.url?.absoluteString,
+            pendingWriteCount: PendingWriteStore.shared.pendingCount,
+            lastSyncedAt: lastSyncedAt.map { ISO8601DateFormatter().string(from: $0) },
+            lastErrorMessage: lastErrorMessage,
+            subscriptionsRegistered: UserDefaults.standard.bool(forKey: Self.subscriptionsRegisteredKey)
+        )
+
+        // Private zone probe
+        let privateZoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
+        do {
+            _ = try await container.privateCloudDatabase.recordZone(for: privateZoneID)
+            snap.privateZoneExists = true
+            if let share = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: privateZoneID) {
+                snap.privateZoneShareExists = true
+                snap.privateZoneShareURL = share.url?.absoluteString
+            }
+        } catch {
+            // Zone absente → OK, on laisse false.
+        }
+
+        // Shared zones probe
+        if let zones = try? await container.sharedCloudDatabase.allRecordZones() {
+            snap.sharedZonesCount = zones.count
+            snap.sharedZones = zones.map { "\($0.zoneID.zoneName) / \($0.zoneID.ownerName)" }
+            for zone in zones {
+                if (try? await fetchZoneShare(database: container.sharedCloudDatabase, zoneID: zone.zoneID)) != nil {
+                    snap.sharedZoneShareExists = true
+                    break
+                }
+            }
+        }
+
+        return snap
+    }
+
+    private func describe(_ r: ShareRole) -> String {
+        switch r {
+        case .none: return ".none (aucun rôle établi)"
+        case .owner: return ".owner (propriétaire du partage)"
+        case .participant: return ".participant (invité au partage)"
+        }
+    }
+
+    private func describe(_ s: AccountStatus) -> String {
+        switch s {
+        case .unknown: return ".unknown (statut non déterminé)"
+        case .available: return ".available (iCloud connecté)"
+        case .noAccount: return ".noAccount (aucun compte iCloud)"
+        case .restricted: return ".restricted (contrôle parental)"
+        case .unavailable: return ".unavailable (indisponible)"
+        }
+    }
 }
 
 // MARK: - Participant info
