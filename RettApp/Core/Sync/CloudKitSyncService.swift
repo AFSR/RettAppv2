@@ -194,6 +194,24 @@ final class CloudKitSyncService {
             if case .syncing = syncState { syncState = .idle }
         }
 
+        // GARDE-FOU CRITIQUE — refuser la création d'un nouveau partage si ce
+        // device est en fait participant d'un partage existant. Sans cette
+        // vérification, le bouton « Inviter un autre parent » (affiché tant
+        // que role == .none, i.e. avant que `refreshShareStatus` n'ait
+        // terminé) déclenchait la création d'une nouvelle zone privée +
+        // share sur le device du participant → il se voyait attribuer le
+        // rôle owner et le lien avec l'owner d'origine était rompu.
+        //
+        // On force un refresh du statut serveur AVANT toute création. Si on
+        // découvre qu'on est participant, on refuse et on renvoie un share
+        // artificiel n'est pas possible — on lève une erreur explicite pour
+        // que l'UI puisse afficher un message pertinent.
+        await refreshShareStatus()
+        if role == .participant {
+            Self.log.error("prepareShareForController: refusé — ce device est déjà participant d'un partage")
+            throw SyncError.alreadyParticipant
+        }
+
         // (1) Pousse l'existant pour que l'invité voie tout au moment d'accepter.
         //    Important : avant d'attacher le share, sinon les records ajoutés
         //    plus tard ne propagent pas tout de suite.
@@ -355,7 +373,19 @@ final class CloudKitSyncService {
             // c'est ça qui fait foi. On nettoie même toute zone privée
             // résiduelle sur ce device pour ne plus jamais retomber dans
             // ce piège.
-            let sharedZones = (try? await container.sharedCloudDatabase.allRecordZones()) ?? []
+            //
+            // Sur ÉCHEC RÉSEAU du fetch des zones partagées, on préserve
+            // le role précédent plutôt que de risquer une bascule owner
+            // erronée. `try` sans `?` — un throw sort proprement de la
+            // fonction sans muter role.
+            let sharedZones: [CKRecordZone]
+            do {
+                sharedZones = try await container.sharedCloudDatabase.allRecordZones()
+            } catch {
+                Self.log.error("refreshShareStatus: sharedDB fetch KO — état préservé, retry au prochain refresh (\(error.localizedDescription))")
+                lastErrorMessage = error.localizedDescription
+                return
+            }
             if !sharedZones.isEmpty {
                 var primaryShare: CKShare?
                 for zone in sharedZones {
@@ -1793,9 +1823,12 @@ enum SyncError: LocalizedError {
     case shareURLUnavailable
     case shareSaveFailed(underlying: Error)
     case perRecordPushFailed(count: Int)
+    case alreadyParticipant
 
     var errorDescription: String? {
         switch self {
+        case .alreadyParticipant:
+            return "Vous êtes déjà participant du partage d'un autre parent. Impossible de créer un nouveau partage depuis cet appareil sans quitter le partage actuel d'abord (Réglages → Partage entre parents → Quitter le partage)."
         case .perRecordPushFailed(let count):
             return "Impossible de pousser \(count) enregistrement(s) vers iCloud. Ils seront réessayés à la prochaine synchronisation."
         case .iCloudUnavailable(let status):
