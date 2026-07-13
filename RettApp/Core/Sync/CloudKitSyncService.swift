@@ -1423,27 +1423,52 @@ final class CloudKitSyncService {
         // subscriptions (inactivité > ~1 mois, reset de compte iCloud, etc.),
         // donc plus jamais de push silencieux jusqu'au prochain resetSyncState
         // manuel. On préfère un no-op réseau court à un silence total.
-        do {
+        //
+        // IMPORTANT — chaque enregistrement est ISOLÉ dans son propre
+        // `do/catch` : historiquement on chaînait tout dans un seul `do`,
+        // et l'erreur "Subscription evaluation type not allowed in shared
+        // database" (CKQuerySubscription N'EST PAS supportée par Apple sur
+        // sharedCloudDatabase) faisait bailer TOUT le bloc — le flag
+        // « registered » n'était jamais setté, et à chaque foreground on
+        // relançait la même séquence qui échouait toujours au même endroit.
+        //
+        // On note aussi que la seizure alert n'a de sens que sur privateDB :
+        // c'est le OWNER de la zone qui reçoit l'alerte quand le participant
+        // pousse une crise. Le participant reçoit la crise via silent push
+        // (CKDatabaseSubscription sur shared) + son propre pull.
+        await tryRegister(label: "private database subscription") {
             try await registerDatabaseSubscription(
                 database: container.privateCloudDatabase,
                 subscriptionID: "afsr.private.changes"
             )
+        }
+        await tryRegister(label: "shared database subscription") {
             try await registerDatabaseSubscription(
                 database: container.sharedCloudDatabase,
                 subscriptionID: "afsr.shared.changes"
             )
+        }
+        await tryRegister(label: "private seizure alert (owner)") {
             try await registerSeizureAlertSubscription(
                 database: container.privateCloudDatabase,
                 subscriptionID: "afsr.private.seizure.alert"
             )
-            try await registerSeizureAlertSubscription(
-                database: container.sharedCloudDatabase,
-                subscriptionID: "afsr.shared.seizure.alert"
-            )
-            UserDefaults.standard.set(true, forKey: Self.subscriptionsRegisteredKey)
-            Self.log.info("CKSubscriptions ensured (database + seizure alerts)")
+        }
+        // Note : PAS d'équivalent sur sharedCloudDatabase. Apple ne permet pas
+        // les CKQuerySubscription sur la base partagée. La détection d'une
+        // crise poussée par l'autre parent se fait via silent push + pull.
+        UserDefaults.standard.set(true, forKey: Self.subscriptionsRegisteredKey)
+        Self.log.info("CKSubscriptions ensured (au moins celles qui étaient permises)")
+    }
+
+    /// Wrapper à usage interne : loue le tag, exécute l'enregistrement,
+    /// avale les erreurs individuelles pour ne pas contaminer les
+    /// enregistrements suivants.
+    private func tryRegister(label: String, _ action: () async throws -> Void) async {
+        do {
+            try await action()
         } catch {
-            Self.log.error("ensureSubscriptions error: \(error.localizedDescription)")
+            Self.log.error("Subscription '\(label)' KO : \(error.localizedDescription)")
         }
     }
 
