@@ -774,10 +774,19 @@ final class CloudKitSyncService {
     /// `.serverRecordChanged`. Retry les erreurs transitoires (rate-limit,
     /// zoneBusy, réseau) via `CKRetry`.
     ///
-    /// Ne throw QUE si le batch entier échoue au niveau réseau. Une erreur
-    /// per-record NON-résolvable (permission, quota, invalid data) lève
-    /// une `SyncError.perRecordPushFailed` pour que l'appelant requeue le
-    /// batch (sinon on perdrait silencieusement des enregistrements).
+    /// IMPORTANT — `atomically: false` :
+    ///   Par défaut CloudKit exécute `modifyRecords` en mode atomique : si UN
+    ///   record échoue (schéma, contrainte, permission), tous les autres du
+    ///   même batch sont marqués `.batchRequestFailed` en cascade. Un
+    ///   utilisateur qui a 40 records en buffer verrait alors « 40 erreurs »
+    ///   là où un seul est vraiment fautif — et le drain requeue les 40, boucle
+    ///   à l'infini sans progression. On passe à `atomically: false` pour que
+    ///   chaque record aille indépendamment ; `.batchRequestFailed` est ensuite
+    ///   filtré comme erreur "cascade sans cause" et pas comme vraie failure.
+    ///
+    /// Ne throw QUE si des records ont eu une VRAIE erreur non résolvable.
+    /// `.batchRequestFailed` est ignoré (les vrais coupables sont ailleurs dans
+    /// le batch et ont leur propre entrée dans `saveResults`).
     private func pushBatch(
         _ records: [CKRecord],
         deletes: [CKRecord.ID],
@@ -788,7 +797,8 @@ final class CloudKitSyncService {
             let result = try await database.modifyRecords(
                 saving: records,
                 deleting: deletes,
-                savePolicy: .ifServerRecordUnchanged
+                savePolicy: .ifServerRecordUnchanged,
+                atomically: false
             )
 
             // 1) Handle per-record save results — recover LWW on serverRecordChanged.
@@ -796,12 +806,27 @@ final class CloudKitSyncService {
             var terminalFailures: [(recordID: CKRecord.ID, error: Error)] = []
             for (recordID, res) in result.saveResults {
                 guard case .failure(let err) = res else { continue }
-                if let ck = err as? CKError, ck.code == .serverRecordChanged {
-                    if let merged = self.mergeForLWW(conflict: ck) {
-                        conflictedRecordsToReplay.append(merged)
+                if let ck = err as? CKError {
+                    switch ck.code {
+                    case .serverRecordChanged:
+                        if let merged = self.mergeForLWW(conflict: ck) {
+                            conflictedRecordsToReplay.append(merged)
+                        }
+                        // Merge nil = serveur gagne → abandon volontaire, pas une perte.
+                    case .batchRequestFailed:
+                        // Cascade d'un autre record fautif dans le même batch.
+                        // Avec atomically:false ça ne devrait plus arriver, mais
+                        // on filtre par sécurité — le vrai coupable a sa propre
+                        // entrée `terminalFailures`, pas la peine de doubler.
+                        Self.log.debug("[\(label)] cascade .batchRequestFailed sur \(recordID.recordName), ignoré")
+                    case .unknownItem:
+                        // Record inconnu côté serveur pour une save →
+                        // habituellement quelqu'un vient de le supprimer.
+                        // On abandonne notre push (le pull ramènera la suppression).
+                        Self.log.info("[\(label)] .unknownItem sur \(recordID.recordName) → record supprimé côté serveur, abandon du push")
+                    default:
+                        terminalFailures.append((recordID, err))
                     }
-                    // Si merge nil (serveur gagne) → notre push est
-                    // délibérément abandonné, ce n'est pas une perte.
                 } else {
                     terminalFailures.append((recordID, err))
                 }
@@ -815,10 +840,15 @@ final class CloudKitSyncService {
                 let replayResult = try await database.modifyRecords(
                     saving: conflictedRecordsToReplay,
                     deleting: [],
-                    savePolicy: .ifServerRecordUnchanged
+                    savePolicy: .ifServerRecordUnchanged,
+                    atomically: false
                 )
                 for (recordID, res) in replayResult.saveResults {
                     if case .failure(let err) = res {
+                        if let ck = err as? CKError,
+                           ck.code == .batchRequestFailed || ck.code == .unknownItem {
+                            continue
+                        }
                         terminalFailures.append((recordID, err))
                     }
                 }
@@ -838,7 +868,11 @@ final class CloudKitSyncService {
             if !terminalFailures.isEmpty {
                 Self.log.error("[\(label)] \(terminalFailures.count) échec(s) terminal(aux) per-record")
                 for (id, err) in terminalFailures {
-                    Self.log.error("  - \(id.recordName) : \(err.localizedDescription)")
+                    if let ck = err as? CKError {
+                        Self.log.error("  - \(id.recordName) [CKError \(ck.errorCode)]: \(err.localizedDescription)")
+                    } else {
+                        Self.log.error("  - \(id.recordName): \(err.localizedDescription)")
+                    }
                 }
                 throw SyncError.perRecordPushFailed(count: terminalFailures.count)
             }
