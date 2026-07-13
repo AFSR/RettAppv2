@@ -137,18 +137,36 @@ final class CloudKitSyncService {
 
     // MARK: - Zone setup
 
-    /// S'assure que la zone partagée existe (créée à la demande, idempotent).
-    @discardableResult
-    private func ensureZone() async throws -> CKRecordZone {
+    /// Récupère la zone privée si elle existe déjà. **Ne crée JAMAIS**.
+    /// À utiliser dans les chemins de lecture/écriture normaux (pull, push,
+    /// drain), pour ne PAS accidentellement créer une zone privée sur le
+    /// device d'un participant — ce qui le promouvait en owner d'un nouveau
+    /// partage vide, cassant le lien avec l'owner original.
+    private func existingOwnedZone() async -> CKRecordZone? {
         if let ownedZone { return ownedZone }
         let zoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
-        // Tentative de fetch d'abord
+        do {
+            let zone = try await container.privateCloudDatabase.recordZone(for: zoneID)
+            ownedZone = zone
+            return zone
+        } catch {
+            return nil
+        }
+    }
+
+    /// Crée la zone privée si elle n'existe pas encore. **UNIQUEMENT** appelée
+    /// depuis le flux d'initialisation du partage (`prepareShareForController`)
+    /// où on est explicitement propriétaire. Toute autre voie doit passer par
+    /// `existingOwnedZone()`.
+    @discardableResult
+    private func createOwnedZoneForSharing() async throws -> CKRecordZone {
+        if let ownedZone { return ownedZone }
+        let zoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
         do {
             let zone = try await container.privateCloudDatabase.recordZone(for: zoneID)
             ownedZone = zone
             return zone
         } catch let error as CKError where error.code == .zoneNotFound {
-            // Création
             let zone = CKRecordZone(zoneID: zoneID)
             let saved = try await container.privateCloudDatabase.save(zone)
             ownedZone = saved
@@ -181,7 +199,7 @@ final class CloudKitSyncService {
         //    plus tard ne propagent pas tout de suite.
         try? await replicateAll(from: context)
 
-        let zone = try await ensureZone()
+        let zone = try await createOwnedZoneForSharing()
 
         // (2) Cherche un share existant dans la zone
         if let existing = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: zone.zoneID) {
@@ -262,7 +280,8 @@ final class CloudKitSyncService {
         // Ce chemin n'est plus utilisé par l'UI principale (ProximityShare
         // utilise prepareShareForController). Conservé en filet de sécurité.
         try await ensureSignedIn()
-        let zone = try await ensureZone()
+        // Ce flow initialise un partage → on peut créer la zone.
+        let zone = try await createOwnedZoneForSharing()
         // Important : on ne peut pas écrire `currentShare ?? (try? await …)`
         // parce que l'opérateur `??` utilise un `@autoclosure` non-async,
         // et un `await` dans un autoclosure ne compile pas en Swift 5.9.
@@ -322,25 +341,21 @@ final class CloudKitSyncService {
     /// utilisateur ait activé la découvrabilité — souvent désactivée).
     func refreshShareStatus() async {
         do {
-            // 1) Côté propriétaire — zone privée existante ?
-            let zoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
-            do {
-                _ = try await container.privateCloudDatabase.recordZone(for: zoneID)
-                if let share = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: zoneID) {
-                    await applyOwnedShare(share)
-                    return
-                }
-            } catch let error as CKError where error.code == .zoneNotFound {
-                // Pas de zone côté privé — on bascule en check participant.
-            }
-
-            // 2) Côté participant — zone(s) présente(s) dans la sharedCloudDatabase ?
-            //    On itère TOUTES les zones partagées pour supporter le cas où
-            //    l'utilisateur est participant de plusieurs enfants (par
-            //    exemple un pro qui accompagne plusieurs familles). On garde
-            //    le premier share trouvé comme "primaire" pour l'UI de statut,
-            //    mais chaque zone est bien pullée par `pullChanges`.
-            let sharedZones = try await container.sharedCloudDatabase.allRecordZones()
+            // ORDRE IMPORTANT — on vérifie le rôle PARTICIPANT en premier.
+            //
+            // Historique du bug : la version précédente vérifiait d'abord
+            // l'existence de la zone privée. Si un participant avait un
+            // résidu de zone privée créée par erreur (via l'ancien
+            // `ensureZone()` déclenché par un pull/push avant que le rôle
+            // soit connu), il était étiqueté « owner » — et l'app tentait
+            // ensuite de partager depuis SA zone, cassant le lien avec le
+            // vrai owner.
+            //
+            // Fix : si on est participant d'un partage EXISTANT côté serveur,
+            // c'est ça qui fait foi. On nettoie même toute zone privée
+            // résiduelle sur ce device pour ne plus jamais retomber dans
+            // ce piège.
+            let sharedZones = (try? await container.sharedCloudDatabase.allRecordZones()) ?? []
             if !sharedZones.isEmpty {
                 var primaryShare: CKShare?
                 for zone in sharedZones {
@@ -357,10 +372,30 @@ final class CloudKitSyncService {
                     participantCount = 0
                     ownerDisplayNameFromShare = nil
                 }
+                // Nettoyage : si ce device a une zone privée « FamilyData »
+                // résiduelle (bug historique), on la supprime pour ne pas
+                // qu'elle revienne polluer un futur refresh.
+                await purgeLeftoverPrivateZoneIfNotUsed()
                 return
             }
 
-            // 3) Aucun partage en cours
+            // Pas de partage côté participant → check côté propriétaire.
+            let privateZoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
+            do {
+                _ = try await container.privateCloudDatabase.recordZone(for: privateZoneID)
+                if let share = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: privateZoneID) {
+                    await applyOwnedShare(share)
+                    return
+                }
+                // Zone privée présente mais pas de share attaché → on est
+                // owner sans partage actif (setup pré-share, ou share
+                // supprimé). On garde role.none pour ne pas déclencher un
+                // push vers une zone sans destinataire.
+            } catch let error as CKError where error.code == .zoneNotFound {
+                // Pas de zone privée → pas owner.
+            }
+
+            // Aucun partage actif
             role = .none
             participants = []
             participantCount = 0
@@ -369,6 +404,34 @@ final class CloudKitSyncService {
         } catch {
             Self.log.error("refreshShareStatus error: \(error.localizedDescription)")
             lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Best-effort : supprime toute zone privée « FamilyData » présente sur ce
+    /// device alors qu'on est participant d'un partage. Résidu d'un bug
+    /// historique où `ensureZone()` créait la zone accidentellement.
+    /// Silencieux en cas d'échec — la présence de la zone n'affecte plus le
+    /// rôle après le fix, c'est juste du nettoyage.
+    private func purgeLeftoverPrivateZoneIfNotUsed() async {
+        let zoneID = CKRecordZone.ID(zoneName: Self.zoneName, ownerName: CKCurrentUserDefaultName)
+        do {
+            _ = try await container.privateCloudDatabase.recordZone(for: zoneID)
+        } catch {
+            return // Pas de zone à nettoyer.
+        }
+        // La zone existe. On ne la supprime QUE si aucun share n'y est
+        // attaché — sinon on toucherait à un partage actif dont on serait
+        // participant sur un autre device (edge case).
+        if let _ = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: zoneID) {
+            Self.log.info("purgeLeftoverPrivateZone : share présent, on ne touche pas")
+            return
+        }
+        do {
+            _ = try await container.privateCloudDatabase.deleteRecordZone(withID: zoneID)
+            ownedZone = nil
+            Self.log.info("purgeLeftoverPrivateZone : zone résiduelle supprimée")
+        } catch {
+            Self.log.error("purgeLeftoverPrivateZone : échec suppression — \(error.localizedDescription)")
         }
     }
 
@@ -388,6 +451,9 @@ final class CloudKitSyncService {
     private func applyParticipantShare(_ share: CKShare) async {
         currentShare = share
         role = .participant
+        // Un participant ne DOIT jamais utiliser une "zone owned" cachée en
+        // mémoire — sinon un pull ultérieur pousserait dans la mauvaise zone.
+        ownedZone = nil
         let infos = share.participants.map { p in
             ParticipantInfo(from: p, isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID)
         }
@@ -600,7 +666,13 @@ final class CloudKitSyncService {
             }
             zoneID = zone.zoneID
         } else {
-            let zone = try await ensureZone()
+            // Owner : on utilise la zone existante mais on ne la crée PAS ici.
+            // La création est réservée au flow de partage (prepareShareForController).
+            guard let zone = await existingOwnedZone() else {
+                Self.log.info("replicateAll: pas de zone privée existante, skip")
+                lastSyncedAt = Date()
+                return
+            }
             zoneID = zone.zoneID
         }
 
@@ -906,13 +978,24 @@ final class CloudKitSyncService {
     /// Retourne les zones à cibler pour un push (owner : zone privée ; participant :
     /// toutes les zones partagées). Alloué à un seul appel par cycle pour éviter
     /// les allers-retours réseau redondants.
+    ///
+    /// **Critique** : ne crée JAMAIS de zone. Un participant qui n'aurait pas
+    /// encore reçu la métadata du share (edge case, refresh en cours) ne doit
+    /// SURTOUT pas se voir créer une zone privée par erreur — ça le
+    /// promouvait en owner d'un nouveau partage vide et cassait le lien avec
+    /// l'owner original.
     private func resolveZoneIDs() async throws -> [CKRecordZone.ID] {
-        if role == .participant {
+        switch role {
+        case .participant:
             let zones = try await container.sharedCloudDatabase.allRecordZones()
             return zones.map { $0.zoneID }
-        } else {
-            let zone = try await ensureZone()
+        case .owner:
+            guard let zone = await existingOwnedZone() else { return [] }
             return [zone.zoneID]
+        case .none:
+            // Rôle indéterminé — on refuse toute action de zone plutôt que
+            // de risquer une création accidentelle.
+            return []
         }
     }
 
@@ -975,7 +1058,13 @@ final class CloudKitSyncService {
 
         let zoneIDs: [CKRecordZone.ID]
         if scope == .private {
-            let zone = try await ensureZone()
+            // On PULL uniquement d'une zone qui existe déjà. Créer une zone
+            // depuis un pull est une hérésie — c'est comme ça qu'un
+            // participant a été promu owner par accident.
+            guard let zone = await existingOwnedZone() else {
+                Self.log.info("pullChanges: pas de zone privée existante, skip")
+                return
+            }
             zoneIDs = [zone.zoneID]
         } else {
             let zones = try await database.allRecordZones()
@@ -1234,7 +1323,7 @@ final class CloudKitSyncService {
         // On liste toutes les zones dispo pour être robuste au cas participant/owner.
         let zoneIDs: [CKRecordZone.ID]
         if appropriateDatabaseScope() == .private {
-            guard let zone = try? await ensureZone() else { return }
+            guard let zone = await existingOwnedZone() else { return }
             zoneIDs = [zone.zoneID]
         } else {
             zoneIDs = (try? await database.allRecordZones().map { $0.zoneID }) ?? []
@@ -1258,6 +1347,9 @@ final class CloudKitSyncService {
         defer { syncState = .idle }
         try await container.accept(metadata)
         role = .participant
+        // Un cache résiduel de zone privée pourrait faire pousser dans la
+        // mauvaise zone après acceptation → on invalide.
+        ownedZone = nil
         Self.log.info("Share accepté (rootRecordID=\(metadata.rootRecordID.recordName))")
     }
 
