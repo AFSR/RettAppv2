@@ -256,6 +256,20 @@ final class CloudKitSyncService {
         // (souvent : schéma CloudKit non déployé en production).
         for (_, modResult) in saveResult.saveResults {
             if case .failure(let err) = modResult {
+                // Récupération : « un share existe déjà sur cette zone ».
+                // CloudKit refuse un 2e share zone-wide — l'erreur porte
+                // alors le record serveur (le share EXISTANT) dans son
+                // userInfo. On le récupère et on repart avec, au lieu
+                // d'échouer. C'est le filet de sécurité si le fetch direct
+                // du share a raté (latence de propagation serveur).
+                if let ck = err as? CKError, ck.code == .serverRecordChanged,
+                   let existing = ck.userInfo[CKRecordChangedErrorServerRecordKey] as? CKShare,
+                   existing.url != nil {
+                    Self.log.info("share save conflicted — récupération du share serveur existant")
+                    currentShare = existing
+                    role = .owner
+                    return (existing, container)
+                }
                 Self.log.error("share save failed: \(err.localizedDescription)")
                 throw SyncError.shareSaveFailed(underlying: err)
             }
@@ -318,19 +332,47 @@ final class CloudKitSyncService {
         throw SyncError.shareURLUnavailable
     }
 
-    /// Cherche un `CKShare` dans une zone donnée en scannant les
-    /// modifications via `recordZoneChanges`. Fonctionne aussi bien pour les
-    /// shares per-record que zone-wide — c'est l'API officielle Apple pour
-    /// retrouver le share associé à une zone, qu'on en soit propriétaire ou
-    /// participant.
+    /// Cherche le `CKShare` d'une zone donnée.
+    ///
+    /// **BUG HISTORIQUE (cause de « aucun partage identifié ») :** l'ancienne
+    /// implémentation scannait la PREMIÈRE page de `recordZoneChanges` sans
+    /// gérer `moreComing`. Tant que la zone contenait peu de records, le
+    /// CKShare apparaissait dans la première page — mais dès que la zone a
+    /// dépassé quelques centaines de records (532 poussés par replicateAll),
+    /// le record `cloudkit.zoneshare` est tombé hors de la première page :
+    /// le share devenait introuvable, `refreshShareStatus` concluait « pas de
+    /// partage », et `prepareShareForController` tentait de créer un DEUXIÈME
+    /// share zone-wide que CloudKit refuse — d'où l'échec du re-partage.
+    ///
+    /// Fix en deux étages :
+    ///   1. Fetch DIRECT par recordID : un share zone-wide porte toujours le
+    ///      recordName réservé `CKRecordNameZoneWideShare` — O(1), exact,
+    ///      insensible au volume de la zone.
+    ///   2. Fallback : scan paginé COMPLET (boucle sur `moreComing`) pour
+    ///      couvrir un éventuel share per-record hérité d'une vieille version.
     private func fetchZoneShare(database: CKDatabase, zoneID: CKRecordZone.ID) async throws -> CKShare? {
-        let result = try await database.recordZoneChanges(inZoneWith: zoneID, since: nil)
-        for (_, modResult) in result.modificationResultsByID {
-            if case .success(let mod) = modResult, let share = mod.record as? CKShare {
+        // (1) Fetch direct du zone-wide share.
+        let zoneShareID = CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID)
+        do {
+            if let share = try await database.record(for: zoneShareID) as? CKShare {
                 return share
             }
+        } catch let error as CKError where error.code == .unknownItem {
+            // Pas de share zone-wide — on tombe dans le scan complet.
         }
-        return nil
+
+        // (2) Scan paginé complet — TOUTES les pages, pas seulement la première.
+        var token: CKServerChangeToken?
+        while true {
+            let result = try await database.recordZoneChanges(inZoneWith: zoneID, since: token)
+            for (_, modResult) in result.modificationResultsByID {
+                if case .success(let mod) = modResult, let share = mod.record as? CKShare {
+                    return share
+                }
+            }
+            guard result.moreComing else { return nil }
+            token = result.changeToken
+        }
     }
 
     /// Récupère le nom complet de l'utilisateur iCloud courant via
