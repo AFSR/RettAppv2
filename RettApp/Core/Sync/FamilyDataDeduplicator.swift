@@ -84,10 +84,15 @@ enum FamilyDataDeduplicator {
 
         // Re-rattache la relation Medication.childProfile AVANT de supprimer
         // les doublons — sinon la cascade `.cascade` emporterait les
-        // médicaments avec le profil supprimé.
+        // médicaments avec le profil supprimé. Les orphelins (childProfile
+        // nil — résultat du détachement anti-cascade de `deleteLocal` quand
+        // la suppression d'un profil doublon arrive par le réseau) sont
+        // adoptés par le survivant au passage.
         if let meds = try? context.fetch(FetchDescriptor<Medication>()) {
             for m in meds {
                 if let pid = m.childProfile?.id, loserIds.contains(pid) {
+                    m.childProfile = winner
+                } else if m.childProfile == nil {
                     m.childProfile = winner
                 }
             }
@@ -205,6 +210,32 @@ enum FamilyDataDeduplicator {
             .map { String(format: "%02d:%02d", $0.hour, $0.minute) }
             .sorted()
             .joined(separator: ",")
+    }
+
+    /// Re-rattache au profil unique les médicaments orphelins (childProfile
+    /// nil). Ces orphelins naissent du détachement anti-cascade de
+    /// `CloudKitSyncService.deleteLocal` : quand la suppression d'un profil
+    /// doublon arrive par le réseau, on détache ses médicaments plutôt que
+    /// de laisser la cascade les détruire. À appeler après chaque pull.
+    ///
+    /// Ne fait rien s'il y a 0 ou 2+ profils (avec plusieurs profils, le
+    /// rattachement serait non-déterministe — c'est `mergeDuplicateProfiles`
+    /// qui gère ce cas en adoptant vers son survivant).
+    @discardableResult
+    static func adoptOrphanMedications(in context: ModelContext) -> Int {
+        guard let profiles = try? context.fetch(FetchDescriptor<ChildProfile>()),
+              profiles.count == 1, let only = profiles.first else { return 0 }
+        guard let meds = try? context.fetch(FetchDescriptor<Medication>()) else { return 0 }
+        var adopted = 0
+        for m in meds where m.childProfile == nil {
+            m.childProfile = only
+            adopted += 1
+        }
+        if adopted > 0 {
+            try? context.saveTouching()
+            log.info("Adoption : \(adopted) médicament(s) orphelin(s) re-rattaché(s) au profil")
+        }
+        return adopted
     }
 
     /// Pré-check bon marché : y a-t-il des doublons candidats à la fusion ?

@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import CloudKit
 @testable import RettApp
 
 /// Tests du fusionneur de doublons multi-appareil. Scénario reproduit :
@@ -163,6 +164,53 @@ final class FamilyDataDeduplicatorTests: XCTestCase {
 
         XCTAssertEqual(FamilyDataDeduplicator.run(in: context), 1)
         XCTAssertEqual(FamilyDataDeduplicator.run(in: context), 0, "2e passe = no-op")
+    }
+
+    // MARK: - Anti-cascade (suppression distante de profil)
+
+    func test_remoteProfileDeletion_doesNotCascadeKillMedications() throws {
+        let context = try makeContext()
+        let profile = ChildProfile(firstName: "Louise")
+        context.insert(profile)
+        let med = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg,
+                             scheduledHours: [HourMinute(hour: 8, minute: 0)])
+        med.childProfile = profile
+        context.insert(med)
+        try context.save()
+
+        // Simule l'arrivée réseau de la suppression du profil (fusion faite
+        // sur l'autre appareil) AVANT que ce device n'ait re-pointé ses
+        // médicaments.
+        let zoneID = CKRecordZone.ID(zoneName: "FamilyData", ownerName: CKCurrentUserDefaultName)
+        let recordID = CKRecord.ID(recordName: profile.id.uuidString, zoneID: zoneID)
+        CloudKitSyncService.deleteLocal(recordID: recordID, in: context)
+        try context.save()
+
+        let meds = try context.fetch(FetchDescriptor<Medication>())
+        XCTAssertEqual(meds.count, 1, "le plan ne doit PAS être emporté par la cascade")
+        XCTAssertNil(meds.first?.childProfile, "le médicament survit détaché")
+        XCTAssertEqual(try context.fetch(FetchDescriptor<ChildProfile>()).count, 0)
+
+        // Le profil survivant arrive au pull suivant → l'orphelin est adopté.
+        let winner = ChildProfile(firstName: "Louise")
+        context.insert(winner)
+        try context.save()
+        XCTAssertEqual(FamilyDataDeduplicator.adoptOrphanMedications(in: context), 1)
+        XCTAssertEqual(meds.first?.childProfile?.id, winner.id)
+    }
+
+    func test_adoptOrphans_isNoOpWithMultipleProfiles() throws {
+        let context = try makeContext()
+        // Avec 2+ profils, l'adoption serait non-déterministe → no-op
+        // (c'est mergeDuplicateProfiles qui décidera du survivant).
+        context.insert(ChildProfile(firstName: "A", createdAt: Date(timeIntervalSince1970: 1_000)))
+        context.insert(ChildProfile(firstName: "B", createdAt: Date(timeIntervalSince1970: 2_000)))
+        let orphan = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg, scheduledHours: [])
+        context.insert(orphan)
+        try context.save()
+
+        XCTAssertEqual(FamilyDataDeduplicator.adoptOrphanMedications(in: context), 0)
+        XCTAssertNil(orphan.childProfile)
     }
 
     // MARK: - Normalisation
