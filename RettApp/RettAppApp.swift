@@ -103,6 +103,18 @@ struct RettAppApp: App {
                 .environment(updateService)
                 .tint(.afsrPurpleAdaptive)
                 .task {
+                    // Watchdog : quoi qu'il arrive (offline, iCloud lent), on
+                    // débloque l'onboarding après 8 s pour ne jamais bloquer
+                    // un premier lancement sans réseau.
+                    let watchdog = Task { [syncService] in
+                        try? await Task.sleep(nanoseconds: 8_000_000_000)
+                        syncService.initialCloudCheckDone = true
+                    }
+                    defer {
+                        watchdog.cancel()
+                        syncService.initialCloudCheckDone = true
+                    }
+
                     await syncService.refreshAccountStatus()
                     await syncService.refreshShareStatus()
                     // Enregistre les CKDatabaseSubscription pour recevoir des
@@ -121,6 +133,9 @@ struct RettAppApp: App {
                     // Draine tout ce qui est resté dans le buffer d'écriture
                     // depuis la dernière session (offline, crash, kill app…).
                     await syncService.performCycle(context: sharedModelContainer.mainContext, reason: "launch")
+                    // Le pull de lancement est fini : RootView peut décider
+                    // (onboarding vs données restaurées) sans attendre le reste.
+                    syncService.initialCloudCheckDone = true
                     // Bandeau de mise à jour App Store. Cache 24 h, silencieux
                     // en cas d'échec réseau — jamais bloquant.
                     await updateService.checkForUpdate()
@@ -180,14 +195,44 @@ private func logSwiftDataError(_ stage: String, _ error: Error) {
 /// données restent locales (SwiftData) ou dans l'iCloud personnel de
 /// l'utilisateur (CloudKit Sharing). Le compte iCloud du device sert
 /// d'identité ; pas besoin de Sign in with Apple.
+///
+/// **Garde anti-doublon multi-appareil** : sur un appareil fraîchement
+/// installé, on attend la fin du premier check iCloud (`initialCloudCheckDone`,
+/// watchdog 8 s) avant de proposer l'onboarding. Si un suivi existe déjà sur
+/// le compte (2ᵉ iPhone/iPad du même parent, ou partage accepté), le pull le
+/// ramène pendant cette attente et l'app ouvre directement l'écran principal
+/// — au lieu de faire re-saisir profil + plan et de créer des doublons.
 struct RootView: View {
     @Query private var profiles: [ChildProfile]
+    @Environment(CloudKitSyncService.self) private var sync
 
     var body: some View {
-        if profiles.isEmpty {
+        if !profiles.isEmpty {
+            ContentView()
+        } else if sync.initialCloudCheckDone {
             ProfileSetupView()
         } else {
-            ContentView()
+            CloudRestoreCheckView()
         }
+    }
+}
+
+/// Écran d'attente affiché quelques secondes au premier lancement, le temps
+/// de vérifier si un suivi existe déjà sur iCloud (2ᵉ appareil, partage).
+private struct CloudRestoreCheckView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Recherche d'un suivi existant…")
+                .font(.headline)
+            Text("Si vous avez déjà utilisé RettApp sur un autre appareil ou accepté un partage, vos données vont apparaître automatiquement.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.afsrBackground.ignoresSafeArea())
     }
 }

@@ -61,6 +61,14 @@ final class CloudKitSyncService {
     /// d'être poussées vers CloudKit. Alimenté par une notification postée par
     /// le store à chaque mutation → l'UI (bandeau) se rafraîchit sans polling.
     var pendingWriteCount: Int = 0
+
+    /// Vrai une fois que le premier cycle refresh + pull du lancement est
+    /// terminé (ou son watchdog écoulé). `RootView` s'en sert pour NE PAS
+    /// afficher l'onboarding tant qu'on ne sait pas si un suivi existe déjà
+    /// sur iCloud — sinon un 2ᵉ appareil fraîchement installé ferait
+    /// re-saisir le profil et le plan, créant des doublons (nouveaux UUIDs)
+    /// qui polluent ensuite les deux parents à la synchro suivante.
+    var initialCloudCheckDone: Bool = false
     /// Métadonnées des autres parents (e-mail / nom Apple ID, statut, droits).
     /// Vide si on n'est pas en partage ou si CloudKit n'a pas encore renvoyé la liste.
     var participants: [ParticipantInfo] = []
@@ -1170,6 +1178,13 @@ final class CloudKitSyncService {
         try? context.save()
         lastSyncedAt = Date()
         Self.log.info("pullChanges OK : \(totalUpserted) upsertés, \(totalDeleted) supprimés")
+
+        // Fusion post-pull des doublons multi-appareil (profil + plan
+        // médicamenteux re-saisis sur un 2ᵉ device avant le premier pull).
+        // Déterministe → chaque appareil converge vers les mêmes survivants.
+        // À faire AVANT le dedup des prises : les prises re-pointées vers le
+        // médicament survivant y sont collapsées dans la même passe.
+        FamilyDataDeduplicator.run(in: context)
 
         // Dedup post-pull : quand l'autre parent pousse un log planifié dont le
         // recordName (UUID) ne correspond pas au nôtre (cas hérité pré-stableId),
