@@ -22,12 +22,13 @@ import os.log
 ///   humeurs, observations, symptômes) sont re-rattachés au survivant.
 ///   `hasEpilepsy` est OR-é : une fusion ne doit jamais masquer le suivi
 ///   épilepsie.
-/// - **Médicaments** : groupés par (nom normalisé, unité, type). On garde
-///   le plus RÉCEMMENT modifié (celui que le parent utilise activement).
-///   Les prises et révisions du perdant sont re-pointées vers le
-///   survivant — aucun historique n'est perdu. Le dedup des prises
-///   planifiées (`MedicationLog.dedupeScheduledLogs`) collapse ensuite
-///   les doublons de journal résultants.
+/// - **Médicaments** : groupés par (nom normalisé, unité, type, planning).
+///   On garde le plus ANCIEN (createdAt — immuable donc identique sur tous
+///   les appareils, contrairement à lastModifiedAt qui diverge le temps que
+///   les éditions se propagent). Les prises et révisions du perdant sont
+///   re-pointées vers le survivant — aucun historique n'est perdu. Le dedup
+///   des prises planifiées (`MedicationLog.dedupeScheduledLogs`) collapse
+///   ensuite les doublons de journal résultants.
 ///
 /// Les suppressions passent par `saveTouching()` → enqueue dans le
 /// `PendingWriteStore` → propagées à CloudKit au prochain drain.
@@ -155,10 +156,19 @@ enum FamilyDataDeduplicator {
 
         var removed = 0
         for (_, group) in groups where group.count > 1 {
-            // Survivant : le plus récemment modifié (celui que le parent
-            // utilise), tie-break UUID pour le déterminisme.
+            // Survivant : le plus ANCIEN createdAt, tie-break UUID.
+            //
+            // ATTENTION — le critère doit être basé sur des champs IMMUABLES
+            // et déjà convergés entre appareils. Une première version
+            // utilisait `lastModifiedAt` (« le plus récemment modifié ») :
+            // deux appareils dédupliquant en parallèle avec des éditions
+            // locales pas encore propagées voyaient des timestamps
+            // différents, choisissaient des survivants OPPOSÉS, et chacun
+            // poussait la suppression de l'autre → les DEUX copies
+            // détruites. `createdAt` est fixé à la création et identique
+            // partout → même survivant sur tous les appareils, toujours.
             let sorted = group.sorted {
-                if $0.lastModifiedAt != $1.lastModifiedAt { return $0.lastModifiedAt > $1.lastModifiedAt }
+                if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
                 return $0.id.uuidString < $1.id.uuidString
             }
             let winner = sorted[0]

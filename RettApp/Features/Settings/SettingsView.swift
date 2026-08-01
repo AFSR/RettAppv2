@@ -5,6 +5,7 @@ import HealthKit
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
     @Query(sort: \SeizureEvent.startTime) private var seizures: [SeizureEvent]
@@ -363,6 +364,11 @@ struct SettingsView: View {
     }
 
     private func eraseAll() {
+        // GARDE ANTI-BOUCLE : ne jamais effacer pendant qu'un partage est
+        // actif (profil vide → onboarding → nouveau profil → dédupliqué et
+        // supprimé par l'autre appareil → boucle). L'UI de DataSubView
+        // affiche le message explicatif ; ici on refuse silencieusement.
+        guard sync.role == .none else { return }
         // EFFACEMENT LOCAL UNIQUEMENT — volontairement via `save()` et PAS
         // `saveTouching()` : saveTouching enfilerait chaque suppression dans
         // le PendingWriteStore, qui la propagerait à CloudKit, qui

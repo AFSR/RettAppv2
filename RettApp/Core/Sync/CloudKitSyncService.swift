@@ -220,21 +220,23 @@ final class CloudKitSyncService {
             throw SyncError.alreadyParticipant
         }
 
-        // (1) Pousse l'existant pour que l'invité voie tout au moment d'accepter.
-        //    Important : avant d'attacher le share, sinon les records ajoutés
-        //    plus tard ne propagent pas tout de suite.
-        try? await replicateAll(from: context)
-
+        // (1) Créer la zone AVANT replicateAll : depuis que replicateAll
+        //    utilise `existingOwnedZone()` (jamais de création), l'appeler
+        //    en premier sur un tout premier partage serait un no-op (pas de
+        //    zone → skip) et l'invité accepterait un partage VIDE.
         let zone = try await createOwnedZoneForSharing()
 
-        // (2) Cherche un share existant dans la zone
+        // (2) Pousse l'existant pour que l'invité voie tout au moment d'accepter.
+        try? await replicateAll(from: context)
+
+        // (3) Cherche un share existant dans la zone
         if let existing = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: zone.zoneID) {
             currentShare = existing
             role = .owner
             return (existing, container)
         }
 
-        // (3) Crée un nouveau share zone-wide
+        // (4) Crée un nouveau share zone-wide
         let share = CKShare(recordZoneID: zone.zoneID)
         share[CKShare.SystemFieldKey.title] = "Suivi RettApp — \(childProfile?.fullName ?? "enfant")" as CKRecordValue
         share[CKShare.SystemFieldKey.shareType] = "fr.afsr.RettApp.familyShare" as CKRecordValue
@@ -1347,6 +1349,16 @@ final class CloudKitSyncService {
                 deleted += 1
             }
 
+            // ORDRE CRITIQUE : persister SwiftData AVANT de committer le
+            // token de cette page. Sinon un crash/kill entre les deux (ou un
+            // save qui échoue) laisserait le token avancé alors que les
+            // records de la page n'ont jamais été écrits — et comme CloudKit
+            // ne renvoie que les changements POSTÉRIEURS au token, ces
+            // records seraient perdus définitivement pour cet appareil.
+            // Un throw ici sort de pullZone sans committer le token → la
+            // page entière est re-téléchargée au prochain pull. Les upserts
+            // sont idempotents, un rejeu est sans danger.
+            try context.save()
             ChangeTokenStore.save(result.changeToken, zoneID: zoneID, scope: scope)
             sinceToken = result.changeToken
             moreComing = result.moreComing

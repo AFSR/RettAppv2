@@ -26,7 +26,16 @@ struct CombinedBackup: Codable {
     var symptoms: [SymptomBackup]
     var revisions: [RevisionBackup]
 
-    static let currentVersion: Int = 1
+    /// Tous les profils (multi-appareil peut en avoir créé plusieurs avant
+    /// fusion). `child` est conservé pour la rétro-compatibilité (v1) et
+    /// contient le premier profil.
+    var children: [ChildBackup]? = nil
+
+    /// v2 : ajout de `lastModifiedAt` sur chaque enregistrement + `children`.
+    /// Permet à l'import de n'écraser un enregistrement existant QUE si la
+    /// sauvegarde est plus récente (sinon un restore ferait « gagner » de
+    /// vieilles valeurs partout via le LWW de la synchro).
+    static let currentVersion: Int = 2
 
     // MARK: - Backup sub-structs (mirror du modèle SwiftData)
 
@@ -38,6 +47,7 @@ struct CombinedBackup: Codable {
         let hasEpilepsy: Bool
         let sexRaw: String
         let createdAt: Date
+        var lastModifiedAt: Date? = nil
     }
 
     struct MedicationBackup: Codable {
@@ -51,6 +61,7 @@ struct CombinedBackup: Codable {
         let createdAt: Date
         let intakes: [MedicationIntake]
         let childProfileId: UUID?
+        var lastModifiedAt: Date? = nil
     }
 
     struct LogBackup: Codable {
@@ -65,6 +76,7 @@ struct CombinedBackup: Codable {
         let childProfileId: UUID?
         let isAdHoc: Bool
         let adhocReason: String
+        var lastModifiedAt: Date? = nil
     }
 
     struct SeizureBackup: Codable {
@@ -76,6 +88,7 @@ struct CombinedBackup: Codable {
         let triggerNotes: String
         let notes: String
         let childProfileId: UUID?
+        var lastModifiedAt: Date? = nil
     }
 
     struct MoodBackup: Codable {
@@ -84,6 +97,7 @@ struct CombinedBackup: Codable {
         let levelRaw: Int
         let notes: String
         let childProfileId: UUID?
+        var lastModifiedAt: Date? = nil
     }
 
     struct ObservationBackup: Codable {
@@ -106,6 +120,7 @@ struct CombinedBackup: Codable {
         let napNotes: String
         let generalNotes: String
         let childProfileId: UUID?
+        var lastModifiedAt: Date? = nil
     }
 
     struct SymptomBackup: Codable {
@@ -116,6 +131,7 @@ struct CombinedBackup: Codable {
         let durationMinutes: Int
         let notes: String
         let childProfileId: UUID?
+        var lastModifiedAt: Date? = nil
     }
 
     struct RevisionBackup: Codable {
@@ -129,5 +145,6 @@ struct CombinedBackup: Codable {
         let isActive: Bool
         let notifyEnabled: Bool
         let intakes: [MedicationIntake]
+        var lastModifiedAt: Date? = nil
     }
 }

@@ -81,21 +81,24 @@ final class FamilyDataDeduplicatorTests: XCTestCase {
 
     // MARK: - Médicaments
 
-    func test_mergeMedications_keepsMostRecent_andRepointsLogs() throws {
+    func test_mergeMedications_keepsOldestCreated_andRepointsLogs() throws {
         let context = try makeContext()
         // Même nom (à la casse/espace près), même unité, même type, MÊME
         // planning de prises → vrai doublon de re-saisie → fusion.
-        let old = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg,
-                             scheduledHours: [HourMinute(hour: 8, minute: 0)])
-        old.lastModifiedAt = Date(timeIntervalSince1970: 1_000)
-        let recent = Medication(name: "keppra ", doseAmount: 750, doseUnit: .mg,
-                                scheduledHours: [HourMinute(hour: 8, minute: 0)])
-        recent.lastModifiedAt = Date(timeIntervalSince1970: 2_000)
-        context.insert(old)
-        context.insert(recent)
+        // Survivant = createdAt le plus ANCIEN (critère immuable, identique
+        // sur tous les appareils — lastModifiedAt divergerait le temps que
+        // les éditions se propagent et ferait choisir des survivants opposés).
+        let original = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg,
+                                  scheduledHours: [HourMinute(hour: 8, minute: 0)],
+                                  createdAt: Date(timeIntervalSince1970: 1_000))
+        let duplicate = Medication(name: "keppra ", doseAmount: 750, doseUnit: .mg,
+                                   scheduledHours: [HourMinute(hour: 8, minute: 0)],
+                                   createdAt: Date(timeIntervalSince1970: 2_000))
+        context.insert(original)
+        context.insert(duplicate)
 
         let log = MedicationLog(
-            medicationId: old.id, medicationName: "Keppra",
+            medicationId: duplicate.id, medicationName: "Keppra",
             scheduledTime: Date(), taken: true,
             dose: 500, doseUnit: .mg
         )
@@ -108,8 +111,8 @@ final class FamilyDataDeduplicatorTests: XCTestCase {
         XCTAssertEqual(removed, 1)
         let meds = try context.fetch(FetchDescriptor<Medication>())
         XCTAssertEqual(meds.count, 1)
-        XCTAssertEqual(meds.first?.id, recent.id, "le plus récemment modifié doit survivre")
-        XCTAssertEqual(log.medicationId, recent.id, "les prises du doublon doivent être re-pointées")
+        XCTAssertEqual(meds.first?.id, original.id, "le plus ancien (createdAt) doit survivre")
+        XCTAssertEqual(log.medicationId, original.id, "les prises du doublon doivent être re-pointées")
     }
 
     func test_mergeMedications_doesNotMergeDifferentSchedules() throws {
