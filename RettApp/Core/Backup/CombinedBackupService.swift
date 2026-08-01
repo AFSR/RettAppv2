@@ -15,7 +15,8 @@ enum CombinedBackupService {
 
     @MainActor
     static func export(context: ModelContext) throws -> URL {
-        let profile = (try? context.fetch(FetchDescriptor<ChildProfile>()))?.first
+        let profiles = (try? context.fetch(FetchDescriptor<ChildProfile>())) ?? []
+        let profile = profiles.first
         let medications = (try? context.fetch(FetchDescriptor<Medication>())) ?? []
         let logs = (try? context.fetch(FetchDescriptor<MedicationLog>())) ?? []
         let seizures = (try? context.fetch(FetchDescriptor<SeizureEvent>())) ?? []
@@ -31,7 +32,8 @@ enum CombinedBackupService {
                 CombinedBackup.ChildBackup(
                     id: p.id, firstName: p.firstName, lastName: p.lastName,
                     birthDate: p.birthDate, hasEpilepsy: p.hasEpilepsy,
-                    sexRaw: p.sexRaw, createdAt: p.createdAt
+                    sexRaw: p.sexRaw, createdAt: p.createdAt,
+                    lastModifiedAt: p.lastModifiedAt
                 )
             },
             medications: medications.map { m in
@@ -40,7 +42,8 @@ enum CombinedBackupService {
                     doseUnitRaw: m.doseUnitRaw, kindRaw: m.kindRaw,
                     isActive: m.isActive, notifyEnabled: m.notifyEnabled,
                     createdAt: m.createdAt, intakes: m.intakes,
-                    childProfileId: m.childProfile?.id
+                    childProfileId: m.childProfile?.id,
+                    lastModifiedAt: m.lastModifiedAt
                 )
             },
             medicationLogs: logs.map { l in
@@ -49,7 +52,8 @@ enum CombinedBackupService {
                     medicationName: l.medicationName, scheduledTime: l.scheduledTime,
                     takenTime: l.takenTime, taken: l.taken, dose: l.dose,
                     doseUnitRaw: l.doseUnitRaw, childProfileId: l.childProfileId,
-                    isAdHoc: l.isAdHoc, adhocReason: l.adhocReason
+                    isAdHoc: l.isAdHoc, adhocReason: l.adhocReason,
+                    lastModifiedAt: l.lastModifiedAt
                 )
             },
             seizures: seizures.map { s in
@@ -57,13 +61,15 @@ enum CombinedBackupService {
                     id: s.id, startTime: s.startTime, endTime: s.endTime,
                     seizureTypeRaw: s.seizureTypeRaw, triggerRaw: s.triggerRaw,
                     triggerNotes: s.triggerNotes, notes: s.notes,
-                    childProfileId: s.childProfileId
+                    childProfileId: s.childProfileId,
+                    lastModifiedAt: s.lastModifiedAt
                 )
             },
             moods: moods.map { m in
                 CombinedBackup.MoodBackup(
                     id: m.id, timestamp: m.timestamp, levelRaw: m.levelRaw,
-                    notes: m.notes, childProfileId: m.childProfileId
+                    notes: m.notes, childProfileId: m.childProfileId,
+                    lastModifiedAt: m.lastModifiedAt
                 )
             },
             observations: observations.map { o in
@@ -78,14 +84,16 @@ enum CombinedBackupService {
                     nightSleepDurationMinutes: o.nightSleepDurationMinutes,
                     nightSleepNotes: o.nightSleepNotes,
                     napDurationMinutes: o.napDurationMinutes, napNotes: o.napNotes,
-                    generalNotes: o.generalNotes, childProfileId: o.childProfileId
+                    generalNotes: o.generalNotes, childProfileId: o.childProfileId,
+                    lastModifiedAt: o.lastModifiedAt
                 )
             },
             symptoms: symptoms.map { s in
                 CombinedBackup.SymptomBackup(
                     id: s.id, timestamp: s.timestamp, symptomTypeRaw: s.symptomTypeRaw,
                     intensityRaw: s.intensityRaw, durationMinutes: s.durationMinutes,
-                    notes: s.notes, childProfileId: s.childProfileId
+                    notes: s.notes, childProfileId: s.childProfileId,
+                    lastModifiedAt: s.lastModifiedAt
                 )
             },
             revisions: revisions.map { r in
@@ -93,15 +101,25 @@ enum CombinedBackupService {
                     id: r.id, medicationId: r.medicationId, effectiveFrom: r.effectiveFrom,
                     name: r.name, doseAmount: r.doseAmount, doseUnitRaw: r.doseUnitRaw,
                     kindRaw: r.kindRaw, isActive: r.isActive,
-                    notifyEnabled: r.notifyEnabled, intakes: r.intakes
+                    notifyEnabled: r.notifyEnabled, intakes: r.intakes,
+                    lastModifiedAt: r.lastModifiedAt
                 )
             }
         )
+        var enriched = backup
+        enriched.children = profiles.map { p in
+            CombinedBackup.ChildBackup(
+                id: p.id, firstName: p.firstName, lastName: p.lastName,
+                birthDate: p.birthDate, hasEpilepsy: p.hasEpilepsy,
+                sexRaw: p.sexRaw, createdAt: p.createdAt,
+                lastModifiedAt: p.lastModifiedAt
+            )
+        }
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(backup)
+        let data = try encoder.encode(enriched)
 
         let dir = FileManager.default.temporaryDirectory
         let url = dir.appendingPathComponent(fileName)
@@ -156,21 +174,40 @@ enum CombinedBackupService {
             return result
         }
 
-        // ChildProfile : on ne crée pas un second profil (l'app n'en gère
-        // qu'un). On met à jour le profil existant s'il a le même UUID,
-        // sinon on ignore — l'utilisateur doit configurer son enfant via
-        // l'onboarding avant d'importer.
-        if let c = backup.child {
+        // ChildProfile(s) : v2 fournit `children` (tous les profils), v1
+        // seulement `child`. Deux règles de sécurité :
+        //   1. CRÉER le profil s'il manque — indispensable pour qu'une
+        //      restauration après effacement fonctionne réellement (l'ancien
+        //      code « update-only » laissait zéro profil et affichait quand
+        //      même « restauré avec succès »).
+        //   2. Ne METTRE À JOUR un profil existant que si la sauvegarde est
+        //      plus récente (`shouldApply`), sinon un vieux fichier écraserait
+        //      des données fraîches — qui gagneraient ensuite le LWW partout.
+        let childBackups = backup.children ?? backup.child.map { [$0] } ?? []
+        for c in childBackups {
             let cid = c.id
             let existing = try? context.fetch(FetchDescriptor<ChildProfile>(
                 predicate: #Predicate<ChildProfile> { $0.id == cid }
             )).first
             if let existing {
-                existing.firstName = c.firstName
-                existing.lastName = c.lastName
-                existing.birthDate = c.birthDate
-                existing.hasEpilepsy = c.hasEpilepsy
-                existing.sexRaw = c.sexRaw
+                if shouldApply(backupTs: c.lastModifiedAt, over: existing.lastModifiedAt) {
+                    existing.firstName = c.firstName
+                    existing.lastName = c.lastName
+                    existing.birthDate = c.birthDate
+                    existing.hasEpilepsy = c.hasEpilepsy
+                    existing.sexRaw = c.sexRaw
+                    existing.lastModifiedAt = c.lastModifiedAt ?? existing.lastModifiedAt
+                    result.childProfileApplied = true
+                }
+            } else {
+                let new = ChildProfile(
+                    id: c.id, firstName: c.firstName, lastName: c.lastName,
+                    birthDate: c.birthDate, hasEpilepsy: c.hasEpilepsy,
+                    sex: ChildSex(rawValue: c.sexRaw) ?? .unspecified,
+                    createdAt: c.createdAt
+                )
+                if let ts = c.lastModifiedAt { new.lastModifiedAt = ts }
+                context.insert(new)
                 result.childProfileApplied = true
             }
         }
@@ -205,11 +242,25 @@ enum CombinedBackupService {
         }
 
         do {
-            try context.saveTouching()
+            // stampingTimestamps: false — les enregistrements restaurés gardent
+            // leur lastModifiedAt d'origine. Ils sont bien re-poussés vers
+            // CloudKit (enqueue PendingWriteStore), mais s'ils y rencontrent
+            // une version plus récente, le LWW la laisse gagner : restaurer un
+            // vieux fichier ne fait PAS régresser l'autre parent.
+            try context.saveTouching(stampingTimestamps: false)
         } catch {
             result.errors.append("Erreur d'écriture SwiftData : \(error.localizedDescription)")
         }
         return result
+    }
+
+    /// Règle d'application d'une sauvegarde SUR un enregistrement existant :
+    /// uniquement si le fichier est plus récent. Une sauvegarde v1 (sans
+    /// timestamp) ne modifie JAMAIS un enregistrement existant — elle ne
+    /// sert qu'à recréer les manquants (comportement le plus sûr).
+    private static func shouldApply(backupTs: Date?, over localTs: Date) -> Bool {
+        guard let ts = backupTs else { return false }
+        return ts >= localTs
     }
 
     // MARK: - Per-type upserts
@@ -228,6 +279,7 @@ enum CombinedBackupService {
             )).first
         }
         if let existing {
+            guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return }
             existing.name = m.name
             existing.doseAmount = m.doseAmount
             existing.doseUnit = unit
@@ -236,6 +288,7 @@ enum CombinedBackupService {
             existing.notifyEnabled = m.notifyEnabled
             existing.intakes = m.intakes
             existing.childProfile = child
+            existing.lastModifiedAt = m.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = Medication(
                 id: m.id, name: m.name,
@@ -246,6 +299,7 @@ enum CombinedBackupService {
                 intakes: m.intakes
             )
             new.childProfile = child
+            if let ts = m.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
     }
@@ -257,6 +311,7 @@ enum CombinedBackupService {
         )).first
         let unit = DoseUnit(rawValue: l.doseUnitRaw) ?? .mg
         if let existing {
+            guard shouldApply(backupTs: l.lastModifiedAt, over: existing.lastModifiedAt) else { return }
             existing.medicationId = l.medicationId
             existing.medicationName = l.medicationName
             existing.scheduledTime = l.scheduledTime
@@ -267,6 +322,7 @@ enum CombinedBackupService {
             existing.childProfileId = l.childProfileId
             existing.isAdHoc = l.isAdHoc
             existing.adhocReason = l.adhocReason
+            existing.lastModifiedAt = l.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = MedicationLog(
                 id: l.id, medicationId: l.medicationId, medicationName: l.medicationName,
@@ -274,6 +330,7 @@ enum CombinedBackupService {
                 dose: l.dose, doseUnit: unit, childProfileId: l.childProfileId,
                 isAdHoc: l.isAdHoc, adhocReason: l.adhocReason
             )
+            if let ts = l.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
     }
@@ -286,6 +343,7 @@ enum CombinedBackupService {
         let type = SeizureType(rawValue: s.seizureTypeRaw) ?? .other
         let trigger = SeizureTrigger(rawValue: s.triggerRaw) ?? .none
         if let existing {
+            guard shouldApply(backupTs: s.lastModifiedAt, over: existing.lastModifiedAt) else { return }
             existing.startTime = s.startTime
             existing.endTime = s.endTime
             existing.durationSeconds = max(0, Int(s.endTime.timeIntervalSince(s.startTime)))
@@ -294,6 +352,7 @@ enum CombinedBackupService {
             existing.triggerNotes = s.triggerNotes
             existing.notes = s.notes
             existing.childProfileId = s.childProfileId
+            existing.lastModifiedAt = s.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = SeizureEvent(
                 id: s.id, startTime: s.startTime, endTime: s.endTime,
@@ -301,6 +360,7 @@ enum CombinedBackupService {
                 triggerNotes: s.triggerNotes, notes: s.notes,
                 childProfileId: s.childProfileId
             )
+            if let ts = s.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
     }
@@ -312,15 +372,18 @@ enum CombinedBackupService {
         )).first
         let level = MoodLevel(rawValue: m.levelRaw) ?? .neutral
         if let existing {
+            guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return }
             existing.timestamp = m.timestamp
             existing.level = level
             existing.notes = m.notes
             existing.childProfileId = m.childProfileId
+            existing.lastModifiedAt = m.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = MoodEntry(
                 id: m.id, timestamp: m.timestamp, level: level,
                 notes: m.notes, childProfileId: m.childProfileId
             )
+            if let ts = m.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
     }
@@ -332,6 +395,7 @@ enum CombinedBackupService {
         )).first
         let target: DailyObservation
         if let existing {
+            guard shouldApply(backupTs: o.lastModifiedAt, over: existing.lastModifiedAt) else { return }
             target = existing
         } else {
             target = DailyObservation(id: o.id, dayStart: o.dayStart)
@@ -355,6 +419,7 @@ enum CombinedBackupService {
         target.napNotes = o.napNotes
         target.generalNotes = o.generalNotes
         target.childProfileId = o.childProfileId
+        if let ts = o.lastModifiedAt { target.lastModifiedAt = ts }
     }
 
     private static func upsertSymptom(_ s: CombinedBackup.SymptomBackup, in context: ModelContext) {
@@ -364,18 +429,21 @@ enum CombinedBackupService {
         )).first
         let type = RettSymptom(rawValue: s.symptomTypeRaw) ?? .other
         if let existing {
+            guard shouldApply(backupTs: s.lastModifiedAt, over: existing.lastModifiedAt) else { return }
             existing.timestamp = s.timestamp
             existing.symptomType = type
             existing.intensityRaw = s.intensityRaw
             existing.durationMinutes = s.durationMinutes
             existing.notes = s.notes
             existing.childProfileId = s.childProfileId
+            existing.lastModifiedAt = s.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = SymptomEvent(
                 id: s.id, timestamp: s.timestamp, symptomType: type,
                 intensity: s.intensityRaw, durationMinutes: s.durationMinutes,
                 notes: s.notes, childProfileId: s.childProfileId
             )
+            if let ts = s.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
     }
@@ -388,6 +456,7 @@ enum CombinedBackupService {
         let unit = DoseUnit(rawValue: r.doseUnitRaw) ?? .mg
         let kind = MedicationKind(rawValue: r.kindRaw) ?? .regular
         if let existing {
+            guard shouldApply(backupTs: r.lastModifiedAt, over: existing.lastModifiedAt) else { return }
             existing.medicationId = r.medicationId
             existing.effectiveFrom = r.effectiveFrom
             existing.name = r.name
@@ -397,6 +466,7 @@ enum CombinedBackupService {
             existing.isActive = r.isActive
             existing.notifyEnabled = r.notifyEnabled
             existing.intakes = r.intakes
+            existing.lastModifiedAt = r.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = MedicationRevision(
                 id: r.id, medicationId: r.medicationId, effectiveFrom: r.effectiveFrom,
@@ -404,6 +474,7 @@ enum CombinedBackupService {
                 intakes: r.intakes, kind: kind,
                 isActive: r.isActive, notifyEnabled: r.notifyEnabled
             )
+            if let ts = r.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
     }

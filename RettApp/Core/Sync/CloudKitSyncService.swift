@@ -220,21 +220,23 @@ final class CloudKitSyncService {
             throw SyncError.alreadyParticipant
         }
 
-        // (1) Pousse l'existant pour que l'invité voie tout au moment d'accepter.
-        //    Important : avant d'attacher le share, sinon les records ajoutés
-        //    plus tard ne propagent pas tout de suite.
-        try? await replicateAll(from: context)
-
+        // (1) Créer la zone AVANT replicateAll : depuis que replicateAll
+        //    utilise `existingOwnedZone()` (jamais de création), l'appeler
+        //    en premier sur un tout premier partage serait un no-op (pas de
+        //    zone → skip) et l'invité accepterait un partage VIDE.
         let zone = try await createOwnedZoneForSharing()
 
-        // (2) Cherche un share existant dans la zone
+        // (2) Pousse l'existant pour que l'invité voie tout au moment d'accepter.
+        try? await replicateAll(from: context)
+
+        // (3) Cherche un share existant dans la zone
         if let existing = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: zone.zoneID) {
             currentShare = existing
             role = .owner
             return (existing, container)
         }
 
-        // (3) Crée un nouveau share zone-wide
+        // (4) Crée un nouveau share zone-wide
         let share = CKShare(recordZoneID: zone.zoneID)
         share[CKShare.SystemFieldKey.title] = "Suivi RettApp — \(childProfile?.fullName ?? "enfant")" as CKRecordValue
         share[CKShare.SystemFieldKey.shareType] = "fr.afsr.RettApp.familyShare" as CKRecordValue
@@ -1192,6 +1194,11 @@ final class CloudKitSyncService {
             SafetySnapshots.take(context: context, label: "avant-fusion")
             FamilyDataDeduplicator.run(in: context)
         }
+        // Re-rattache les médicaments détachés par la garde anti-cascade de
+        // `deleteLocal` (suppression réseau d'un profil doublon). Toujours
+        // exécuté — pas seulement quand hasDuplicates : après convergence il
+        // ne reste qu'un profil et d'éventuels orphelins à adopter.
+        FamilyDataDeduplicator.adoptOrphanMedications(in: context)
 
         // Dedup post-pull : quand l'autre parent pousse un log planifié dont le
         // recordName (UUID) ne correspond pas au nôtre (cas hérité pré-stableId),
@@ -1342,6 +1349,16 @@ final class CloudKitSyncService {
                 deleted += 1
             }
 
+            // ORDRE CRITIQUE : persister SwiftData AVANT de committer le
+            // token de cette page. Sinon un crash/kill entre les deux (ou un
+            // save qui échoue) laisserait le token avancé alors que les
+            // records de la page n'ont jamais été écrits — et comme CloudKit
+            // ne renvoie que les changements POSTÉRIEURS au token, ces
+            // records seraient perdus définitivement pour cet appareil.
+            // Un throw ici sort de pullZone sans committer le token → la
+            // page entière est re-téléchargée au prochain pull. Les upserts
+            // sont idempotents, un rejeu est sans danger.
+            try context.save()
             ChangeTokenStore.save(result.changeToken, zoneID: zoneID, scope: scope)
             sinceToken = result.changeToken
             moreComing = result.moreComing
@@ -1377,6 +1394,18 @@ final class CloudKitSyncService {
         // On essaie chacun des 7 types — c'est le moyen le plus simple sans avoir
         // le recordType (Apple ne le donne pas dans CKDatabase.RecordZoneChange.Deletion).
         if let p = try? context.fetch(FetchDescriptor<ChildProfile>(predicate: #Predicate { $0.id == id })).first {
+            // ANTI-CASCADE CRITIQUE : la relation ChildProfile.medications est
+            // en `.cascade`. Scénario destructeur : l'appareil A fusionne les
+            // profils doublons et supprime le perdant → la suppression se
+            // propage → CET appareil la reçoit AVANT d'avoir lui-même
+            // re-pointé ses médicaments → la cascade détruirait le plan
+            // entier localement, et les tokens de pull étant consommés, il ne
+            // reviendrait jamais. On DÉTACHE donc les médicaments avant de
+            // supprimer le profil ; `FamilyDataDeduplicator.adoptOrphanMedications`
+            // les re-rattache au profil survivant à la fin du pull.
+            for m in p.medications {
+                m.childProfile = nil
+            }
             context.delete(p); return
         }
         if let m = try? context.fetch(FetchDescriptor<Medication>(predicate: #Predicate { $0.id == id })).first {

@@ -153,6 +153,7 @@ struct ConfigurationSubView: View {
 /// Export CSV, données de démo (générer/supprimer), effacer toutes les données.
 struct DataSubView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
     @Query(sort: \SeizureEvent.startTime) private var seizures: [SeizureEvent]
@@ -167,6 +168,7 @@ struct DataSubView: View {
     @State private var snapshots: [URL] = []
     @State private var snapshotToRestore: URL?
     @State private var restoreSummary: String?
+    @State private var eraseBlockedMessage: String?
 
     var body: some View {
         Form {
@@ -207,7 +209,16 @@ struct DataSubView: View {
 
             Section {
                 Button(role: .destructive) {
-                    showEraseConfirm = true
+                    // GARDE ANTI-BOUCLE : effacer pendant qu'un partage est
+                    // actif produit un cycle infernal — profil vide →
+                    // onboarding → nouveau profil (UUID neuf) poussé →
+                    // l'autre appareil le déduplique et le supprime → retour
+                    // onboarding… On exige de quitter le partage d'abord.
+                    if sync.role != .none {
+                        eraseBlockedMessage = "Le partage entre parents est actif. Quittez d'abord le partage (Réglages → Partage entre parents → " + (sync.role == .owner ? "Arrêter le partage" : "Quitter le partage") + "), puis revenez effacer cet appareil."
+                    } else {
+                        showEraseConfirm = true
+                    }
                 } label: {
                     Label("Effacer les données de cet appareil", systemImage: "trash")
                 }
@@ -279,6 +290,14 @@ struct DataSubView: View {
             set: { if !$0 { restoreSummary = nil } }
         ), presenting: restoreSummary) { _ in
             Button("OK") { restoreSummary = nil }
+        } message: { msg in
+            Text(msg)
+        }
+        .alert("Partage actif", isPresented: Binding(
+            get: { eraseBlockedMessage != nil },
+            set: { if !$0 { eraseBlockedMessage = nil } }
+        ), presenting: eraseBlockedMessage) { _ in
+            Button("OK") { eraseBlockedMessage = nil }
         } message: { msg in
             Text(msg)
         }
