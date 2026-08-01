@@ -83,7 +83,27 @@ enum SeizureImporter {
             let type = SeizureType(rawValue: row["type"] ?? "") ?? .other
             let trigger = SeizureTrigger(rawValue: row["trigger"] ?? "") ?? .none
 
+            // IDEMPOTENCE : l'UUID est dérivé du contenu (début|fin|type).
+            // Ré-importer le même fichier — ou l'importer sur les deux
+            // appareils des parents — produit les MÊMES ids : localement on
+            // saute les existants, et côté CloudKit les records convergent
+            // au lieu de se dupliquer.
+            let stableId = DeterministicID.uuid(
+                namespace: "afsr.seizure.import.v1",
+                String(Int(start.timeIntervalSince1970)),
+                String(Int(end.timeIntervalSince1970)),
+                type.rawValue
+            )
+            let existing = try? context.fetch(FetchDescriptor<SeizureEvent>(
+                predicate: #Predicate { $0.id == stableId }
+            )).first
+            if existing != nil {
+                skipped += 1
+                continue
+            }
+
             let event = SeizureEvent(
+                id: stableId,
                 startTime: start,
                 endTime: end,
                 seizureType: type,

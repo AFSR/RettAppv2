@@ -213,32 +213,25 @@ enum CombinedBackupService {
         }
 
         for m in backup.medications {
-            upsertMedication(m, in: context)
-            result.medications += 1
+            if upsertMedication(m, in: context) { result.medications += 1 }
         }
         for l in backup.medicationLogs {
-            upsertLog(l, in: context)
-            result.medicationLogs += 1
+            if upsertLog(l, in: context) { result.medicationLogs += 1 }
         }
         for s in backup.seizures {
-            upsertSeizure(s, in: context)
-            result.seizures += 1
+            if upsertSeizure(s, in: context) { result.seizures += 1 }
         }
         for m in backup.moods {
-            upsertMood(m, in: context)
-            result.moods += 1
+            if upsertMood(m, in: context) { result.moods += 1 }
         }
         for o in backup.observations {
-            upsertObservation(o, in: context)
-            result.observations += 1
+            if upsertObservation(o, in: context) { result.observations += 1 }
         }
         for s in backup.symptoms {
-            upsertSymptom(s, in: context)
-            result.symptoms += 1
+            if upsertSymptom(s, in: context) { result.symptoms += 1 }
         }
         for r in backup.revisions {
-            upsertRevision(r, in: context)
-            result.revisions += 1
+            if upsertRevision(r, in: context) { result.revisions += 1 }
         }
 
         do {
@@ -265,7 +258,8 @@ enum CombinedBackupService {
 
     // MARK: - Per-type upserts
 
-    private static func upsertMedication(_ m: CombinedBackup.MedicationBackup, in context: ModelContext) {
+    @discardableResult
+    private static func upsertMedication(_ m: CombinedBackup.MedicationBackup, in context: ModelContext) -> Bool {
         let id = m.id
         let existing = try? context.fetch(FetchDescriptor<Medication>(
             predicate: #Predicate { $0.id == id }
@@ -279,7 +273,7 @@ enum CombinedBackupService {
             )).first
         }
         if let existing {
-            guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return }
+            guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             existing.name = m.name
             existing.doseAmount = m.doseAmount
             existing.doseUnit = unit
@@ -302,16 +296,18 @@ enum CombinedBackupService {
             if let ts = m.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
+        return true
     }
 
-    private static func upsertLog(_ l: CombinedBackup.LogBackup, in context: ModelContext) {
+    @discardableResult
+    private static func upsertLog(_ l: CombinedBackup.LogBackup, in context: ModelContext) -> Bool {
         let id = l.id
         let existing = try? context.fetch(FetchDescriptor<MedicationLog>(
             predicate: #Predicate { $0.id == id }
         )).first
         let unit = DoseUnit(rawValue: l.doseUnitRaw) ?? .mg
         if let existing {
-            guard shouldApply(backupTs: l.lastModifiedAt, over: existing.lastModifiedAt) else { return }
+            guard shouldApply(backupTs: l.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             existing.medicationId = l.medicationId
             existing.medicationName = l.medicationName
             existing.scheduledTime = l.scheduledTime
@@ -333,9 +329,11 @@ enum CombinedBackupService {
             if let ts = l.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
+        return true
     }
 
-    private static func upsertSeizure(_ s: CombinedBackup.SeizureBackup, in context: ModelContext) {
+    @discardableResult
+    private static func upsertSeizure(_ s: CombinedBackup.SeizureBackup, in context: ModelContext) -> Bool {
         let id = s.id
         let existing = try? context.fetch(FetchDescriptor<SeizureEvent>(
             predicate: #Predicate { $0.id == id }
@@ -343,7 +341,7 @@ enum CombinedBackupService {
         let type = SeizureType(rawValue: s.seizureTypeRaw) ?? .other
         let trigger = SeizureTrigger(rawValue: s.triggerRaw) ?? .none
         if let existing {
-            guard shouldApply(backupTs: s.lastModifiedAt, over: existing.lastModifiedAt) else { return }
+            guard shouldApply(backupTs: s.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             existing.startTime = s.startTime
             existing.endTime = s.endTime
             existing.durationSeconds = max(0, Int(s.endTime.timeIntervalSince(s.startTime)))
@@ -363,16 +361,18 @@ enum CombinedBackupService {
             if let ts = s.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
+        return true
     }
 
-    private static func upsertMood(_ m: CombinedBackup.MoodBackup, in context: ModelContext) {
+    @discardableResult
+    private static func upsertMood(_ m: CombinedBackup.MoodBackup, in context: ModelContext) -> Bool {
         let id = m.id
         let existing = try? context.fetch(FetchDescriptor<MoodEntry>(
             predicate: #Predicate { $0.id == id }
         )).first
         let level = MoodLevel(rawValue: m.levelRaw) ?? .neutral
         if let existing {
-            guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return }
+            guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             existing.timestamp = m.timestamp
             existing.level = level
             existing.notes = m.notes
@@ -386,16 +386,18 @@ enum CombinedBackupService {
             if let ts = m.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
+        return true
     }
 
-    private static func upsertObservation(_ o: CombinedBackup.ObservationBackup, in context: ModelContext) {
+    @discardableResult
+    private static func upsertObservation(_ o: CombinedBackup.ObservationBackup, in context: ModelContext) -> Bool {
         let id = o.id
         let existing = try? context.fetch(FetchDescriptor<DailyObservation>(
             predicate: #Predicate { $0.id == id }
         )).first
         let target: DailyObservation
         if let existing {
-            guard shouldApply(backupTs: o.lastModifiedAt, over: existing.lastModifiedAt) else { return }
+            guard shouldApply(backupTs: o.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             target = existing
         } else {
             target = DailyObservation(id: o.id, dayStart: o.dayStart)
@@ -420,16 +422,18 @@ enum CombinedBackupService {
         target.generalNotes = o.generalNotes
         target.childProfileId = o.childProfileId
         if let ts = o.lastModifiedAt { target.lastModifiedAt = ts }
+        return true
     }
 
-    private static func upsertSymptom(_ s: CombinedBackup.SymptomBackup, in context: ModelContext) {
+    @discardableResult
+    private static func upsertSymptom(_ s: CombinedBackup.SymptomBackup, in context: ModelContext) -> Bool {
         let id = s.id
         let existing = try? context.fetch(FetchDescriptor<SymptomEvent>(
             predicate: #Predicate { $0.id == id }
         )).first
         let type = RettSymptom(rawValue: s.symptomTypeRaw) ?? .other
         if let existing {
-            guard shouldApply(backupTs: s.lastModifiedAt, over: existing.lastModifiedAt) else { return }
+            guard shouldApply(backupTs: s.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             existing.timestamp = s.timestamp
             existing.symptomType = type
             existing.intensityRaw = s.intensityRaw
@@ -446,9 +450,11 @@ enum CombinedBackupService {
             if let ts = s.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
+        return true
     }
 
-    private static func upsertRevision(_ r: CombinedBackup.RevisionBackup, in context: ModelContext) {
+    @discardableResult
+    private static func upsertRevision(_ r: CombinedBackup.RevisionBackup, in context: ModelContext) -> Bool {
         let id = r.id
         let existing = try? context.fetch(FetchDescriptor<MedicationRevision>(
             predicate: #Predicate { $0.id == id }
@@ -456,7 +462,7 @@ enum CombinedBackupService {
         let unit = DoseUnit(rawValue: r.doseUnitRaw) ?? .mg
         let kind = MedicationKind(rawValue: r.kindRaw) ?? .regular
         if let existing {
-            guard shouldApply(backupTs: r.lastModifiedAt, over: existing.lastModifiedAt) else { return }
+            guard shouldApply(backupTs: r.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             existing.medicationId = r.medicationId
             existing.effectiveFrom = r.effectiveFrom
             existing.name = r.name
@@ -477,5 +483,6 @@ enum CombinedBackupService {
             if let ts = r.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
+        return true
     }
 }

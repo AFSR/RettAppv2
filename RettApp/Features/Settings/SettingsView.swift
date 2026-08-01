@@ -397,6 +397,8 @@ struct SettingsView: View {
 
 struct ChildProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(CloudKitSyncService.self) private var sync
     @Bindable var profile: ChildProfile
 
     @State private var hasBirthDate: Bool = false
@@ -460,6 +462,13 @@ struct ChildProfileEditor: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("OK") {
                     profile.birthDate = hasBirthDate ? birthDate : nil
+                    // Sauvegarde EXPLICITE via saveTouching : sans elle,
+                    // l'autosave SwiftData (un save() nu) persistait bien
+                    // localement mais n'alimentait jamais le buffer de sync
+                    // → les modifications du profil (prénom, épilepsie,
+                    // date de naissance) n'atteignaient JAMAIS l'autre parent.
+                    try? modelContext.saveTouching()
+                    sync.scheduleSync(context: modelContext)
                     dismiss()
                 }
             }

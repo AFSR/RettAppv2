@@ -1051,6 +1051,15 @@ final class CloudKitSyncService {
             return nil
         }
         // Local strictement plus récent → on rejoue avec le tag serveur.
+        // On copie les clés locales, ET on efface du record serveur les clés
+        // custom qu'il porte mais que le local n'a plus : nos mappers
+        // omettent les optionnels nil (ex. `takenTime` d'une prise décochée)
+        // — sans ce nettoyage, la valeur serveur « fantôme » survivrait au
+        // merge et la prise resterait cochée chez l'autre parent.
+        let localKeys = Set(localRec.allKeys())
+        for key in serverRec.allKeys() where !localKeys.contains(key) {
+            serverRec[key] = nil
+        }
         for key in localRec.allKeys() {
             serverRec[key] = localRec[key]
         }

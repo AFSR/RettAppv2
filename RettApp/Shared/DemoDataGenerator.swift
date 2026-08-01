@@ -92,7 +92,10 @@ enum DemoDataGenerator {
                 for slot in m.hours {
                     let scheduled = slot.date(on: day)
                     let taken = Double.random(in: 0...1) < 0.95
+                    // stableId : si les deux parents génèrent la démo, les
+                    // prises convergent au lieu de se dupliquer via CloudKit.
                     let log = MedicationLog(
+                        id: MedicationLog.stableId(medicationId: med.id, scheduledTime: scheduled),
                         medicationId: med.id,
                         medicationName: med.name,
                         scheduledTime: scheduled,
