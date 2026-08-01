@@ -82,11 +82,13 @@ final class FamilyDataDeduplicatorTests: XCTestCase {
 
     func test_mergeMedications_keepsMostRecent_andRepointsLogs() throws {
         let context = try makeContext()
+        // Même nom (à la casse/espace près), même unité, même type, MÊME
+        // planning de prises → vrai doublon de re-saisie → fusion.
         let old = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg,
                              scheduledHours: [HourMinute(hour: 8, minute: 0)])
         old.lastModifiedAt = Date(timeIntervalSince1970: 1_000)
         let recent = Medication(name: "keppra ", doseAmount: 750, doseUnit: .mg,
-                                scheduledHours: [HourMinute(hour: 8, minute: 30)])
+                                scheduledHours: [HourMinute(hour: 8, minute: 0)])
         recent.lastModifiedAt = Date(timeIntervalSince1970: 2_000)
         context.insert(old)
         context.insert(recent)
@@ -107,6 +109,26 @@ final class FamilyDataDeduplicatorTests: XCTestCase {
         XCTAssertEqual(meds.count, 1)
         XCTAssertEqual(meds.first?.id, recent.id, "le plus récemment modifié doit survivre")
         XCTAssertEqual(log.medicationId, recent.id, "les prises du doublon doivent être re-pointées")
+    }
+
+    func test_mergeMedications_doesNotMergeDifferentSchedules() throws {
+        let context = try makeContext()
+        // Même nom mais plannings différents : deux entrées LÉGITIMES
+        // (ex. « Dépakine » du matin et « Dépakine » du soir saisies comme
+        // deux médicaments). Elles ne doivent JAMAIS être fusionnées — la
+        // fusion détruirait l'un des deux plans.
+        let morning = Medication(name: "Dépakine", doseAmount: 500, doseUnit: .mg,
+                                 scheduledHours: [HourMinute(hour: 8, minute: 0)])
+        let evening = Medication(name: "Dépakine", doseAmount: 200, doseUnit: .mg,
+                                 scheduledHours: [HourMinute(hour: 20, minute: 0)])
+        context.insert(morning)
+        context.insert(evening)
+        try context.save()
+
+        let removed = FamilyDataDeduplicator.mergeDuplicateMedications(in: context)
+
+        XCTAssertEqual(removed, 0, "plannings différents = médicaments distincts, pas de fusion")
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Medication>()).count, 2)
     }
 
     func test_mergeMedications_doesNotMergeDifferentUnitsOrKinds() throws {

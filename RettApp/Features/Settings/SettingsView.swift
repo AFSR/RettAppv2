@@ -363,9 +363,12 @@ struct SettingsView: View {
     }
 
     private func eraseAll() {
-        // Cascade SwiftData ne populate PAS deletedModelsArray (cf. audit
-        // sync). On énumère tous les types pour que chaque delete parvienne
-        // au PendingWriteStore et soit propagé à CloudKit.
+        // EFFACEMENT LOCAL UNIQUEMENT — volontairement via `save()` et PAS
+        // `saveTouching()` : saveTouching enfilerait chaque suppression dans
+        // le PendingWriteStore, qui la propagerait à CloudKit, qui
+        // l'appliquerait chez L'AUTRE PARENT. « Effacer toutes les données »
+        // sur un appareil ne doit JAMAIS détruire le suivi de toute la
+        // famille. Les données restent dans iCloud et chez l'autre parent.
         let moods = (try? modelContext.fetch(FetchDescriptor<MoodEntry>())) ?? []
         let observations = (try? modelContext.fetch(FetchDescriptor<DailyObservation>())) ?? []
         let symptoms = (try? modelContext.fetch(FetchDescriptor<SymptomEvent>())) ?? []
@@ -379,7 +382,7 @@ struct SettingsView: View {
         for o in observations { modelContext.delete(o) }
         for s in symptoms { modelContext.delete(s) }
         for p in profiles { modelContext.delete(p) }
-        try? modelContext.saveTouching()
+        try? modelContext.save()
         Task { await MedicationViewModel().cancelAllNotifications() }
     }
 }

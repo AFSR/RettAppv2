@@ -133,13 +133,18 @@ enum FamilyDataDeduplicator {
         guard let meds = try? context.fetch(FetchDescriptor<Medication>()),
               meds.count > 1 else { return 0 }
 
-        // Clé de groupement stricte : même nom (normalisé), même unité,
-        // même type (regular/adhoc). L'unité et le type dans la clé évitent
-        // de fusionner un médicament du plan avec un homonyme ad-hoc ou
-        // avec un dosage exprimé différemment.
+        // Clé de groupement STRICTE : même nom (normalisé), même unité, même
+        // type (regular/adhoc) ET même planning d'horaires de prises.
+        //
+        // Le planning dans la clé est la protection anti-destruction : deux
+        // entrées légitimes de même nom (ex. « Dépakine » du matin et
+        // « Dépakine » du soir saisies comme deux médicaments distincts) ont
+        // des horaires différents → jamais fusionnées. Seuls les VRAIS
+        // doublons (re-saisie du même plan sur un 2ᵉ appareil → mêmes
+        // horaires) sont collapsés.
         var groups: [String: [Medication]] = [:]
         for m in meds {
-            let key = normalizedName(m.name) + "|" + m.doseUnitRaw + "|" + m.kindRaw
+            let key = normalizedName(m.name) + "|" + m.doseUnitRaw + "|" + m.kindRaw + "|" + scheduleKey(m)
             groups[key, default: []].append(m)
         }
 
@@ -190,5 +195,29 @@ enum FamilyDataDeduplicator {
             .lowercased()
             .split(separator: " ")
             .joined(separator: " ")
+    }
+
+    /// Empreinte du planning de prises : heures/minutes triées. Deux
+    /// médicaments ne sont candidats à la fusion QUE si cette empreinte est
+    /// identique — signature d'une re-saisie du même plan.
+    static func scheduleKey(_ m: Medication) -> String {
+        m.intakes
+            .map { String(format: "%02d:%02d", $0.hour, $0.minute) }
+            .sorted()
+            .joined(separator: ",")
+    }
+
+    /// Pré-check bon marché : y a-t-il des doublons candidats à la fusion ?
+    /// Utilisé pour déclencher l'instantané de sécurité AVANT toute fusion —
+    /// on ne prend jamais le risque de supprimer sans copie locale préalable.
+    static func hasDuplicates(in context: ModelContext) -> Bool {
+        if ((try? context.fetchCount(FetchDescriptor<ChildProfile>())) ?? 0) > 1 { return true }
+        guard let meds = try? context.fetch(FetchDescriptor<Medication>()), meds.count > 1 else { return false }
+        var seen = Set<String>()
+        for m in meds {
+            let key = normalizedName(m.name) + "|" + m.doseUnitRaw + "|" + m.kindRaw + "|" + scheduleKey(m)
+            if !seen.insert(key).inserted { return true }
+        }
+        return false
     }
 }
