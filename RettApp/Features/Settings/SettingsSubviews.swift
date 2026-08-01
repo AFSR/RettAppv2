@@ -164,6 +164,9 @@ struct DataSubView: View {
     @State private var demoSummary: String?
     @State private var exportURL: URL?
     @State private var showShareSheet = false
+    @State private var snapshots: [URL] = []
+    @State private var snapshotToRestore: URL?
+    @State private var restoreSummary: String?
 
     var body: some View {
         Form {
@@ -206,14 +209,79 @@ struct DataSubView: View {
                 Button(role: .destructive) {
                     showEraseConfirm = true
                 } label: {
-                    Label("Effacer toutes les données", systemImage: "trash")
+                    Label("Effacer les données de cet appareil", systemImage: "trash")
                 }
             } footer: {
-                Text("Action irréversible : profil, crises, médicaments, prises, humeurs et observations seront supprimés.")
+                Text("Supprime profil, crises, médicaments, prises, humeurs et observations de CET appareil uniquement. Les données de l'autre parent et la copie iCloud ne sont pas touchées — si le partage est actif, quittez-le d'abord (Réglages → Partage) pour éviter que les données ne reviennent à la prochaine synchronisation.")
+            }
+
+            // ── INSTANTANÉS DE SÉCURITÉ
+            Section {
+                if snapshots.isEmpty {
+                    Text("Aucun instantané pour l'instant. Un instantané est pris automatiquement avant chaque fusion de données (par exemple lors de la réconciliation d'un nouvel appareil).")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(snapshots, id: \.self) { url in
+                        Button {
+                            snapshotToRestore = url
+                        } label: {
+                            HStack {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .foregroundStyle(.afsrPurpleAdaptive)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(snapshotLabel(url))
+                                        .foregroundStyle(.primary)
+                                    if let d = SafetySnapshots.creationDate(of: url) {
+                                        Text(d, format: .dateTime.day().month().year().hour().minute())
+                                            .font(AFSRFont.caption())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Text("Restaurer")
+                                    .font(AFSRFont.caption())
+                                    .foregroundStyle(.afsrPurpleAdaptive)
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Instantanés de sécurité")
+            } footer: {
+                Text("Copies locales complètes prises automatiquement avant toute fusion. La restauration ré-insère les données de l'instantané (sans effacer les plus récentes) puis les re-synchronise.")
             }
         }
         .navigationTitle("Mes données")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { snapshots = SafetySnapshots.list() }
+        .confirmationDialog(
+            "Restaurer cet instantané ?",
+            isPresented: Binding(
+                get: { snapshotToRestore != nil },
+                set: { if !$0 { snapshotToRestore = nil } }
+            ),
+            presenting: snapshotToRestore
+        ) { url in
+            Button("Restaurer") {
+                let result = SafetySnapshots.restore(url: url, context: modelContext)
+                restoreSummary = result.errors.isEmpty
+                    ? "\(result.total) enregistrement(s) restauré(s). Ils seront re-synchronisés automatiquement."
+                    : result.errors.joined(separator: "\n")
+                snapshotToRestore = nil
+            }
+            Button("Annuler", role: .cancel) { snapshotToRestore = nil }
+        } message: { _ in
+            Text("Les données de l'instantané seront ré-insérées. Les enregistrements plus récents ne sont pas effacés.")
+        }
+        .alert("Restauration", isPresented: Binding(
+            get: { restoreSummary != nil },
+            set: { if !$0 { restoreSummary = nil } }
+        ), presenting: restoreSummary) { _ in
+            Button("OK") { restoreSummary = nil }
+        } message: { msg in
+            Text(msg)
+        }
         .sheet(isPresented: $showShareSheet) {
             if let url = exportURL { ShareSheet(items: [url]) }
         }
@@ -245,6 +313,13 @@ struct DataSubView: View {
         }
     }
 
+    private func snapshotLabel(_ url: URL) -> String {
+        // « rettapp-avant-fusion-2026-08-01T… » → « Avant fusion »
+        let name = url.deletingPathExtension().lastPathComponent
+        if name.contains("avant-fusion") { return "Avant fusion automatique" }
+        return "Instantané"
+    }
+
     // MARK: - Helpers (dupliqués depuis SettingsView pour rester self-contained)
 
     private func runGenerateDemo() {
@@ -258,11 +333,10 @@ struct DataSubView: View {
     }
 
     private func eraseAll() {
-        // Chaque type SwiftData doit être itéré explicitement : la cascade
-        // relationnelle (`.cascade` sur ChildProfile → Medication) ne renseigne
-        // PAS `deletedModelsArray` de SwiftData, donc les records cascadés ne
-        // sont pas propagés à CloudKit → orphelins re-tirés au prochain pull.
-        // On récupère à la volée les types que la vue ne @Query pas déjà.
+        // EFFACEMENT LOCAL UNIQUEMENT — `save()` et PAS `saveTouching()` :
+        // saveTouching propagerait chaque suppression à CloudKit et donc à
+        // l'autre parent. Effacer SON appareil ne doit jamais détruire le
+        // suivi de toute la famille. Les données restent dans iCloud.
         let moods = (try? modelContext.fetch(FetchDescriptor<MoodEntry>())) ?? []
         let observations = (try? modelContext.fetch(FetchDescriptor<DailyObservation>())) ?? []
         let symptoms = (try? modelContext.fetch(FetchDescriptor<SymptomEvent>())) ?? []
@@ -276,7 +350,7 @@ struct DataSubView: View {
         for o in observations { modelContext.delete(o) }
         for s in symptoms { modelContext.delete(s) }
         for p in profiles { modelContext.delete(p) }
-        try? modelContext.saveTouching()
+        try? modelContext.save()
         Task { await MedicationViewModel().cancelAllNotifications() }
     }
 

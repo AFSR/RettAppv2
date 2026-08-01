@@ -1184,7 +1184,14 @@ final class CloudKitSyncService {
         // Déterministe → chaque appareil converge vers les mêmes survivants.
         // À faire AVANT le dedup des prises : les prises re-pointées vers le
         // médicament survivant y sont collapsées dans la même passe.
-        FamilyDataDeduplicator.run(in: context)
+        //
+        // GARANTIE ANTI-PERTE : un instantané JSON complet est pris AVANT
+        // toute fusion. Si un utilisateur constate un dégât, il restaure
+        // depuis Réglages → Mes données → Instantanés de sécurité.
+        if FamilyDataDeduplicator.hasDuplicates(in: context) {
+            SafetySnapshots.take(context: context, label: "avant-fusion")
+            FamilyDataDeduplicator.run(in: context)
+        }
 
         // Dedup post-pull : quand l'autre parent pousse un log planifié dont le
         // recordName (UUID) ne correspond pas au nôtre (cas hérité pré-stableId),
@@ -1376,6 +1383,24 @@ final class CloudKitSyncService {
             context.delete(m); return
         }
         if let l = try? context.fetch(FetchDescriptor<MedicationLog>(predicate: #Predicate { $0.id == id })).first {
+            // GARDE HISTORIQUE FACTUEL : une prise marquée « prise » est un
+            // fait médical. Le scénario destructeur : parent A édite son plan
+            // → `regenerateTodaysPendingLogs` supprime les prises « non
+            // prises » DE SA VUE → la suppression se propage → chez parent B
+            // la même prise venait d'être cochée → destruction d'un fait.
+            // On refuse UNE FOIS la suppression distante d'une prise cochée
+            // et on la re-pousse vers le serveur. La mémoire anti-boucle
+            // permet à une suppression délibérée répétée de finir par gagner
+            // (pas de ping-pong infini entre les deux appareils).
+            if l.taken && !l.isAdHoc && !resurrectedOnce.contains(id.uuidString) {
+                rememberResurrection(id.uuidString)
+                PendingWriteStore.shared.markUpsert(
+                    recordType: CKRecordType.medicationLog,
+                    recordName: id.uuidString
+                )
+                Self.log.info("deleteLocal: prise cochée \(id.uuidString) protégée — re-poussée au lieu d'être supprimée")
+                return
+            }
             context.delete(l); return
         }
         if let s = try? context.fetch(FetchDescriptor<SeizureEvent>(predicate: #Predicate { $0.id == id })).first {
@@ -1397,6 +1422,26 @@ final class CloudKitSyncService {
 
     private func deleteLocal(recordID: CKRecord.ID, in context: ModelContext) {
         Self.deleteLocal(recordID: recordID, in: context)
+    }
+
+    // MARK: - Mémoire anti-boucle des résurrections de prises cochées
+
+    private static let resurrectedKey = "afsr.medlog.resurrectedOnce.v1"
+
+    /// IDs de prises cochées dont on a déjà refusé UNE suppression distante.
+    /// Persistée pour survivre au relaunch — sinon chaque redémarrage
+    /// relancerait un cycle de ping-pong suppression/résurrection.
+    nonisolated private static var resurrectedOnce: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: resurrectedKey) ?? [])
+    }
+
+    nonisolated private static func rememberResurrection(_ id: String) {
+        var current = UserDefaults.standard.stringArray(forKey: resurrectedKey) ?? []
+        current.append(id)
+        // Cap : on ne garde que les 300 derniers — largement assez pour
+        // couvrir les races en cours sans croître indéfiniment.
+        if current.count > 300 { current.removeFirst(current.count - 300) }
+        UserDefaults.standard.set(current, forKey: resurrectedKey)
     }
 
     /// Supprime côté serveur les CKRecord des logs « perdants » fusionnés par la
