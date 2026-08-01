@@ -72,19 +72,13 @@ final class MedicationLog {
     /// CloudKit fait un upsert au lieu de créer un doublon. Utilisé UNIQUEMENT pour les
     /// prises auto-générées par le plan ; les prises ad-hoc gardent un UUID aléatoire.
     static func stableId(medicationId: UUID, scheduledTime: Date) -> UUID {
-        let unix = Int(scheduledTime.timeIntervalSince1970)
-        let seed = "afsr.medlog.v1|\(medicationId.uuidString)|\(unix)"
-        var digest = Array(Insecure.MD5.hash(data: Data(seed.utf8)))
-        // Version 5 (name-based), variante RFC 4122 : conforme au format UUID.
-        digest[6] = (digest[6] & 0x0F) | 0x50
-        digest[8] = (digest[8] & 0x3F) | 0x80
-        let bytes: uuid_t = (
-            digest[0], digest[1], digest[2], digest[3],
-            digest[4], digest[5], digest[6], digest[7],
-            digest[8], digest[9], digest[10], digest[11],
-            digest[12], digest[13], digest[14], digest[15]
+        // NE PAS changer le namespace ni le format : tout changement casserait
+        // la convergence avec les logs déjà créés par les versions déployées.
+        DeterministicID.uuid(
+            namespace: "afsr.medlog.v1",
+            medicationId.uuidString,
+            String(Int(scheduledTime.timeIntervalSince1970))
         )
-        return UUID(uuid: bytes)
     }
 }
 

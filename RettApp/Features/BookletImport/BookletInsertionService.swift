@@ -254,7 +254,11 @@ enum BookletInsertionService {
             existing.takenTime = existing.takenTime ?? scheduledTime
             log.info("Médicament \(med.name, privacy: .public) à \(timeStr, privacy: .public) — log existant marqué pris (\(scheduledTime.ISO8601Format(), privacy: .public))")
         } else {
+            // stableId : le même créneau généré par `ensureLogsExist` chez
+            // l'autre parent portera le MÊME UUID → CloudKit fusionne au
+            // lieu de dupliquer.
             let logEntry = MedicationLog(
+                id: MedicationLog.stableId(medicationId: med.id, scheduledTime: scheduledTime),
                 medicationId: med.id,
                 medicationName: med.name,
                 scheduledTime: scheduledTime,

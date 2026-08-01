@@ -53,7 +53,24 @@ enum MoodImporter {
                 continue
             }
 
+            // IDEMPOTENCE : UUID dérivé du contenu (horodatage|niveau) —
+            // ré-import ou import sur les deux appareils = mêmes ids,
+            // pas de doublons ni localement ni via CloudKit.
+            let stableId = DeterministicID.uuid(
+                namespace: "afsr.mood.import.v1",
+                String(Int(timestamp.timeIntervalSince1970)),
+                String(level.rawValue)
+            )
+            let existing = try? context.fetch(FetchDescriptor<MoodEntry>(
+                predicate: #Predicate { $0.id == stableId }
+            )).first
+            if existing != nil {
+                skipped += 1
+                continue
+            }
+
             let entry = MoodEntry(
+                id: stableId,
                 timestamp: timestamp,
                 level: level,
                 notes: row["notes"] ?? "",

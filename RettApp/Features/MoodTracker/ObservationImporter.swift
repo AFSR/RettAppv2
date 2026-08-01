@@ -90,7 +90,9 @@ enum ObservationImporter {
             if let m = row["nap_minutes"].flatMap(Int.init), m > 0 {
                 obs.napDurationMinutes = m
             }
-            if let notes = row["notes"], !notes.isEmpty {
+            if let notes = row["notes"], !notes.isEmpty, !obs.generalNotes.contains(notes) {
+                // Le guard `contains` rend le ré-import idempotent — sans lui,
+                // rejouer le même CSV ré-appendait les mêmes notes à chaque fois.
                 obs.generalNotes = obs.generalNotes.isEmpty ? notes : obs.generalNotes + "\n" + notes
             }
 
