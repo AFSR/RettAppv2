@@ -65,13 +65,13 @@ enum SafetySnapshots {
     /// synchronisation normale.
     @MainActor
     @discardableResult
-    static func restore(url: URL, context: ModelContext) -> CombinedBackupService.ImportResult {
+    static func restore(url: URL, context: ModelContext) async -> CombinedBackupService.ImportResult {
         guard let data = try? Data(contentsOf: url) else {
             var r = CombinedBackupService.ImportResult()
             r.errors.append("Impossible de lire l'instantané.")
             return r
         }
-        return CombinedBackupService.importBackup(contents: data, context: context)
+        return await CombinedBackupService.importBackup(contents: data, context: context)
     }
 
     private static func prune() {

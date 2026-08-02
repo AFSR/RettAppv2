@@ -275,11 +275,13 @@ struct DataSubView: View {
             presenting: snapshotToRestore
         ) { url in
             Button("Restaurer") {
-                let result = SafetySnapshots.restore(url: url, context: modelContext)
-                restoreSummary = result.errors.isEmpty
-                    ? "\(result.total) enregistrement(s) restauré(s). Ils seront re-synchronisés automatiquement."
-                    : result.errors.joined(separator: "\n")
-                snapshotToRestore = nil
+                Task {
+                    let result = await SafetySnapshots.restore(url: url, context: modelContext)
+                    restoreSummary = result.errors.isEmpty
+                        ? "\(result.total) enregistrement(s) restauré(s). Ils seront re-synchronisés automatiquement."
+                        : result.errors.joined(separator: "\n")
+                    snapshotToRestore = nil
+                }
             }
             Button("Annuler", role: .cancel) { snapshotToRestore = nil }
         } message: { _ in

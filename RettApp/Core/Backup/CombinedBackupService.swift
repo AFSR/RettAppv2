@@ -11,6 +11,41 @@ enum CombinedBackupService {
 
     static let fileName = "rettapp-sauvegarde-complete.json"
 
+    /// Index UUID → objet de tous les enregistrements déjà en base, construit
+    /// en 8 requêtes au début de l'import.
+    ///
+    /// Remplace le `context.fetch(predicate: id == X)` qui était fait POUR
+    /// CHAQUE enregistrement importé : sur une sauvegarde de plusieurs
+    /// milliers de lignes, ce scan-par-ligne rendait l'import quadratique et
+    /// gelait l'application. Avec l'index, l'import est linéaire.
+    final class ExistingIndex {
+        var profiles: [UUID: ChildProfile] = [:]
+        var medications: [UUID: Medication] = [:]
+        var logs: [UUID: MedicationLog] = [:]
+        var seizures: [UUID: SeizureEvent] = [:]
+        var moods: [UUID: MoodEntry] = [:]
+        var observations: [UUID: DailyObservation] = [:]
+        var symptoms: [UUID: SymptomEvent] = [:]
+        var revisions: [UUID: MedicationRevision] = [:]
+
+        init(context: ModelContext) {
+            func map<T: PersistentModel>(_ items: [T], _ key: (T) -> UUID) -> [UUID: T] {
+                var d: [UUID: T] = [:]
+                d.reserveCapacity(items.count)
+                for i in items { d[key(i)] = i }
+                return d
+            }
+            profiles     = map((try? context.fetch(FetchDescriptor<ChildProfile>())) ?? [], \.id)
+            medications  = map((try? context.fetch(FetchDescriptor<Medication>())) ?? [], \.id)
+            logs         = map((try? context.fetch(FetchDescriptor<MedicationLog>())) ?? [], \.id)
+            seizures     = map((try? context.fetch(FetchDescriptor<SeizureEvent>())) ?? [], \.id)
+            moods        = map((try? context.fetch(FetchDescriptor<MoodEntry>())) ?? [], \.id)
+            observations = map((try? context.fetch(FetchDescriptor<DailyObservation>())) ?? [], \.id)
+            symptoms     = map((try? context.fetch(FetchDescriptor<SymptomEvent>())) ?? [], \.id)
+            revisions    = map((try? context.fetch(FetchDescriptor<MedicationRevision>())) ?? [], \.id)
+        }
+    }
+
     // MARK: - Export
 
     @MainActor
@@ -146,9 +181,24 @@ enum CombinedBackupService {
         }
     }
 
+    /// Import asynchrone par lots.
+    ///
+    /// Reste sur le `MainActor` (`ModelContext` n'est pas `Sendable`), mais
+    /// rend la main au run-loop tous les `yieldEvery` enregistrements via
+    /// `await Task.yield()` : l'interface reste vivante et peut afficher la
+    /// progression au lieu de paraître gelée. Combiné à l'index pré-chargé et
+    /// à la transaction du buffer d'écriture, un import de plusieurs milliers
+    /// de lignes passe de « plusieurs minutes de gel » à quelques secondes
+    /// avec progression visible.
+    ///
+    /// - Parameter progress: appelé avec (traités, total) au fil de l'import.
     @MainActor
     @discardableResult
-    static func importBackup(contents: Data, context: ModelContext) -> ImportResult {
+    static func importBackup(
+        contents: Data,
+        context: ModelContext,
+        progress: ((Int, Int) -> Void)? = nil
+    ) async -> ImportResult {
         var result = ImportResult()
 
         let decoder = JSONDecoder()
@@ -174,6 +224,13 @@ enum CombinedBackupService {
             return result
         }
 
+        // INDEX PRÉ-CHARGÉ : sans lui, chaque upsert faisait un
+        // `context.fetch(predicate: id == X)` — soit un scan SwiftData par
+        // enregistrement (O(N²)). Sur une sauvegarde de 5 000 lignes, c'est
+        // l'une des deux causes du gel de l'app. On charge ici, en 8 requêtes,
+        // la table des enregistrements existants indexée par UUID.
+        let index = ExistingIndex(context: context)
+
         // ChildProfile(s) : v2 fournit `children` (tous les profils), v1
         // seulement `child`. Deux règles de sécurité :
         //   1. CRÉER le profil s'il manque — indispensable pour qu'une
@@ -185,10 +242,7 @@ enum CombinedBackupService {
         //      des données fraîches — qui gagneraient ensuite le LWW partout.
         let childBackups = backup.children ?? backup.child.map { [$0] } ?? []
         for c in childBackups {
-            let cid = c.id
-            let existing = try? context.fetch(FetchDescriptor<ChildProfile>(
-                predicate: #Predicate<ChildProfile> { $0.id == cid }
-            )).first
+            let existing = index.profiles[c.id]
             if let existing {
                 if shouldApply(backupTs: c.lastModifiedAt, over: existing.lastModifiedAt) {
                     existing.firstName = c.firstName
@@ -208,31 +262,59 @@ enum CombinedBackupService {
                 )
                 if let ts = c.lastModifiedAt { new.lastModifiedAt = ts }
                 context.insert(new)
+                // Le profil doit entrer dans l'index : les médicaments
+                // importés juste après s'y rattachent par childProfileId.
+                index.profiles[c.id] = new
                 result.childProfileApplied = true
             }
         }
 
+        // Compteur global pour la progression + rendu de la main périodique.
+        let total = backup.medications.count + backup.medicationLogs.count
+            + backup.seizures.count + backup.moods.count + backup.observations.count
+            + backup.symptoms.count + backup.revisions.count
+        var done = 0
+        let yieldEvery = 200
+        progress?(0, total)
+
+        @MainActor
+        func tick() async {
+            done += 1
+            if done % yieldEvery == 0 {
+                progress?(done, total)
+                await Task.yield()
+            }
+        }
+
         for m in backup.medications {
-            if upsertMedication(m, in: context) { result.medications += 1 }
+            if upsertMedication(m, in: context, index: index) { result.medications += 1 }
+            await tick()
         }
         for l in backup.medicationLogs {
-            if upsertLog(l, in: context) { result.medicationLogs += 1 }
+            if upsertLog(l, in: context, index: index) { result.medicationLogs += 1 }
+            await tick()
         }
         for s in backup.seizures {
-            if upsertSeizure(s, in: context) { result.seizures += 1 }
+            if upsertSeizure(s, in: context, index: index) { result.seizures += 1 }
+            await tick()
         }
         for m in backup.moods {
-            if upsertMood(m, in: context) { result.moods += 1 }
+            if upsertMood(m, in: context, index: index) { result.moods += 1 }
+            await tick()
         }
         for o in backup.observations {
-            if upsertObservation(o, in: context) { result.observations += 1 }
+            if upsertObservation(o, in: context, index: index) { result.observations += 1 }
+            await tick()
         }
         for s in backup.symptoms {
-            if upsertSymptom(s, in: context) { result.symptoms += 1 }
+            if upsertSymptom(s, in: context, index: index) { result.symptoms += 1 }
+            await tick()
         }
         for r in backup.revisions {
-            if upsertRevision(r, in: context) { result.revisions += 1 }
+            if upsertRevision(r, in: context, index: index) { result.revisions += 1 }
+            await tick()
         }
+        progress?(total, total)
 
         do {
             // stampingTimestamps: false — les enregistrements restaurés gardent
@@ -259,19 +341,11 @@ enum CombinedBackupService {
     // MARK: - Per-type upserts
 
     @discardableResult
-    private static func upsertMedication(_ m: CombinedBackup.MedicationBackup, in context: ModelContext) -> Bool {
-        let id = m.id
-        let existing = try? context.fetch(FetchDescriptor<Medication>(
-            predicate: #Predicate { $0.id == id }
-        )).first
+    private static func upsertMedication(_ m: CombinedBackup.MedicationBackup, in context: ModelContext, index: ExistingIndex) -> Bool {
+        let existing = index.medications[m.id]
         let unit = DoseUnit(rawValue: m.doseUnitRaw) ?? .mg
         let kind = MedicationKind(rawValue: m.kindRaw) ?? .regular
-        let cid = m.childProfileId
-        let child: ChildProfile? = cid.flatMap { uuid in
-            try? context.fetch(FetchDescriptor<ChildProfile>(
-                predicate: #Predicate { $0.id == uuid }
-            )).first
-        }
+        let child: ChildProfile? = m.childProfileId.flatMap { index.profiles[$0] }
         if let existing {
             guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
             existing.name = m.name
@@ -295,16 +369,14 @@ enum CombinedBackupService {
             new.childProfile = child
             if let ts = m.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
+            index.medications[m.id] = new
         }
         return true
     }
 
     @discardableResult
-    private static func upsertLog(_ l: CombinedBackup.LogBackup, in context: ModelContext) -> Bool {
-        let id = l.id
-        let existing = try? context.fetch(FetchDescriptor<MedicationLog>(
-            predicate: #Predicate { $0.id == id }
-        )).first
+    private static func upsertLog(_ l: CombinedBackup.LogBackup, in context: ModelContext, index: ExistingIndex) -> Bool {
+        let existing = index.logs[l.id]
         let unit = DoseUnit(rawValue: l.doseUnitRaw) ?? .mg
         if let existing {
             guard shouldApply(backupTs: l.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
@@ -333,11 +405,8 @@ enum CombinedBackupService {
     }
 
     @discardableResult
-    private static func upsertSeizure(_ s: CombinedBackup.SeizureBackup, in context: ModelContext) -> Bool {
-        let id = s.id
-        let existing = try? context.fetch(FetchDescriptor<SeizureEvent>(
-            predicate: #Predicate { $0.id == id }
-        )).first
+    private static func upsertSeizure(_ s: CombinedBackup.SeizureBackup, in context: ModelContext, index: ExistingIndex) -> Bool {
+        let existing = index.seizures[s.id]
         let type = SeizureType(rawValue: s.seizureTypeRaw) ?? .other
         let trigger = SeizureTrigger(rawValue: s.triggerRaw) ?? .none
         if let existing {
@@ -365,11 +434,8 @@ enum CombinedBackupService {
     }
 
     @discardableResult
-    private static func upsertMood(_ m: CombinedBackup.MoodBackup, in context: ModelContext) -> Bool {
-        let id = m.id
-        let existing = try? context.fetch(FetchDescriptor<MoodEntry>(
-            predicate: #Predicate { $0.id == id }
-        )).first
+    private static func upsertMood(_ m: CombinedBackup.MoodBackup, in context: ModelContext, index: ExistingIndex) -> Bool {
+        let existing = index.moods[m.id]
         let level = MoodLevel(rawValue: m.levelRaw) ?? .neutral
         if let existing {
             guard shouldApply(backupTs: m.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
@@ -390,11 +456,8 @@ enum CombinedBackupService {
     }
 
     @discardableResult
-    private static func upsertObservation(_ o: CombinedBackup.ObservationBackup, in context: ModelContext) -> Bool {
-        let id = o.id
-        let existing = try? context.fetch(FetchDescriptor<DailyObservation>(
-            predicate: #Predicate { $0.id == id }
-        )).first
+    private static func upsertObservation(_ o: CombinedBackup.ObservationBackup, in context: ModelContext, index: ExistingIndex) -> Bool {
+        let existing = index.observations[o.id]
         let target: DailyObservation
         if let existing {
             guard shouldApply(backupTs: o.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
@@ -426,11 +489,8 @@ enum CombinedBackupService {
     }
 
     @discardableResult
-    private static func upsertSymptom(_ s: CombinedBackup.SymptomBackup, in context: ModelContext) -> Bool {
-        let id = s.id
-        let existing = try? context.fetch(FetchDescriptor<SymptomEvent>(
-            predicate: #Predicate { $0.id == id }
-        )).first
+    private static func upsertSymptom(_ s: CombinedBackup.SymptomBackup, in context: ModelContext, index: ExistingIndex) -> Bool {
+        let existing = index.symptoms[s.id]
         let type = RettSymptom(rawValue: s.symptomTypeRaw) ?? .other
         if let existing {
             guard shouldApply(backupTs: s.lastModifiedAt, over: existing.lastModifiedAt) else { return false }
@@ -454,11 +514,8 @@ enum CombinedBackupService {
     }
 
     @discardableResult
-    private static func upsertRevision(_ r: CombinedBackup.RevisionBackup, in context: ModelContext) -> Bool {
-        let id = r.id
-        let existing = try? context.fetch(FetchDescriptor<MedicationRevision>(
-            predicate: #Predicate { $0.id == id }
-        )).first
+    private static func upsertRevision(_ r: CombinedBackup.RevisionBackup, in context: ModelContext, index: ExistingIndex) -> Bool {
+        let existing = index.revisions[r.id]
         let unit = DoseUnit(rawValue: r.doseUnitRaw) ?? .mg
         let kind = MedicationKind(rawValue: r.kindRaw) ?? .regular
         if let existing {
