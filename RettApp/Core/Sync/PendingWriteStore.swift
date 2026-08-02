@@ -51,6 +51,12 @@ final class PendingWriteStore {
     private let queue = DispatchQueue(label: "afsr.pending-writes", qos: .userInitiated)
     private let fileURL: URL
 
+    /// Profondeur de transaction : > 0 = les mutations ne persistent pas sur
+    /// disque immédiatement. Voir `batch(_:)`.
+    private var batchDepth = 0
+    /// Une mutation a-t-elle eu lieu pendant la transaction en cours ?
+    private var batchDirty = false
+
     private init() {
         // ApplicationSupportDirectory persiste entre installations et n'est pas
         // exposé à iTunes/Files — approprié pour un buffer de sync.
@@ -59,6 +65,34 @@ final class PendingWriteStore {
         self.fileURL = base.appendingPathComponent("pending_writes.json")
         self.entries = loadFromDisk()
         Self.log.info("PendingWriteStore chargé avec \(self.entries.count) entrée(s)")
+    }
+
+    // MARK: - Transactions (imports de masse)
+
+    /// Exécute `body` en suspendant l'écriture disque : toutes les mutations
+    /// du buffer faites pendant la transaction ne déclenchent qu'UN SEUL
+    /// `persist()` (et une seule notification UI) à la sortie.
+    ///
+    /// **Indispensable pour les imports de masse.** Sans transaction, chaque
+    /// `markUpsert` ré-encodait tout le buffer en JSON et l'écrivait sur
+    /// disque : importer 5 000 lignes provoquait 5 000 écritures d'un fichier
+    /// qui grossissait à chaque tour (~12,5 millions d'entrées ré-encodées au
+    /// total) — la cause dominante du gel de l'app.
+    ///
+    /// Réentrant : des transactions imbriquées ne persistent qu'à la sortie
+    /// de la plus externe.
+    func batch<T>(_ body: () throws -> T) rethrows -> T {
+        queue.sync { batchDepth += 1 }
+        defer {
+            queue.sync {
+                batchDepth -= 1
+                if batchDepth == 0 && batchDirty {
+                    batchDirty = false
+                    persistNow()
+                }
+            }
+        }
+        return try body()
     }
 
     // MARK: - Public
@@ -129,7 +163,20 @@ final class PendingWriteStore {
         return Set(decoded)
     }
 
+    /// Persiste, sauf si une transaction `batch(_:)` est en cours — auquel cas
+    /// on note simplement que le buffer est sale ; l'écriture aura lieu une
+    /// seule fois à la sortie de la transaction.
+    /// Doit être appelée depuis `queue`.
     private func persist() {
+        guard batchDepth == 0 else {
+            batchDirty = true
+            return
+        }
+        persistNow()
+    }
+
+    /// Écriture disque effective + notification UI. Doit être appelée depuis `queue`.
+    private func persistNow() {
         do {
             let data = try JSONEncoder().encode(Array(entries))
             try data.write(to: fileURL, options: [.atomic])

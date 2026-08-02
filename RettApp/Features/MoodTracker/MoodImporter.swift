@@ -38,6 +38,9 @@ enum MoodImporter {
         var skipped = 0
         var errors: [String] = []
 
+        // Index pré-chargé des ids existants : évite un fetch par ligne.
+        var existingIds = Set(((try? context.fetch(FetchDescriptor<MoodEntry>())) ?? []).map(\.id))
+
         for (index, row) in rows.enumerated() {
             let lineNumber = index + 2
 
@@ -61,13 +64,11 @@ enum MoodImporter {
                 String(Int(timestamp.timeIntervalSince1970)),
                 String(level.rawValue)
             )
-            let existing = try? context.fetch(FetchDescriptor<MoodEntry>(
-                predicate: #Predicate { $0.id == stableId }
-            )).first
-            if existing != nil {
+            if existingIds.contains(stableId) {
                 skipped += 1
                 continue
             }
+            existingIds.insert(stableId)
 
             let entry = MoodEntry(
                 id: stableId,

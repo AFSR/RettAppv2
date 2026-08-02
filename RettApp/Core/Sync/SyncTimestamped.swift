@@ -82,11 +82,19 @@ extension ModelContext {
 
         // 5) Enqueue dans le buffer persistant. On ne push pas ici : c'est le
         //    job du service de sync (drain + retry + back-off + LWW).
-        for (recordType, recordName) in upsertKeys {
-            PendingWriteStore.shared.markUpsert(recordType: recordType, recordName: recordName)
-        }
-        for (recordType, recordName) in deleteKeys {
-            PendingWriteStore.shared.markDelete(recordType: recordType, recordName: recordName)
+        //
+        //    `batch { }` est CRITIQUE pour les imports de masse : sans lui,
+        //    chaque markUpsert ré-encodait tout le buffer en JSON et l'écrivait
+        //    sur disque. Un import de 5 000 lignes = 5 000 écritures d'un
+        //    fichier grandissant → l'app gelait plusieurs minutes. Avec la
+        //    transaction : une seule écriture, quel que soit le volume.
+        PendingWriteStore.shared.batch {
+            for (recordType, recordName) in upsertKeys {
+                PendingWriteStore.shared.markUpsert(recordType: recordType, recordName: recordName)
+            }
+            for (recordType, recordName) in deleteKeys {
+                PendingWriteStore.shared.markDelete(recordType: recordType, recordName: recordName)
+            }
         }
     }
 }

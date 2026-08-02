@@ -36,6 +36,21 @@ struct HistoricalDataImportView: View {
     /// valeur est fiable.
     @State private var shareItem: ShareItem?
     @State private var exportError: String?
+    /// Import en cours : bloque l'interaction et affiche la progression.
+    /// Sans ce retour visuel, un gros import donnait l'impression que l'app
+    /// avait planté.
+    @State private var importProgress: ImportProgress?
+
+    struct ImportProgress: Equatable {
+        var done: Int = 0
+        var total: Int = 0
+        var label: String
+        /// Fraction pour la ProgressView, nil tant que le total est inconnu.
+        var fraction: Double? {
+            guard total > 0 else { return nil }
+            return min(1, Double(done) / Double(total))
+        }
+    }
 
     /// Wrapper Identifiable pour le sheet de partage. L'`id` est l'URL —
     /// SwiftUI rebuild le sheet à chaque nouvelle URL, donc on peut
@@ -136,7 +151,7 @@ struct HistoricalDataImportView: View {
             allowedContentTypes: Self.allAllowedTypes,
             allowsMultipleSelection: false
         ) { result in
-            handleFilePickResult(result)
+            Task { await handleFilePickResult(result) }
         }
         // Sheet unique pour partager un fichier (JSON ou CSV template).
         // `.sheet(item:)` est plus fiable que deux `.sheet(isPresented:)`
@@ -151,6 +166,43 @@ struct HistoricalDataImportView: View {
         } message: {
             Text(exportError ?? "")
         }
+        // Overlay bloquant pendant l'import : l'utilisateur voit que le
+        // travail avance au lieu de croire à un plantage.
+        .overlay {
+            if let p = importProgress {
+                importOverlay(p)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: importProgress != nil)
+    }
+
+    @ViewBuilder
+    private func importOverlay(_ p: ImportProgress) -> some View {
+        ZStack {
+            Color.black.opacity(0.35).ignoresSafeArea()
+            VStack(spacing: 14) {
+                if let fraction = p.fraction {
+                    ProgressView(value: fraction)
+                        .progressViewStyle(.linear)
+                        .frame(width: 180)
+                    Text("\(p.done) / \(p.total)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView().controlSize(.large)
+                }
+                Text(p.label)
+                    .font(.subheadline.weight(.medium))
+                    .multilineTextAlignment(.center)
+                Text("Ne fermez pas l'application.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(radius: 12)
+        }
+        .transition(.opacity)
     }
 
     // MARK: - Sections
@@ -233,7 +285,7 @@ struct HistoricalDataImportView: View {
 
     // MARK: - Routing du picker unique
 
-    private func handleFilePickResult(_ result: Result<[URL], Error>) {
+    private func handleFilePickResult(_ result: Result<[URL], Error>) async {
         // `pickerType` survit volontairement au binding `showPicker`
         // (réinitialisé par SwiftUI avant le callback). On capture
         // localement puis on remet à zéro pour la prochaine ouverture.
@@ -256,7 +308,18 @@ struct HistoricalDataImportView: View {
             do {
                 let data = try Data(contentsOf: url)
                 if importer == .combinedBackup {
-                    let r = CombinedBackupService.importBackup(contents: data, context: modelContext)
+                    importProgress = ImportProgress(label: "Import de la sauvegarde…")
+                    let r = await CombinedBackupService.importBackup(
+                        contents: data,
+                        context: modelContext,
+                        progress: { done, total in
+                            importProgress = ImportProgress(
+                                done: done, total: total,
+                                label: "Import de la sauvegarde…"
+                            )
+                        }
+                    )
+                    importProgress = nil
                     var body = "Médicaments : \(r.medications)\n"
                     body += "Prises : \(r.medicationLogs)\n"
                     body += "Crises : \(r.seizures)\n"
@@ -271,7 +334,11 @@ struct HistoricalDataImportView: View {
                     )
                 } else {
                     let content = String(decoding: data, as: UTF8.self)
+                    importProgress = ImportProgress(label: "Import du fichier…")
+                    // Rend la main pour que l'overlay s'affiche avant le travail.
+                    await Task.yield()
                     summary = runCSVImport(importer: importer, content: content)
+                    importProgress = nil
                 }
             } catch {
                 summary = SummaryAlert(

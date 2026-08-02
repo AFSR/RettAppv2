@@ -81,6 +81,14 @@ enum MedicationLogImporter {
                               uniquingKeysWith: { first, _ in first })
         }()
 
+        // Index pré-chargé (medicationId, scheduledTime) → prise. Sans lui,
+        // chaque ligne déclenchait un fetch SwiftData filtré : quadratique sur
+        // un gros CSV, l'une des causes du gel de l'app à l'import.
+        var existingBySlot: [LogSlotKey: MedicationLog] = [:]
+        for log in ((try? context.fetch(FetchDescriptor<MedicationLog>())) ?? []) {
+            existingBySlot[LogSlotKey(medicationId: log.medicationId, scheduledTime: log.scheduledTime)] = log
+        }
+
         for (index, row) in rows.enumerated() {
             let lineNumber = index + 2
 
@@ -141,12 +149,9 @@ enum MedicationLogImporter {
 
             // Idempotence : on évite le doublon si une prise existe déjà pour
             // (medicationId, scheduledTime). Met à jour les champs sinon.
-            let descriptor = FetchDescriptor<MedicationLog>(
-                predicate: #Predicate<MedicationLog> { log in
-                    log.medicationId == medicationId && log.scheduledTime == scheduledTime
-                }
-            )
-            if let existing = (try? context.fetch(descriptor))?.first {
+            // Lookup via l'index pré-chargé (pas de fetch par ligne).
+            let slotKey = LogSlotKey(medicationId: medicationId, scheduledTime: scheduledTime)
+            if let existing = existingBySlot[slotKey] {
                 existing.medicationName = resolvedName
                 existing.taken = taken
                 existing.takenTime = takenTime
@@ -175,6 +180,7 @@ enum MedicationLogImporter {
                     adhocReason: adhocReason
                 )
                 context.insert(log)
+                existingBySlot[slotKey] = log
             }
             imported += 1
         }
@@ -186,5 +192,11 @@ enum MedicationLogImporter {
         }
 
         return ImportResult(imported: imported, skipped: skipped, errors: errors)
+    }
+
+    /// Clé métier d'une prise planifiée, pour l'index d'idempotence.
+    private struct LogSlotKey: Hashable {
+        let medicationId: UUID
+        let scheduledTime: Date
     }
 }

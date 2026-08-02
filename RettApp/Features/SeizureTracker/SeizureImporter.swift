@@ -56,6 +56,10 @@ enum SeizureImporter {
         var skipped = 0
         var errors: [String] = []
 
+        // Index pré-chargé des ids existants : évite un fetch SwiftData par
+        // ligne (quadratique sur un gros CSV — cause de gel de l'app).
+        var existingIds = Set(((try? context.fetch(FetchDescriptor<SeizureEvent>())) ?? []).map(\.id))
+
         for (index, row) in rows.enumerated() {
             let lineNumber = index + 2  // +1 pour 1-indexed, +1 pour skip header
 
@@ -94,13 +98,11 @@ enum SeizureImporter {
                 String(Int(end.timeIntervalSince1970)),
                 type.rawValue
             )
-            let existing = try? context.fetch(FetchDescriptor<SeizureEvent>(
-                predicate: #Predicate { $0.id == stableId }
-            )).first
-            if existing != nil {
+            if existingIds.contains(stableId) {
                 skipped += 1
                 continue
             }
+            existingIds.insert(stableId)
 
             let event = SeizureEvent(
                 id: stableId,
