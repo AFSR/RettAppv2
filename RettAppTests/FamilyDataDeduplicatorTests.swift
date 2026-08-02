@@ -224,3 +224,98 @@ final class FamilyDataDeduplicatorTests: XCTestCase {
         XCTAssertEqual(FamilyDataDeduplicator.normalizedName("KEPPRA"), "keppra")
     }
 }
+
+// MARK: - Purge des prises d'un médicament inactif / supprimé
+
+final class ObsoleteLogPurgeTests: XCTestCase {
+
+    private func makeContext() throws -> ModelContext {
+        let schema = Schema([
+            ChildProfile.self, SeizureEvent.self, Medication.self,
+            MedicationLog.self, MoodEntry.self, DailyObservation.self,
+            SymptomEvent.self, MedicationRevision.self
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return ModelContext(try ModelContainer(for: schema, configurations: [config]))
+    }
+
+    private func makeLog(medId: UUID, at date: Date, taken: Bool = false, adhoc: Bool = false) -> MedicationLog {
+        MedicationLog(
+            id: MedicationLog.stableId(medicationId: medId, scheduledTime: date),
+            medicationId: medId, medicationName: "Keppra",
+            scheduledTime: date, taken: taken, dose: 500, doseUnit: .mg,
+            isAdHoc: adhoc
+        )
+    }
+
+    func test_purge_removesPendingLogsOfInactiveMedication() throws {
+        let context = try makeContext()
+        let med = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg,
+                             scheduledHours: [HourMinute(hour: 8, minute: 0)],
+                             isActive: false)
+        context.insert(med)
+        let today = Calendar.current.startOfDay(for: Date())
+        context.insert(makeLog(medId: med.id, at: today.addingTimeInterval(8 * 3600)))
+        try context.save()
+
+        XCTAssertEqual(MedicationLog.purgeObsoleteScheduledLogs(in: context), 1)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<MedicationLog>()).isEmpty)
+    }
+
+    func test_purge_keepsLogsOfActiveMedication() throws {
+        let context = try makeContext()
+        let med = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg,
+                             scheduledHours: [HourMinute(hour: 8, minute: 0)],
+                             isActive: true)
+        context.insert(med)
+        let today = Calendar.current.startOfDay(for: Date())
+        context.insert(makeLog(medId: med.id, at: today.addingTimeInterval(8 * 3600)))
+        try context.save()
+
+        XCTAssertEqual(MedicationLog.purgeObsoleteScheduledLogs(in: context), 0)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<MedicationLog>()).count, 1)
+    }
+
+    func test_purge_neverTouchesTakenOrPastOrAdhoc() throws {
+        let context = try makeContext()
+        // Médicament inactif : tout ce qui suit devrait être purgeable…
+        let med = Medication(name: "Keppra", doseAmount: 500, doseUnit: .mg,
+                             scheduledHours: [], isActive: false)
+        context.insert(med)
+        let today = Calendar.current.startOfDay(for: Date())
+        let yesterday = today.addingTimeInterval(-24 * 3600)
+
+        // …sauf : prise déjà donnée (fait médical)
+        context.insert(makeLog(medId: med.id, at: today.addingTimeInterval(8 * 3600), taken: true))
+        // …sauf : prise passée non donnée (information de suivi)
+        context.insert(makeLog(medId: med.id, at: yesterday.addingTimeInterval(8 * 3600)))
+        // …sauf : prise ponctuelle
+        context.insert(makeLog(medId: med.id, at: today.addingTimeInterval(12 * 3600), adhoc: true))
+        try context.save()
+
+        XCTAssertEqual(MedicationLog.purgeObsoleteScheduledLogs(in: context), 0)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<MedicationLog>()).count, 3)
+    }
+
+    func test_purge_removesOrphanLogsOfDeletedMedication() throws {
+        let context = try makeContext()
+        // Aucun Medication en base → la prise planifiée est orpheline.
+        let today = Calendar.current.startOfDay(for: Date())
+        context.insert(makeLog(medId: UUID(), at: today.addingTimeInterval(8 * 3600)))
+        try context.save()
+
+        XCTAssertEqual(MedicationLog.purgeObsoleteScheduledLogs(in: context), 1)
+    }
+
+    func test_purge_isIdempotent() throws {
+        let context = try makeContext()
+        let med = Medication(name: "K", doseAmount: 1, doseUnit: .mg, scheduledHours: [], isActive: false)
+        context.insert(med)
+        let today = Calendar.current.startOfDay(for: Date())
+        context.insert(makeLog(medId: med.id, at: today.addingTimeInterval(8 * 3600)))
+        try context.save()
+
+        XCTAssertEqual(MedicationLog.purgeObsoleteScheduledLogs(in: context), 1)
+        XCTAssertEqual(MedicationLog.purgeObsoleteScheduledLogs(in: context), 0)
+    }
+}

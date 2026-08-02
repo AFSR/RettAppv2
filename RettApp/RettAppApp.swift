@@ -130,6 +130,9 @@ struct RettAppApp: App {
                     // (UUID aléatoire par parent avant fix de la sync). Prend
                     // effet une seule fois puis reste no-op.
                     MedicationLog.dedupeScheduledLogsIfNeeded(in: sharedModelContainer.mainContext)
+                    // Purge des prises d'un médicament désactivé/supprimé
+                    // (rattrape les états hérités des versions précédentes).
+                    MedicationLog.purgeObsoleteScheduledLogs(in: sharedModelContainer.mainContext)
                     // Draine tout ce qui est resté dans le buffer d'écriture
                     // depuis la dernière session (offline, crash, kill app…).
                     await syncService.performCycle(context: sharedModelContainer.mainContext, reason: "launch")

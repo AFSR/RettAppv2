@@ -148,6 +148,58 @@ extension MedicationLog {
         return merged
     }
 
+    // MARK: - Purge des prises orphelines / inactives
+
+    /// Supprime les prises PLANIFIÉES ET NON ENCORE PRISES qui ne devraient
+    /// plus exister :
+    ///   - celles d'un médicament devenu **inactif**,
+    ///   - celles d'un médicament **supprimé** (plus aucune fiche associée).
+    ///
+    /// Pourquoi c'est nécessaire : `ensureLogsExist` filtre bien `isActive` à
+    /// la création, mais rien ne nettoyait les prises DÉJÀ générées. Résultat,
+    /// un médicament désactivé continuait d'apparaître dans le journal —
+    /// indéfiniment si la désactivation venait d'un autre jour ou de l'autre
+    /// parent via la synchronisation (l'éditeur ne nettoyait que le jour même,
+    /// et seulement sur l'appareil qui faisait la modification).
+    ///
+    /// Garde-fous — on ne touche JAMAIS :
+    ///   - aux prises marquées « prise » (fait médical, historique factuel),
+    ///   - aux prises ponctuelles (`isAdHoc`, sans fiche médicament requise),
+    ///   - aux prises PASSÉES (avant aujourd'hui) : ne pas réécrire l'histoire,
+    ///     une prise non donnée hier reste une information de suivi.
+    ///
+    /// Idempotent : sans rien à purger, aucun save n'est émis.
+    @discardableResult
+    static func purgeObsoleteScheduledLogs(in context: ModelContext) -> Int {
+        let meds = (try? context.fetch(FetchDescriptor<Medication>())) ?? []
+        // Ensemble des médicaments encore valides pour générer des prises.
+        let activeIds = Set(meds.filter { $0.isActive }.map(\.id))
+
+        let today = Calendar.current.startOfDay(for: Date())
+        let descriptor = FetchDescriptor<MedicationLog>(
+            predicate: #Predicate<MedicationLog> { log in
+                log.isAdHoc == false
+                && log.taken == false
+                && log.scheduledTime >= today
+            }
+        )
+        guard let candidates = try? context.fetch(descriptor) else { return 0 }
+
+        var removed = 0
+        for log in candidates where !activeIds.contains(log.medicationId) {
+            context.delete(log)
+            removed += 1
+        }
+        if removed > 0 {
+            // saveTouching → les suppressions partent aussi vers l'autre
+            // parent, sinon le médicament désactivé chez A resterait affiché
+            // chez B.
+            try? context.saveTouching()
+            print("ℹ️ Purge : \(removed) prise(s) planifiée(s) obsolète(s) supprimée(s)")
+        }
+        return removed
+    }
+
     /// Récupère et vide la liste des UUIDs supprimés par les derniers passages
     /// de dedup, pour que le service de sync les supprime aussi côté CloudKit.
     static func drainDeletedIdsFromDedup() -> [UUID] {
