@@ -353,6 +353,7 @@ struct MedicationPlanView: View {
         for i in offsets {
             modelContext.delete(medications[i])
         }
+        MedicationLog.purgeObsoleteScheduledLogs(in: modelContext)
         try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext, priority: .urgent)
         Task {
@@ -369,6 +370,9 @@ struct MedicationPlanView: View {
     /// pour conserver l'historique tel quel) et on resynchronise.
     private func deleteMedication(_ med: Medication) {
         modelContext.delete(med)
+        // Les prises planifiées à venir de ce médicament n'ont plus de fiche :
+        // on les purge (les prises déjà données restent — historique factuel).
+        MedicationLog.purgeObsoleteScheduledLogs(in: modelContext)
         try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext, priority: .urgent)
         Task {
@@ -421,13 +425,19 @@ struct MedicationPlanView: View {
         // d'où la confusion utilisateur (« le journal se popule de
         // doublons »).
         regenerateTodaysPendingLogs(for: target)
+        // Purge globale : si le médicament vient d'être désactivé, ses prises
+        // planifiées à venir (au-delà d'aujourd'hui, ou générées un autre
+        // jour) doivent disparaître aussi — sinon un médicament arrêté
+        // continuait de s'afficher dans le journal.
+        MedicationLog.purgeObsoleteScheduledLogs(in: modelContext)
 
         try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext, priority: .urgent)
         let vm = MedicationViewModel()
         await vm.requestNotificationPermissionIfNeeded()
         await vm.rescheduleAllNotifications(medications: medications, childFirstName: profile?.firstName ?? "")
-        // Régénère les logs du jour à partir du nouveau plan.
+        // Régénère les logs du jour à partir du nouveau plan (no-op pour un
+        // médicament inactif : `ensureLogsExist` filtre déjà `isActive`).
         vm.ensureLogsExist(for: Date(), medications: medications, profile: profile, in: modelContext)
     }
 

@@ -1209,6 +1209,12 @@ final class CloudKitSyncService {
         // ne reste qu'un profil et d'éventuels orphelins à adopter.
         FamilyDataDeduplicator.adoptOrphanMedications(in: context)
 
+        // Purge des prises planifiées devenues obsolètes : médicament
+        // désactivé ou supprimé — y compris quand la désactivation vient de
+        // l'autre parent par la synchro. Sans ça, un médicament arrêté
+        // continuait d'apparaître dans le journal de cet appareil.
+        MedicationLog.purgeObsoleteScheduledLogs(in: context)
+
         // Dedup post-pull : quand l'autre parent pousse un log planifié dont le
         // recordName (UUID) ne correspond pas au nôtre (cas hérité pré-stableId),
         // le fallback dans `MedicationLog.upsert(from:)` fusionne dans le local.
