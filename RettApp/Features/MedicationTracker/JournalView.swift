@@ -152,17 +152,36 @@ struct JournalView: View {
         }
         .sheet(isPresented: $showDatePicker) {
             NavigationStack {
-                DatePicker("Date", selection: $viewModel.selectedDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .padding()
-                    .navigationTitle("Choisir une date")
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("OK") { showDatePicker = false }
+                VStack(spacing: 0) {
+                    // `labelsHidden` : le titre de la feuille dit déjà « Choisir
+                    // une date », le label du DatePicker ferait doublon et
+                    // volerait de la hauteur au calendrier.
+                    DatePicker("Date", selection: $viewModel.selectedDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .labelsHidden()
+                        .padding(.horizontal)
+                    Spacer(minLength: 0)
+                }
+                .navigationTitle("Choisir une date")
+                // Titre inline : le format large consommait ~96 pt de hauteur,
+                // ce qui rognait le calendrier.
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Aujourd'hui") {
+                            viewModel.selectedDate = Calendar.current.startOfDay(for: Date())
                         }
                     }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("OK") { showDatePicker = false }
+                    }
+                }
             }
-            .presentationDetents([.medium, .large])
+            // Hauteur explicite : le calendrier `.graphical` mesure ~400 pt.
+            // Avec le détent `.medium` (moitié d'écran) il était comprimé et
+            // rogné. On dimensionne la feuille pour qu'il tienne entier, tout
+            // en gardant `.large` pour les grands réglages d'accessibilité.
+            .presentationDetents([.height(520), .large])
         }
         .task(id: medications.map(\.id)) {
             viewModel.ensureLogsExist(for: viewModel.selectedDate, medications: medications, profile: profile, in: modelContext)
