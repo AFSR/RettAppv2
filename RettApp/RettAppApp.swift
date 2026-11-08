@@ -101,6 +101,10 @@ struct RettAppApp: App {
             RootView()
                 .environment(syncService)
                 .environment(updateService)
+                // Accédé ici, dans le ViewBuilder (donc sur le main actor),
+                // et non via un @State de la structure App : le singleton est
+                // isolé MainActor, comme DeviceRoleStore.
+                .environment(UsageModeStore.shared)
                 .tint(.afsrPurpleAdaptive)
                 .task {
                     // Watchdog : quoi qu'il arrive (offline, iCloud lent), on
@@ -208,14 +212,38 @@ private func logSwiftDataError(_ stage: String, _ error: Error) {
 struct RootView: View {
     @Query private var profiles: [ChildProfile]
     @Environment(CloudKitSyncService.self) private var sync
+    @Environment(UsageModeStore.self) private var usageStore
 
     var body: some View {
-        if !profiles.isEmpty {
-            ContentView()
-        } else if sync.initialCloudCheckDone {
-            ProfileSetupView()
-        } else {
-            CloudRestoreCheckView()
+        Group {
+            if !profiles.isEmpty {
+                // Un profil existe : l'usage est le suivi, sans discussion et
+                // sans question. C'est ce qui garantit qu'une famille qui met
+                // à jour depuis une version antérieure ne voit jamais l'écran
+                // de choix apparaître sous ses pieds.
+                ContentView(usage: .suivi)
+            } else if !sync.initialCloudCheckDone {
+                // Un suivi existe peut-être sur iCloud (2ᵉ appareil, partage
+                // accepté) : on attend le premier pull avant de décider.
+                CloudRestoreCheckView()
+            } else {
+                switch usageStore.usage {
+                case .none:
+                    UsageChoiceView { usageStore.set($0) }
+                case .decouverte:
+                    ContentView(usage: .decouverte)
+                case .suivi:
+                    ProfileSetupView()
+                }
+            }
+        }
+        .onAppear {
+            // Migration : tout utilisateur qui a déjà un profil est en usage
+            // suivi. Idempotent, et sans effet sur un premier lancement.
+            if !profiles.isEmpty { usageStore.adoptSuiviIfUnset() }
+        }
+        .onChange(of: profiles.isEmpty) { _, isEmpty in
+            if !isEmpty { usageStore.adoptSuiviIfUnset() }
         }
     }
 }
