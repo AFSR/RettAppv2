@@ -1093,6 +1093,14 @@ final class CloudKitSyncService {
     /// Construit un `CKRecord` à partir d'un modèle SwiftData identifié par
     /// `entry`. Retourne nil si le modèle n'existe plus (supprimé entre-temps).
     private func buildCKRecord(for entry: PendingWriteStore.Entry, zoneID: CKRecordZone.ID, context: ModelContext) -> CKRecord? {
+        // Une pierre tombale ne vit pas dans SwiftData mais dans la corbeille :
+        // elle se construit avant le garde UUID ci-dessous, son nom portant un
+        // préfixe.
+        if entry.recordType == CKRecordType.tombstone {
+            guard let target = TrashStore.target(fromCloudRecordName: entry.recordName) else { return nil }
+            return TrashStore.makeCloudRecord(forTarget: target, zoneID: zoneID)
+        }
+
         guard let id = UUID(uuidString: entry.recordName) else { return nil }
         switch entry.recordType {
         case CKRecordType.childProfile:
@@ -1381,6 +1389,33 @@ final class CloudKitSyncService {
     }
 
     private func upsert(_ record: CKRecord, in context: ModelContext) {
+        // Une pierre tombale n'est pas une donnée de suivi : on la range dans
+        // la corbeille, qui protégera cet appareil contre une réinsertion, et
+        // on supprime ce qu'elle vise s'il est encore là.
+        if record.recordType == CKRecordType.tombstone {
+            TrashStore.applyCloudRecord(record)
+            if let target = record["targetRecordName"] as? String,
+               let id = UUID(uuidString: target) {
+                Self.deleteLocal(
+                    recordID: CKRecord.ID(recordName: id.uuidString, zoneID: record.recordID.zoneID),
+                    in: context
+                )
+            }
+            return
+        }
+
+        // RÈGLE DU PLUS RÉCENT, ÉTENDUE À LA SUPPRESSION. Un enregistrement
+        // qui revient alors qu'il a été supprimé APRÈS sa dernière
+        // modification est un revenant : appareil resté hors ligne, écriture
+        // en attente datant d'avant, restauration d'une vieille sauvegarde.
+        // On le refuse. S'il a été modifié après la suppression, c'est au
+        // contraire une recréation délibérée, et elle passe.
+        let modifie = record[SyncFields.lastModifiedAt] as? Date
+        if TrashStore.shouldRejectIncoming(recordName: record.recordID.recordName, lastModifiedAt: modifie) {
+            Self.log.info("upsert refusé : \(record.recordID.recordName, privacy: .public) supprimé plus récemment")
+            return
+        }
+
         switch record.recordType {
         case CKRecordType.childProfile:     ChildProfile.upsert(from: record, in: context)
         case CKRecordType.medication:       Medication.upsert(from: record, in: context)

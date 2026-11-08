@@ -81,6 +81,10 @@ struct TrashView: View {
                 Text("Supprimé le \(item.deletedAt.formatted(date: .abbreviated, time: .shortened))")
                 Text("·")
                 Text(remainingLabel(item))
+                if !item.restorable {
+                    Text("·")
+                    Text("non récupérable ici")
+                }
             }
             .font(AFSRFont.caption())
             .foregroundStyle(.secondary)
@@ -92,15 +96,21 @@ struct TrashView: View {
             } label: {
                 Label("Supprimer", systemImage: "trash")
             }
-            Button {
-                toRestore = item
-            } label: {
-                Label("Restaurer", systemImage: "arrow.uturn.backward")
+            // Une suppression venue de l'autre parent ne transporte pas le
+            // contenu : il n'y a rien à remettre en place, et proposer
+            // « Restaurer » mentirait. On affiche l'entrée — savoir ce qui a
+            // disparu et quand a de la valeur — sans l'action.
+            if item.restorable {
+                Button {
+                    toRestore = item
+                } label: {
+                    Label("Restaurer", systemImage: "arrow.uturn.backward")
+                }
+                .tint(.afsrPurpleAdaptive)
             }
-            .tint(.afsrPurpleAdaptive)
         }
         .contentShape(Rectangle())
-        .onTapGesture { toRestore = item }
+        .onTapGesture { if item.restorable { toRestore = item } }
     }
 
     private func remainingLabel(_ item: TrashStore.Item) -> String {

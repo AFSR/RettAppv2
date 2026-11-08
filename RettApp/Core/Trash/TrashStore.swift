@@ -49,6 +49,13 @@ enum TrashStore {
         /// Sauvegarde d'un seul enregistrement.
         let payload: CombinedBackup
 
+        /// Une entrée venue de l'autre parent ne transporte pas le contenu
+        /// supprimé, seulement la suppression : il n'y a rien à remettre en
+        /// place, et proposer « Restaurer » mentirait. Par défaut vrai, pour
+        /// que les entrées déjà enregistrées avant ce champ restent
+        /// restaurables.
+        var restorable: Bool = true
+
         var expiresAt: Date { deletedAt.addingTimeInterval(TrashStore.retention) }
 
         static func == (lhs: Item, rhs: Item) -> Bool { lhs.id == rhs.id }
@@ -122,7 +129,8 @@ enum TrashStore {
         recordType: String,
         summary: String,
         payload: CombinedBackup,
-        deletedAt: Date = Date()
+        deletedAt: Date = Date(),
+        restorable: Bool = true
     ) {
         let item = Item(
             id: UUID(),
@@ -130,7 +138,8 @@ enum TrashStore {
             recordType: recordType,
             deletedAt: deletedAt,
             summary: summary,
-            payload: payload
+            payload: payload,
+            restorable: restorable
         )
         queue.sync {
             var all = loadUnsafe()
@@ -142,6 +151,18 @@ enum TrashStore {
             persistUnsafe(all)
         }
         log.info("corbeille: \(recordType, privacy: .public) déposé")
+
+        // La suppression doit atteindre l'autre parent, et y rester opposable
+        // même s'il repousse plus tard une copie périmée. Seules les
+        // suppressions faites ICI sont poussées : une pierre tombale reçue
+        // n'est pas renvoyée, sinon les deux appareils se la relanceraient.
+        if restorable {
+            PendingWriteStore.shared.markUpsert(
+                recordType: CKRecordType.tombstone,
+                recordName: cloudRecordName(forTarget: recordName)
+            )
+        }
+
         NotificationCenter.default.post(name: didChangeNotification, object: nil)
     }
 
