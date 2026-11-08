@@ -568,6 +568,33 @@ struct MedicationEditor: View {
                      : "Dose habituelle pour ce médicament ponctuel.")
             }
 
+            // Démarrage rapide, uniquement tant qu'aucune prise n'existe.
+            // Le cas ordinaire — même dose, tous les jours, deux ou trois
+            // fois — se règle d'un geste ; la finesse du plan reste entière
+            // pour les cas qui en ont besoin.
+            if kind == .regular && intakes.isEmpty {
+                Section {
+                    ForEach(MedicationRhythm.commonCounts, id: \.self) { count in
+                        Button {
+                            applyRhythm(count)
+                        } label: {
+                            HStack {
+                                Text(MedicationRhythm.label(forCountPerDay: count))
+                                Spacer()
+                                Text(MedicationRhythm.hours(forCountPerDay: count)
+                                        .map(\.formatted).joined(separator: " · "))
+                                    .font(AFSRFont.caption())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Rythme habituel")
+                } footer: {
+                    Text("Crée les prises aux heures des repas, à la dose habituelle, tous les jours. Vous pourrez ensuite ajuster chaque prise — heure, dose, jours actifs, rappel.")
+                }
+            }
+
             if kind == .regular {
                 Section {
                     ForEach(intakes) { intake in
@@ -712,6 +739,13 @@ struct MedicationEditor: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// Applique un rythme courant. Ne s'affiche que sur un médicament sans
+    /// prise, donc rien n'est jamais écrasé.
+    private func applyRhythm(_ count: Int) {
+        let amount = Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) ?? 0
+        intakes = MedicationRhythm.intakes(countPerDay: count, dose: amount)
     }
 
     private func addIntake() {

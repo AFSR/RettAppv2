@@ -6,6 +6,78 @@ import Foundation
 /// Permet de gérer des plans complexes : « 5 mg en semaine à 8h, 10 mg le
 /// week-end à 10h », et de désactiver les rappels pour les jours où l'enfant
 /// est pris en charge par un tiers (école, centre, autre parent).
+/// Rythmes de prise les plus courants, et les heures qui vont avec.
+///
+/// Configurer un médicament pris trois fois par jour demandait trois ajouts
+/// puis trois ouvertures pour régler chaque heure. Le plan est volontairement
+/// fin — dose par prise, jours actifs, rappel individuel — mais cette finesse
+/// ne devrait se payer que pour les cas qui en ont besoin, pas pour le cas
+/// ordinaire.
+///
+/// Les heures retenues suivent le rythme des repas, qui est celui auquel les
+/// traitements sont ordinairement calés : matin, midi, goûter, soir. Elles
+/// restent modifiables prise par prise — ce n'est qu'un point de départ.
+enum MedicationRhythm {
+
+    /// Rythmes proposés au démarrage rapide.
+    static let commonCounts = [1, 2, 3, 4]
+
+    /// Heures par défaut pour un nombre de prises par jour.
+    ///
+    /// Au-delà de quatre, on répartit régulièrement entre 8 h et 20 h : un
+    /// rythme inhabituel sera de toute façon ajusté à la main, autant
+    /// proposer quelque chose de régulier plutôt que rien.
+    static func hours(forCountPerDay count: Int) -> [HourMinute] {
+        switch count {
+        case ..<1:  return []
+        case 1:     return [HourMinute(hour: 8, minute: 0)]
+        case 2:     return [HourMinute(hour: 8, minute: 0), HourMinute(hour: 20, minute: 0)]
+        case 3:     return [HourMinute(hour: 8, minute: 0),
+                            HourMinute(hour: 12, minute: 0),
+                            HourMinute(hour: 20, minute: 0)]
+        case 4:     return [HourMinute(hour: 8, minute: 0),
+                            HourMinute(hour: 12, minute: 0),
+                            HourMinute(hour: 16, minute: 0),
+                            HourMinute(hour: 20, minute: 0)]
+        default:
+            let premiere = 8, derniere = 20
+            let pas = Double(derniere - premiere) / Double(count - 1)
+            return (0..<count).map { i in
+                let h = Double(premiere) + pas * Double(i)
+                return HourMinute(hour: Int(h.rounded(.down)),
+                                  minute: Int((h - h.rounded(.down)) * 60).rounded(to: 5))
+            }
+        }
+    }
+
+    /// Prises prêtes à l'emploi : heures par défaut, dose habituelle, tous
+    /// les jours, rappel actif. Tout reste ajustable ensuite.
+    static func intakes(countPerDay count: Int, dose: Double) -> [MedicationIntake] {
+        hours(forCountPerDay: count).map {
+            MedicationIntake(
+                hour: $0.hour,
+                minute: $0.minute,
+                dose: dose,
+                weekdays: MedicationIntake.allWeekdays,
+                notifyEnabled: true
+            )
+        }
+    }
+
+    /// Libellé du rythme, pour les boutons.
+    static func label(forCountPerDay count: Int) -> String {
+        count == 1 ? "1 fois par jour" : "\(count) fois par jour"
+    }
+}
+
+private extension Int {
+    /// Arrondi au multiple le plus proche, pour ne pas proposer « 13 h 43 ».
+    func rounded(to multiple: Int) -> Int {
+        guard multiple > 0 else { return self }
+        return (Int((Double(self) / Double(multiple)).rounded())) * multiple
+    }
+}
+
 struct MedicationIntake: Codable, Hashable, Identifiable {
     var id: UUID
     var hour: Int
