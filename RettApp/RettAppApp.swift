@@ -137,6 +137,11 @@ struct RettAppApp: App {
                     // Purge des prises d'un médicament désactivé/supprimé
                     // (rattrape les états hérités des versions précédentes).
                     MedicationLog.purgeObsoleteScheduledLogs(in: sharedModelContainer.mainContext)
+                    // Corbeille : les suppressions de plus de trente jours
+                    // deviennent définitives. Avant le premier cycle de
+                    // synchronisation, pour qu'une entrée expirée ne protège
+                    // plus contre une réinsertion légitime.
+                    TrashStore.purgeExpired()
                     // Draine tout ce qui est resté dans le buffer d'écriture
                     // depuis la dernière session (offline, crash, kill app…).
                     await syncService.performCycle(context: sharedModelContainer.mainContext, reason: "launch")

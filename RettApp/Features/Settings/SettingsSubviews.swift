@@ -183,6 +183,16 @@ struct DataSubView: View {
             }
 
             Section {
+                NavigationLink {
+                    TrashView()
+                } label: {
+                    Label("Corbeille", systemImage: "trash.slash")
+                }
+            } footer: {
+                Text("Les crises et médicaments supprimés restent récupérables trente jours. Au-delà, ils disparaissent définitivement.")
+            }
+
+            Section {
                 Button {
                     exportAllCSV()
                 } label: {

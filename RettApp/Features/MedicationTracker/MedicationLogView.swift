@@ -351,6 +351,9 @@ struct MedicationPlanView: View {
 
     private func delete(_ offsets: IndexSet) {
         for i in offsets {
+            // Avant la suppression, tant que l'objet est encore lisible : le
+            // médicament part en corbeille, récupérable trente jours.
+            TrashStore.record(medication: medications[i])
             modelContext.delete(medications[i])
         }
         MedicationLog.purgeObsoleteScheduledLogs(in: modelContext)

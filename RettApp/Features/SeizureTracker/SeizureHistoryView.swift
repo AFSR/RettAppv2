@@ -87,6 +87,9 @@ struct SeizureHistoryView: View {
             presenting: toDelete
         ) { event in
             Button("Supprimer", role: .destructive) {
+                // Avant la suppression, tant que l'objet est encore lisible :
+                // la crise part en corbeille, récupérable trente jours.
+                TrashStore.record(seizure: event)
                 modelContext.delete(event)
                 try? modelContext.saveTouching()
                 sync.scheduleSync(context: modelContext, priority: .urgent)
