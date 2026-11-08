@@ -28,6 +28,18 @@ struct DiscoveryHomeView: View {
 
             Section {
                 NavigationLink {
+                    MemberAreaView()
+                } label: {
+                    Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+                }
+            } header: {
+                Text("Adhésion")
+            } footer: {
+                Text("Votre adhésion, vos dons et attestations fiscales, les publications et communications réservées aux adhérents. Connexion par code reçu en SMS ou par e-mail, sans mot de passe.")
+            }
+
+            Section {
+                NavigationLink {
                     DonationView()
                 } label: {
                     Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")

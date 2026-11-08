@@ -52,6 +52,8 @@ struct SettingsView: View {
             //    déjà présenté dans la page de don elle-même)
             supportSection
 
+            memberAreaSection
+
             if isSuivi {
                 // ── 1. PROFIL
                 childSection
@@ -292,6 +294,24 @@ struct SettingsView: View {
                 Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
                     .foregroundStyle(.afsrEmergency)
             }
+        }
+    }
+
+    /// Section à part, et non une ligne de plus sous « Soutenir l'AFSR » :
+    /// celle-ci n'a volontairement pas de sous-texte, le détail étant déjà
+    /// donné dans la page de don.
+    ///
+    /// Présente dans les deux usages — une famille qui suit un enfant est
+    /// souvent adhérente elle aussi.
+    private var memberAreaSection: some View {
+        Section {
+            NavigationLink {
+                MemberAreaView()
+            } label: {
+                Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+            }
+        } footer: {
+            Text("Votre adhésion, vos dons et attestations fiscales, les publications réservées aux adhérents. Sans rapport avec vos données de suivi, qui restent sur cet appareil.")
         }
     }
 
