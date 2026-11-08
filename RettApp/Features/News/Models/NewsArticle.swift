@@ -104,11 +104,16 @@ enum JSONValue: Decodable {
 
     /// Fragments HTML contenus dans un champ Bard.
     ///
-    /// Un Bard avec ensembles mélange du texte augmenté en HTML et des
-    /// ensembles structurés (accordéon, trombinoscope, deux colonnes…) que
-    /// l'app ne sait pas rendre. On récupère le texte et on ignore le reste —
-    /// et quand il ne reste rien, `NewsDetailView` propose la page du site,
-    /// qui sait tout rendre.
+    /// Un Bard avec ensembles mélange des nœuds de texte augmentés en HTML
+    /// — `{ "type": "text", "text": "<p>…" }` — et des ensembles structurés :
+    /// accordéon, deux colonnes, trombinoscope, bloc d'appel à l'action.
+    ///
+    /// Plusieurs de ces ensembles **contiennent eux-mêmes du texte** : les
+    /// deux colonnes portent chacune leur propre Bard, l'accordéon aussi. Un
+    /// article réel d'afsr.fr en contient, et s'arrêter au premier niveau
+    /// reviendrait à en perdre la moitié. On descend donc dans les valeurs,
+    /// et ce qu'on ne sait pas lire est simplement ignoré — quand il ne reste
+    /// rien, `NewsDetailView` propose la page du site, qui sait tout rendre.
     var htmlFragments: [String] {
         switch self {
         case .string(let s):
@@ -116,11 +121,24 @@ enum JSONValue: Decodable {
         case .array(let items):
             return items.flatMap(\.htmlFragments)
         case .object(let dict):
-            // Un nœud de texte Bard augmenté : { "type": "text", "text": "<p>…" }.
             if let text = dict["text"]?.stringValue, !text.isEmpty {
                 return [text]
             }
-            return []
+            // On ne descend que dans les tableaux et les objets. Prendre
+            // aussi les chaînes rendrait du HTML avec le nom d'un ensemble
+            // (« two_columns ») ou le libellé d'un bouton : seule la clé
+            // « text » porte du HTML dans un Bard augmenté.
+            //
+            // Clés triées : l'ordre d'un dictionnaire Swift n'est pas stable,
+            // et deux lectures du même article donneraient des paragraphes
+            // dans un ordre différent. Le tri place aussi « content_left »
+            // avant « content_right », qui est l'ordre de lecture.
+            return dict.keys.sorted().flatMap { key -> [String] in
+                switch dict[key] {
+                case .array, .object: return dict[key]?.htmlFragments ?? []
+                default:              return []
+                }
+            }
         default:
             return []
         }

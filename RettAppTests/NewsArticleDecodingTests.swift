@@ -46,6 +46,40 @@ final class NewsArticleDecodingTests: XCTestCase {
                        "un ensemble structuré n'est pas du HTML : on ne l'injecte pas tel quel")
     }
 
+    /// Forme relevée sur un article réel d'afsr.fr : le corps alterne des
+    /// nœuds de texte et un ensemble « two_columns » qui porte lui-même du
+    /// texte dans chacune de ses colonnes. S'arrêter au premier niveau
+    /// perdrait la moitié de l'article.
+    func test_contenuBard_ensembleImbriquePortantDuTexte() throws {
+        let article = try decode("""
+        {
+          "id": "abc", "title": "T",
+          "content": [
+            { "type": "text", "text": "<p>Avant.</p>" },
+            { "type": "two_columns",
+              "left_width": "1/2",
+              "content_left":  [ { "type": "text", "text": "<p>Colonne gauche.</p>" } ],
+              "content_right": [ { "type": "text", "text": "<p>Colonne droite.</p>" } ] },
+            { "type": "text", "text": "<p>Après.</p>" }
+          ]
+        }
+        """)
+
+        for attendu in ["Avant", "Colonne gauche", "Colonne droite", "Après"] {
+            XCTAssertTrue(article.content.contains(attendu), "« \(attendu) » doit être restitué")
+        }
+        XCTAssertFalse(article.content.contains("two_columns"),
+                       "le nom d'un ensemble n'est pas du contenu")
+        XCTAssertFalse(article.content.contains("1/2"),
+                       "une valeur de réglage n'est pas du contenu")
+
+        // L'ordre de lecture doit être respecté, et il doit être stable d'une
+        // exécution à l'autre : l'ordre d'un dictionnaire Swift ne l'est pas.
+        let gauche = try XCTUnwrap(article.content.range(of: "Colonne gauche"))
+        let droite = try XCTUnwrap(article.content.range(of: "Colonne droite"))
+        XCTAssertTrue(gauche.lowerBound < droite.lowerBound)
+    }
+
     /// Un Bard sans ensembles s'augmente en simple chaîne HTML. Les deux
     /// formes doivent passer.
     func test_contenuBard_chaineSimple() throws {
@@ -71,8 +105,26 @@ final class NewsArticleDecodingTests: XCTestCase {
 
     // MARK: - Image principale
 
-    /// Le handle est `featured_picture`, et un champ `assets` s'augmente en
-    /// tableau même avec `max_files: 1`.
+    /// Forme réellement servie par afsr.fr, relevée sur l'API en production :
+    /// un **objet**, pas un tableau. Avec `max_files: 1`, Statamic n'enveloppe
+    /// pas l'asset. On prend `permalink`, absolu, et non `url`, relatif.
+    func test_imagePrincipale_objetUnique() throws {
+        let article = try decode("""
+        {
+          "id": "abc", "title": "T",
+          "featured_picture": {
+            "id": "assets::marche.jpg",
+            "url": "/assets/marche.jpg",
+            "permalink": "https://afsr.fr/assets/marche.jpg"
+          }
+        }
+        """)
+        XCTAssertEqual(article.featuredImageURL?.absoluteString, "https://afsr.fr/assets/marche.jpg")
+    }
+
+    /// La forme tableau doit continuer de passer : c'est celle que Statamic
+    /// sert dès que `max_files` dépasse 1, et un réglage du blueprint suffit
+    /// à faire basculer le champ d'une forme à l'autre sans prévenir.
     func test_imagePrincipale_tableauDAssets() throws {
         let article = try decode("""
         {

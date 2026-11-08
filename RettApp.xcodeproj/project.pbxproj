@@ -7,711 +7,729 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		022A1B4B76131C498C59F0DD /* RettAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B77F7D4621BF9CB7C601FD /* RettAppApp.swift */; };
-		0D9AF51B20C1AF03CE716EF0 /* AFSRWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E92C7120A42940FB5278BF /* AFSRWebView.swift */; };
-		0E8E7E66B127C22AC734C484 /* UsageModeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 873B5843D78468BB5B631C50 /* UsageModeStoreTests.swift */; };
-		0EA6A23E335D25E9F32C143D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F859BDE2347365F10065D55 /* SettingsView.swift */; };
-		1048FFCD3072E0C5C4653CD0 /* SeizureTrackerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79AF165CC6502C6F53FD0264 /* SeizureTrackerViewModel.swift */; };
-		10788AB9083D634D60A42336 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8DD01A961C7A9BD76C864E52 /* LaunchScreen.storyboard */; };
-		14CEF3454EEFC2DB46E09DBD /* MedicationRevisionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBBD00F2325DD22559AF610 /* MedicationRevisionHistoryView.swift */; };
-		162E7019261E83ADD011D9BF /* BookletScanResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17A7514A192E03F56C4E7A5C /* BookletScanResult.swift */; };
-		1A0D2042DD80A5FDB1525A23 /* BookletPixelSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE67BF0C46542650E145A75A /* BookletPixelSampler.swift */; };
-		1A776FE0BA8EC8164D860A2D /* NewsArticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E95E02EBEA09D5D912A1AC /* NewsArticle.swift */; };
-		1E6A38F64CAC3D1334604E40 /* CKRecordRoundtripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4BF9CF54D9DBD54BF465A0C /* CKRecordRoundtripTests.swift */; };
-		1F989EB58D814BF0A6DA68E5 /* BookletQR.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2415F2EA7A72B22AC5455A /* BookletQR.swift */; };
-		248E785446C56DEE6D292C67 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 844A12D2319B5C00A17E3C14 /* CSVParser.swift */; };
-		2625ABDA46739ABF58AA4355 /* BookletInsertionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E67D16D11BE3C8E6A82F822C /* BookletInsertionService.swift */; };
-		270CD06853F443F946A667FC /* ObservationImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 574F40E555C99A8350A0630E /* ObservationImporter.swift */; };
-		29CC9D8D337E8E6AC049FE7D /* bdpm.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = CC27D0E5FC3BF3FAEDF5B20F /* bdpm.sqlite */; };
-		2BA26E703D11B2F25EF4C464 /* PendingWriteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF35CA956B4748E1674D97A /* PendingWriteStore.swift */; };
-		2BB0378F8143F53E81B8F905 /* MedicationImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 819078BA8F1ACB0CD31FD1D0 /* MedicationImporter.swift */; };
-		2C62199E84D7DDE1E955B611 /* BookletConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBCB766637C204A2E129A490 /* BookletConfigurationView.swift */; };
-		2FF75968AD36DD36B329C4D3 /* DeterministicID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AF77C7124B20A64A749979 /* DeterministicID.swift */; };
-		3197857230FD0906A1C613EC /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 723328546A3E4035E8A11651 /* CloudKitSyncService.swift */; };
-		385EB3F422952273B376D0F9 /* SectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B061A6F2F144D4B691E4B48A /* SectionCard.swift */; };
-		392967D1EC4AC209191A5D47 /* RettAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C0815F7DA602684FD3E0D2 /* RettAppDelegate.swift */; };
-		3D8EDA43D4D89063E7E9BE00 /* ChildProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE851CFCE428D8C1F7F89CCB /* ChildProfile.swift */; };
-		4B90E6038F778947D23716AA /* SeizureImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40BA4737F94D74294C45237 /* SeizureImporter.swift */; };
-		4F8A2EEC470B76CB173119B3 /* SharingDiagnosticView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDF079AEFFD7AA0CE45FE01E /* SharingDiagnosticView.swift */; };
-		5185B5EB7D5BCD87FD6274AE /* CombinedBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45BD21E2D0B55A2C5F6DB8F6 /* CombinedBackup.swift */; };
-		541544B873D6F96C653C91C5 /* SafetySnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 053E2C447F8C5DB39D7E14CA /* SafetySnapshots.swift */; };
-		5AB8E9AF4824756201323572 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 908022AD8D24E136534A9127 /* Foundation.framework */; };
-		5E7E856889A2FE8D298EA932 /* MoodImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80EBCD513E58D21293C33214 /* MoodImporter.swift */; };
-		5FD48613E157F482E6AA00E3 /* MedicationLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E7E0D4D024FA48D42BB6F4A /* MedicationLogView.swift */; };
-		6377B3F6656A7C1AC799396A /* MemberAreaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84CD786F36C1D7BDAA818A1F /* MemberAreaView.swift */; };
-		66F8064AE7ADEA0EEC2D021A /* MedicalReportAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754AA4CC0087F06A312C68BB /* MedicalReportAnalysis.swift */; };
-		678B4DDBC29A5665F7759640 /* SeizureTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46EFECD88FF341F2A569F696 /* SeizureTrackerView.swift */; };
-		6C4020F424FE2176D60AEF30 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA89B12ED896FFC23FCE9A6C /* DashboardViewModel.swift */; };
-		6C45A97AED19CC06BA97E9CB /* AFSRButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA447A65D0D16F184618DCA3 /* AFSRButton.swift */; };
-		714D334686BE5B54676C8962 /* ManualSeizureEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C812B5D25F22ABCE32FF25 /* ManualSeizureEntrySheet.swift */; };
-		74DD2DD6365C10AAA214954D /* MedicationLogImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71025A1637A3E00B2F21C40 /* MedicationLogImporter.swift */; };
-		79F205162197C6143F4C85DC /* ProfileSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E202FE4D7C0E7A865FE3004C /* ProfileSetupView.swift */; };
-		7F9B951D55E2F59F82B325E9 /* HealthDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 534CC7F566BACF58CDBC90C7 /* HealthDataView.swift */; };
-		827BD24E180098A98B3A1530 /* MedicationCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6028D85705670111DFC7E7DE /* MedicationCatalog.swift */; };
-		83A995CADCA7B1828C387F03 /* MoodEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C556295252C30D100281FC5 /* MoodEntry.swift */; };
-		8602AB0E76BA8C1F49ACF00D /* JournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDFDA2F0C9C666220F24D3F2 /* JournalView.swift */; };
-		87196DDCF55271842EFE412E /* MedicationIntake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B04C20CED4BAE6DD13E2DA2 /* MedicationIntake.swift */; };
-		8B16A8714E5B9A0CCF36639C /* FollowUpBookletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E30CDAF5D78D4754BE6F205 /* FollowUpBookletView.swift */; };
-		8CB14B94993495CFC2B44E7E /* AdHocLogSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C872927E7021280E73F6A4B0 /* AdHocLogSheet.swift */; };
-		94ED23DBA2007828B2E92E01 /* PreviewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0BD881538EB7B491D023B2 /* PreviewData.swift */; };
-		98C37DD1764C1809E1E16AD3 /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29F65FA4FFE78A878FBC372B /* Medication.swift */; };
-		993969C3B82D99C661C31C4D /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 929D8DF68661B2A9B4213E91 /* DashboardView.swift */; };
-		9BD08B25873D2D9B17C9E95C /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 908022AD8D24E136534A9127 /* Foundation.framework */; };
-		9DA88FCDABBBF2A98374AE78 /* MedicationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 302912534F5CA94AE0F5289E /* MedicationLog.swift */; };
-		9E181C88E55A1756D14589AA /* FollowUpBookletGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CEEEB90B0AB88C3F8F6F010 /* FollowUpBookletGenerator.swift */; };
-		A2958B463A1ECC0933D1B370 /* DeviceRoleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2C428DCAFE8C42F0239FC4C /* DeviceRoleStore.swift */; };
-		A3489877D684853E9EF3BA2D /* CommonFrenchMedications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044FB82F55EA54445C3C587B /* CommonFrenchMedications.swift */; };
-		A4B56C8C872A1B631512409F /* MedicalReportGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19065A2A2E21AD28D4352E58 /* MedicalReportGenerator.swift */; };
-		A76F151BBDE1615E91A27532 /* NewsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796149E6C27B5DF869A6A987 /* NewsListView.swift */; };
-		ABAF110686E481F5FDA010C6 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 3FB3EC52194ECEA146D2D595 /* Localizable.strings */; };
-		AC0CEE313E002EB2A062B985 /* SeizureEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D63E0C2D8D1ADE3DCF763D /* SeizureEvent.swift */; };
-		AC7D68C4F943A2D211718569 /* UpdateAvailabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41715FEF7CA025A46C8F6B1B /* UpdateAvailabilityService.swift */; };
-		AEC283D846640C96B029DCE9 /* UsageChoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A73B55ACA86CA7A5ECE67F04 /* UsageChoiceView.swift */; };
-		B1EEB1054D145506338F8EE1 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 809B9AED2D7954DEEC8AB34F /* ContentView.swift */; };
-		B3C0DCE9D050F4EA9A361831 /* BookletSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245505DDCB5D561FD1D2DECD /* BookletSchema.swift */; };
-		B54513BFAF2B146B6758E123 /* NewsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB3A62157934A282A05E04D /* NewsViewModel.swift */; };
-		B66B60640503554E009DF9A7 /* SyncGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 417D720506BF9F822878C8D2 /* SyncGate.swift */; };
-		B925CC780E950B2BADA2EB69 /* DiscoveryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E322938099E05125BA0750F6 /* DiscoveryHomeView.swift */; };
-		BC4AAA7E19CC9AE2D0C4A4CD /* CombinedBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03E33D9263AE76FA4613C70 /* CombinedBackupService.swift */; };
-		BE5789BF12B157EFD2FCF21B /* SeizureViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59BC14801EC99A81F60F444 /* SeizureViewModelTests.swift */; };
-		C27194F2547655E3401EFED0 /* FamilyDataDeduplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A0E8BBB5ED7FB283F8A256 /* FamilyDataDeduplicator.swift */; };
-		C5046EFFB2B5509922E237FF /* AFSRTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECDA8025BB3E07AE2790A2E /* AFSRTheme.swift */; };
-		C5C87A6E029B3C810939143F /* MedicationRevision.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286921973013C32F2DE20F92 /* MedicationRevision.swift */; };
-		C6B7CF1AEF26737A6F454F03 /* MedicationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593BA1457CFD44869FD79AA6 /* MedicationViewModel.swift */; };
-		C77AB99C90F7984F24BA4959 /* DonationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400B10F6EC363F47E471413F /* DonationView.swift */; };
-		C8CFDE2C1D7B84C684C623F3 /* BookletScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D2EC081874E8A4595DBD8B /* BookletScannerView.swift */; };
-		CA36E32FB2107D198B855AE0 /* ParentSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66EE757FBC684B86D414D62D /* ParentSharingView.swift */; };
-		CEFE8C6D9F2DDF688B7CBF41 /* ProximityShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3738A171B3C5CEF7BE93B3F6 /* ProximityShareSheet.swift */; };
-		CF3F5848069ADAE1CBBA4117 /* MoodSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 937BD733D52AD38C32142518 /* MoodSheet.swift */; };
-		D0833A7D20694E5D59EBC03C /* BookletImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6822766B64F3EEC1929BC613 /* BookletImportSheet.swift */; };
-		D17EC058F41A8CE855932486 /* ChartImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECC866758460A2CFBE4967B7 /* ChartImageRenderer.swift */; };
-		D27E7B9E714A64D2902D4044 /* CloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1386F541A65EECC52DC17DC /* CloudSyncTests.swift */; };
-		D5D60920F3A404D82C9469A3 /* MedicalReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DB66F173F5DAF062AE9D88 /* MedicalReportView.swift */; };
-		D7538E40578CF866C04A44B6 /* SymptomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85ADE7361A659B8512C5AE56 /* SymptomSheet.swift */; };
-		D75FB395B598BFD1E7E2CBF4 /* SettingsSubviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27765A86A67CD4AB3BAB5CAA /* SettingsSubviews.swift */; };
-		D7B3425C6AD24DB02875A69D /* DailyObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B68B7160460AC915EAA5F2DB /* DailyObservation.swift */; };
-		D8ECDF11805AB86182CDC72C /* UsageModeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CEEFB5706F33FF55471AEAE /* UsageModeStore.swift */; };
-		D9D8D7FF26635BE937A61AB2 /* DailyObservationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19502F0F78275F792D0980CC /* DailyObservationSheet.swift */; };
-		DC846F4B18B9F2B4E437E5B9 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B794BF688BCC4E896FCC08D /* HealthKitManager.swift */; };
-		DDCB25C81A1901262C4E72F3 /* DemoDataGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 489B9542EDF53A7FF6636BB1 /* DemoDataGenerator.swift */; };
-		DE4EB464FB713BF9097458F2 /* HistoricalDataImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 293564E53D7DF8584AD0D5B8 /* HistoricalDataImportView.swift */; };
-		DF61BE015107E5633B8422E4 /* FamilyDataDeduplicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2399AA2B265B27C72130C46 /* FamilyDataDeduplicatorTests.swift */; };
-		E036146298C034494FA97817 /* NewsDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14251EC93C0E2EBEFBE67892 /* NewsDetailView.swift */; };
-		E1B61A0623380E6632B084A3 /* CKRecordMappers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B708D6C2E3000087681CCAB /* CKRecordMappers.swift */; };
-		E21C57E99282DE6CEA2379D0 /* SyncTimestamped.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B4B96CE71C92ADC2425EBA /* SyncTimestamped.swift */; };
-		E59A3585B33E72B281CF94DB /* UpdateAvailabilityBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF2EA3203AB6298F5B38D5A4 /* UpdateAvailabilityBanner.swift */; };
-		E6C68CFB6DB881C21DCB5BB7 /* SeizureHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2355F0722D878B307E42A2AD /* SeizureHistoryView.swift */; };
-		E83992310B0C0F06869138E2 /* HourMinute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36898A2B9A8494B89A2AF5B1 /* HourMinute.swift */; };
-		E9DFFB8F2D9E315B0993BACF /* MedicationIntakeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5DD56410B44ACE6726147A9 /* MedicationIntakeEditorView.swift */; };
-		EA41AF7F7E2321BC104204E5 /* NewsArticleDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEF7285B635722A06A1E3C58 /* NewsArticleDecodingTests.swift */; };
-		EBE910B63EE0CDE324759144 /* FeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B166ED64008DFD836C1795E /* FeatureFlags.swift */; };
-		ECDB3C42CACF8384807F1699 /* BookletConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0177A8C7BF107F6C0B9C7D /* BookletConfigStore.swift */; };
-		ED589F74E49E21D994298F7C /* SymptomEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A87F940F3FB5578C9E6E3F /* SymptomEvent.swift */; };
-		EE98D90F3D7E355EDE3965CB /* BDPMDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A340929662E8288FFED2AB /* BDPMDatabase.swift */; };
-		F091EF6FCD603F1B7DA3A490 /* CKRetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D1F2F86BA39C88682E06E1 /* CKRetry.swift */; };
-		F79EA836FCE8DDD321E5DAA6 /* GazeProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E3B0B047C6DE4CB80A9986F /* GazeProcessorTests.swift */; };
-		F81CCC26F7B3B8D8E22DAA83 /* DonationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8679364181C66AE602AC25CE /* DonationService.swift */; };
-		F8E0382751E90E2740FD0C39 /* SyncStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A174B52C04EE0C167E965846 /* SyncStatusBanner.swift */; };
-		F939D5C2CBCCFB7B730A1098 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F5AC7769702FF521C75B498A /* Assets.xcassets */; };
-		FCB0ECB397F03B6DDED3BFED /* CSVImportMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09093891B852F96C3E048C12 /* CSVImportMenu.swift */; };
-		FF283CB332B64B96F095B252 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CF736B886244F5B4263183 /* EmptyStateView.swift */; };
-		FF2A6418F28D6C58BAC15287 /* BookletLayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18729A7F11124EFBFE196DB /* BookletLayoutEngine.swift */; };
+		03539D9A8540AB05F7D3D3C9 /* MedicationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F6FF84202595848C7EB7B3 /* MedicationViewModel.swift */; };
+		07ED62F4B115D9F8AB7EC144 /* GazeProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19FB342D87483303E7E31259 /* GazeProcessorTests.swift */; };
+		0975C8A19C57C82DFA7ACC68 /* MedicationImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C7EC79CB425C4670C07BF98 /* MedicationImporter.swift */; };
+		0C9B470B3774F02A10BE3249 /* BDPMDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F9477B1C4F2EA186BB3638F /* BDPMDatabase.swift */; };
+		0D1420662101A5AC5C1014C9 /* HourMinute.swift in Sources */ = {isa = PBXBuildFile; fileRef = D265FBFDBE40C53F65961020 /* HourMinute.swift */; };
+		1404FCF51C1A239A3F962F7A /* CKRecordRoundtripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F04F63D7DFC55E3526EB82E /* CKRecordRoundtripTests.swift */; };
+		1595098D3C46BFCC639DFA07 /* FamilyDataDeduplicatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3654990365D5F30304AE5D77 /* FamilyDataDeduplicatorTests.swift */; };
+		1B80B32F67E884929EA8EDAB /* BookletImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B650CB9599716E33B8786A9 /* BookletImportSheet.swift */; };
+		1D65A3F50B5F5060E12F4340 /* FollowUpBookletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7955FE055B57B0556301B515 /* FollowUpBookletView.swift */; };
+		204A11F8015AC0D3F6B52D0D /* MoodSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DCC654DF7CDEE48B8649CF9 /* MoodSheet.swift */; };
+		209A55B025C99CA1A85AB463 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = E0D8F89350285A45CCD65EA4 /* Localizable.strings */; };
+		235B1E61B654DC3C241DC501 /* ChartImageRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E09CCB4EC0547295454AE7 /* ChartImageRenderer.swift */; };
+		2410FD888B0D991D1D6B42D8 /* MedicalReportAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9EF62F087AE9444B43F63F /* MedicalReportAnalysis.swift */; };
+		27833CF4B818A2377C0FED18 /* BookletSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FBEB7B985D53B1D6047C83 /* BookletSchema.swift */; };
+		2A3DDAED68059660DC374187 /* SeizureViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2859983515B9BC86207C46A /* SeizureViewModelTests.swift */; };
+		2C310047C286643ECD68556F /* RettAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9C4DDA166BDAEF1789C59D /* RettAppDelegate.swift */; };
+		2CB6D4B5E4C3AF043B8C60DD /* MedicationRevisionHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB64D90F07CDB7E5E6A84CF5 /* MedicationRevisionHistoryView.swift */; };
+		2DDDC53025ED1E596D82A647 /* CKRecordMappers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83AD8070FF616BE46D5F248D /* CKRecordMappers.swift */; };
+		307E7A335E4108081776DA58 /* SafetySnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88BB8F0DBFEEA60D1B4F523D /* SafetySnapshots.swift */; };
+		346B0782E21F4F717DFB936B /* BookletConfigurationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8418A2A0D7633473A9A5415E /* BookletConfigurationView.swift */; };
+		34D453C6FE8CDEF6C1362EB8 /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D36DD836FE285F2E64D887D /* CloudKitSyncService.swift */; };
+		355E86E40BC00906D00AA117 /* MedicationCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FAB499054E8F13575DC7FD3 /* MedicationCatalog.swift */; };
+		36FF025DFBC5B7E341BCFD2B /* BookletPixelSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0630361913B7F8EA9DDE9942 /* BookletPixelSampler.swift */; };
+		393D3B21651D1A16F2327B5C /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2160540AFC95C7C34E78AFBE /* Medication.swift */; };
+		3D2DCD11CCD41AEFF5A7AA39 /* DeviceRoleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E9DA02AC6BE3A3DB9F60CFD /* DeviceRoleStore.swift */; };
+		3FD168B72354709ED758EF48 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846AC79618E3479487F0D2AF /* DashboardView.swift */; };
+		3FE51C96CF517B21DE8B170C /* NewsArticleDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5845EC11DE94F583B81D6A8 /* NewsArticleDecodingTests.swift */; };
+		45A22091F03D86BF10658DFE /* UsageModeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB276C473610AA3865578058 /* UsageModeStore.swift */; };
+		49BB528B0044086D9A3D76D2 /* CombinedBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C544198B24C610B906792A /* CombinedBackup.swift */; };
+		4EEB0136EA4E7E43CA1A196E /* BookletInsertionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76FDEAB833482290900291CE /* BookletInsertionService.swift */; };
+		50D83E5FCC927D725B1C2BA1 /* MedicationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA283EFF8810B0C4D9D37325 /* MedicationLog.swift */; };
+		580C085496427958F54576C1 /* UsageChoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6DAC7DC12B3F50D8C8A398 /* UsageChoiceView.swift */; };
+		5A45D7DEBC2EF72DE2BBAA9A /* SeizureTrackerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 154D04C01D4958BB6D10E41C /* SeizureTrackerViewModel.swift */; };
+		5CCEA70591DB744FE59A0192 /* CloudSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72A2988DB30F511B6D0F4B9 /* CloudSyncTests.swift */; };
+		5D82A0910404CC3F3894F3FC /* BookletQR.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26355569A56C45D392B1428 /* BookletQR.swift */; };
+		5E8ADBC4A1CDA1AC09C7902D /* AFSRButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B2466F181116878ED514B08 /* AFSRButton.swift */; };
+		5FACD2C2998E3451DC621DF2 /* MedicationRevision.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B040FF90A0D738D6C8246F /* MedicationRevision.swift */; };
+		62B32724625F73F1C9AF006F /* ProximityShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409FE9B69E300D5526B7681B /* ProximityShareSheet.swift */; };
+		631866A59E550321AC8EEAD0 /* ChildProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527ED1473B4FFFFD06A31F6D /* ChildProfile.swift */; };
+		63A843489C67DCCE92226D4A /* DonationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBBE6D1EC46B04DDCA3F843A /* DonationService.swift */; };
+		67DAF10FB93CF21C3732BA1A /* SyncStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304C210EAEF2F1ACFD6B5F6A /* SyncStatusBanner.swift */; };
+		6AAD129D296FB681F97FC38D /* SeizureImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3658959A9C382A2CC9350460 /* SeizureImporter.swift */; };
+		6AEA1DC675E2288A433E1F5F /* MedicalReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45C285108299A00CC2777439 /* MedicalReportView.swift */; };
+		6AFFE59FAC9D1177F0BCD640 /* DiscoveryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0BC04AA5D8ECA545CF00E55 /* DiscoveryHomeView.swift */; };
+		6D567BDA27332714B35B6067 /* BookletScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541CB174622109B8CE06624E /* BookletScannerView.swift */; };
+		6E33A405C0F378A17F47EB78 /* PreviewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317940804BE58AEB33F0F4B3 /* PreviewData.swift */; };
+		6ED1035E7A5B90D43DE0AD54 /* AFSRWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1D32BAE74162B41658DB9B /* AFSRWebView.swift */; };
+		705B923E27C7D5B6D4D69327 /* JournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6784F78142F45A00E5D07858 /* JournalView.swift */; };
+		7072A537E52208CF33ED5318 /* MoodEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E795FEDE25F5515B682C73D /* MoodEntry.swift */; };
+		70B21966BF1CA8EDE3BAFCE0 /* HealthDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F3DFEDE4C37E192BACD3BC9 /* HealthDataView.swift */; };
+		71724ABCA11777B046BFD320 /* CommonFrenchMedications.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3067FE54E13ED4F8BCCEADC /* CommonFrenchMedications.swift */; };
+		721C0683BF33F688D6A6728A /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3202C27A1EF45C60C3EB4908 /* CSVParser.swift */; };
+		728596B7B7F2ADD830621DB1 /* UpdateAvailabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE1CCC46D62F289B2D4BEA0 /* UpdateAvailabilityService.swift */; };
+		73EECC04F4B75E928B94248E /* ProfileSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9CAF8F47F5EDFD4097421C1 /* ProfileSetupView.swift */; };
+		773AE097F36E8CDADEC91476 /* SeizureTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33BFAAEB3D48ACF46389ACE6 /* SeizureTrackerView.swift */; };
+		795497F55255E32F5A7D4BF4 /* MedicationIntake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96FDE621AF5AB945B7202907 /* MedicationIntake.swift */; };
+		7BF51C30CB277B5784409608 /* ObservationImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43EE391D351C7AA523F8C971 /* ObservationImporter.swift */; };
+		7CE8A9ECAB4C1998B40E5404 /* BookletLayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A0CDAEB1D03704DBDE463B /* BookletLayoutEngine.swift */; };
+		7FF53DAB141FA2F7B2D69E7C /* UsageModeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42EF397A0DA8C515419723B1 /* UsageModeStoreTests.swift */; };
+		815BCD3FA922E0B2308CBA01 /* NewsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34320B4B56746EB46D426050 /* NewsViewModel.swift */; };
+		8292230540C8C7680579936A /* AdHocLogSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F3ADDFB5ADF1640E811852 /* AdHocLogSheet.swift */; };
+		85628E2FC927825EE3FBDF92 /* NewsArticle.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5BB85D038C09D627F0FB0C /* NewsArticle.swift */; };
+		85C677A1895A39E742D64D23 /* BookletScanResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 085B5A4C5EE27EC58BFC08F0 /* BookletScanResult.swift */; };
+		87B479EA5ADC100592391AAB /* DeterministicID.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E362144314253FD12522C6 /* DeterministicID.swift */; };
+		8A51FA0FB14455297F63CAAE /* SymptomEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF739E19C78B053604DF2C3C /* SymptomEvent.swift */; };
+		8B239EAE8DA58B786E9DD393 /* DonationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748A0BE95DDADBF762AE46C5 /* DonationView.swift */; };
+		8B31CFE113FCCD6B2AEDC840 /* NewsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B0F7A55751B124E6664CA4 /* NewsListView.swift */; };
+		8D6F26494F69D70103B4E2B7 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 70558472D8622025689B7581 /* LaunchScreen.storyboard */; };
+		8DEB49ABC381D03C7A712061 /* CKRetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106EB4FE829F2AC8DE62161F /* CKRetry.swift */; };
+		92F48032CA632F2CDA364218 /* PendingWriteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C9E4F6374B3281E4CCFF57 /* PendingWriteStore.swift */; };
+		93C8A324CBA77A6E49BF62F5 /* BookletConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716C789305576F4B59892542 /* BookletConfigStore.swift */; };
+		93CE8B0733D1FA4F62B5A658 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B50463F91F7B57DBC7BC4BB /* ContentView.swift */; };
+		93E092DBFE9A00ECB9833CB4 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EE541136E9EF0167B597B4E /* HealthKitManager.swift */; };
+		9692DC7377ADCE9602025A8D /* RettAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81E29FFF4D1C9C58E5905A5 /* RettAppApp.swift */; };
+		9F955C58A9EDF3F6E44E0393 /* SectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2DE7581D6D18F833E945EA5 /* SectionCard.swift */; };
+		A02DE6CFCA30343397E09850 /* SymptomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43AFAFBF37540349150332E8 /* SymptomSheet.swift */; };
+		A0890B9415DB56CF08C0F982 /* DailyObservationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F3ED4833AC069D19C643D6 /* DailyObservationSheet.swift */; };
+		A49C02395D7FFF976C9E60C8 /* DemoDataGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8D39F2C073121977DEBED1 /* DemoDataGenerator.swift */; };
+		A4E46C587C29C6AC7FFE6BB3 /* AFSRTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C1FBDEA0DA60C032636060 /* AFSRTheme.swift */; };
+		AEBEB597EF84B61BDF0082F5 /* bdpm.sqlite in Resources */ = {isa = PBXBuildFile; fileRef = BBA72AF94F44EDB8BF626B09 /* bdpm.sqlite */; };
+		B02AFC4417310E3CFCFCED87 /* ManualSeizureEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99EAA34A661CAD64DD321C13 /* ManualSeizureEntrySheet.swift */; };
+		B4D2F5C07041156EE7E89D30 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A64653D365683E0E4B8EB6 /* EmptyStateView.swift */; };
+		BA694BD342D7C19A8656051B /* SettingsSubviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D80D7C3C5E320D06A8C06F1 /* SettingsSubviews.swift */; };
+		BB4C1FCEAC83518533745ED4 /* CSVImportMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73503EB8D419F52D05F6F3D /* CSVImportMenu.swift */; };
+		BF21695C97614AA330163B79 /* FeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = B390B0A5557A2AF8B58B0640 /* FeatureFlags.swift */; };
+		C7DE124B633A561649ABF1AB /* MedicalReportGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D920C7F6695F95943FF66B /* MedicalReportGenerator.swift */; };
+		CB0488ADB8FF344C4C20E7D3 /* ParentSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F148A514A061FDAFE1216627 /* ParentSharingView.swift */; };
+		CEBFA26D5749EB3721A7BD59 /* MedicationLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A438A3AEE124971963B948D7 /* MedicationLogView.swift */; };
+		D1126DABBE390C0446DEC3B6 /* UpdateAvailabilityBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19586E492D6BC327F09882DB /* UpdateAvailabilityBanner.swift */; };
+		D1B28CC3B701B0B7E0B33788 /* NewsDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D5E906E41B971C0ECD1FAE /* NewsDetailView.swift */; };
+		D1E1AC344E0E26ED1F19A374 /* SeizureEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413A64A13B52DB36DF3B058E /* SeizureEvent.swift */; };
+		D2257EEF1340CDD447E4B6DE /* SharingDiagnosticView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582031641D50AC6368DA352B /* SharingDiagnosticView.swift */; };
+		D38EC05BA3B3CC0DD7609769 /* MoodImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B7BF6F070D4A580124C818 /* MoodImporter.swift */; };
+		D6F1B1102FEC8042D593A222 /* SeizureHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CEF49E3F10CCFC7A48F0BE /* SeizureHistoryView.swift */; };
+		D9C133E43768980CB8BFCE2F /* SyncTimestamped.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE9291C8875FDAAAE4F84FA2 /* SyncTimestamped.swift */; };
+		DB4F0B9E9BD2DE6B8622D29D /* MedicationLogImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BEDA284B4FA12EB4C2967F5 /* MedicationLogImporter.swift */; };
+		DBDAFF7104297EDC143BF278 /* FollowUpBookletGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40874AD56E90BC9492A0FE6 /* FollowUpBookletGenerator.swift */; };
+		DD8BD9B507C9420EB0A5920C /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5C250C13D643978ACDEEA46A /* Foundation.framework */; };
+		E42B8CB39E4F2931EE2FEBE5 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADAD569059D6E6207A6AC9C1 /* SettingsView.swift */; };
+		E56F9F86CB0D89A70471207F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5C250C13D643978ACDEEA46A /* Foundation.framework */; };
+		E9AEC46DA407FF5EA2BA701C /* SyncGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F6F3EF7B6FB42028C45A85D /* SyncGate.swift */; };
+		E9EAC98E405F8D6AEF3862B8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 16B16F914638E6ED0465097A /* Assets.xcassets */; };
+		EA95E90948BE87AA1A09B069 /* MedicationIntakeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505DD211ECD7D2338B4298B4 /* MedicationIntakeEditorView.swift */; };
+		EF11DBA93B38F0C5085C1C11 /* CombinedBackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B552A1B1718D21278D72F8 /* CombinedBackupService.swift */; };
+		F12BC4E748703E36AAAC8AF7 /* DailyObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3656CCBA32C75546E33A29 /* DailyObservation.swift */; };
+		F319F4CA8EC629D2C41CE23D /* MemberAreaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA114B7128155BD55E50ED0 /* MemberAreaView.swift */; };
+		F874722C94A7C27AFFD8A8FB /* FamilyDataDeduplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44EDDDD4A3966F486182A4F /* FamilyDataDeduplicator.swift */; };
+		F9154E79F23401E4FA83BCB2 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B6A2D7175652579955B1D1 /* DashboardViewModel.swift */; };
+		FA5C26F02533EF160C7F0094 /* HistoricalDataImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C2DBAE47D86F978D2CBB34B /* HistoricalDataImportView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		2B067FB5D6E30248C671B5F7 /* PBXContainerItemProxy */ = {
+		D86327914D6E020D26CEF3F1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 357C1E68E87D5B01624DA927 /* Project object */;
+			containerPortal = 855D70902A54E60D0888D8A1 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 2397A88B8D01D4530EB8068D;
+			remoteGlobalIDString = DD88CFEB6522C110CEA43470;
 			remoteInfo = RettApp;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		001E83AA0C08D06B7B5F025D /* RettApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RettApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		044FB82F55EA54445C3C587B /* CommonFrenchMedications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CommonFrenchMedications.swift; sourceTree = "<group>"; };
-		04D1F2F86BA39C88682E06E1 /* CKRetry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CKRetry.swift; sourceTree = "<group>"; };
-		053E2C447F8C5DB39D7E14CA /* SafetySnapshots.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SafetySnapshots.swift; sourceTree = "<group>"; };
-		07C0815F7DA602684FD3E0D2 /* RettAppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RettAppDelegate.swift; sourceTree = "<group>"; };
-		09093891B852F96C3E048C12 /* CSVImportMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CSVImportMenu.swift; sourceTree = "<group>"; };
-		09DB66F173F5DAF062AE9D88 /* MedicalReportView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicalReportView.swift; sourceTree = "<group>"; };
-		0EBBD00F2325DD22559AF610 /* MedicationRevisionHistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationRevisionHistoryView.swift; sourceTree = "<group>"; };
-		14251EC93C0E2EBEFBE67892 /* NewsDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsDetailView.swift; sourceTree = "<group>"; };
-		17A7514A192E03F56C4E7A5C /* BookletScanResult.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletScanResult.swift; sourceTree = "<group>"; };
-		19065A2A2E21AD28D4352E58 /* MedicalReportGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicalReportGenerator.swift; sourceTree = "<group>"; };
-		19502F0F78275F792D0980CC /* DailyObservationSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyObservationSheet.swift; sourceTree = "<group>"; };
-		1B166ED64008DFD836C1795E /* FeatureFlags.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeatureFlags.swift; sourceTree = "<group>"; };
-		2355F0722D878B307E42A2AD /* SeizureHistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureHistoryView.swift; sourceTree = "<group>"; };
-		245505DDCB5D561FD1D2DECD /* BookletSchema.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletSchema.swift; sourceTree = "<group>"; };
-		27765A86A67CD4AB3BAB5CAA /* SettingsSubviews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsSubviews.swift; sourceTree = "<group>"; };
-		286921973013C32F2DE20F92 /* MedicationRevision.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationRevision.swift; sourceTree = "<group>"; };
-		293564E53D7DF8584AD0D5B8 /* HistoricalDataImportView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoricalDataImportView.swift; sourceTree = "<group>"; };
-		29F65FA4FFE78A878FBC372B /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Medication.swift; sourceTree = "<group>"; };
-		2CEEFB5706F33FF55471AEAE /* UsageModeStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageModeStore.swift; sourceTree = "<group>"; };
-		302912534F5CA94AE0F5289E /* MedicationLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationLog.swift; sourceTree = "<group>"; };
-		36898A2B9A8494B89A2AF5B1 /* HourMinute.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HourMinute.swift; sourceTree = "<group>"; };
-		3738A171B3C5CEF7BE93B3F6 /* ProximityShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProximityShareSheet.swift; sourceTree = "<group>"; };
-		3B794BF688BCC4E896FCC08D /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
-		3C556295252C30D100281FC5 /* MoodEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodEntry.swift; sourceTree = "<group>"; };
-		3E3B0B047C6DE4CB80A9986F /* GazeProcessorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GazeProcessorTests.swift; sourceTree = "<group>"; };
-		3FB3EC52194ECEA146D2D595 /* Localizable.strings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; path = Localizable.strings; sourceTree = "<group>"; };
-		400B10F6EC363F47E471413F /* DonationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DonationView.swift; sourceTree = "<group>"; };
-		41715FEF7CA025A46C8F6B1B /* UpdateAvailabilityService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UpdateAvailabilityService.swift; sourceTree = "<group>"; };
-		417D720506BF9F822878C8D2 /* SyncGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncGate.swift; sourceTree = "<group>"; };
-		45BD21E2D0B55A2C5F6DB8F6 /* CombinedBackup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CombinedBackup.swift; sourceTree = "<group>"; };
-		46EFECD88FF341F2A569F696 /* SeizureTrackerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureTrackerView.swift; sourceTree = "<group>"; };
-		489B9542EDF53A7FF6636BB1 /* DemoDataGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoDataGenerator.swift; sourceTree = "<group>"; };
-		4C0BD881538EB7B491D023B2 /* PreviewData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreviewData.swift; sourceTree = "<group>"; };
-		534CC7F566BACF58CDBC90C7 /* HealthDataView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthDataView.swift; sourceTree = "<group>"; };
-		574F40E555C99A8350A0630E /* ObservationImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationImporter.swift; sourceTree = "<group>"; };
-		593BA1457CFD44869FD79AA6 /* MedicationViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationViewModel.swift; sourceTree = "<group>"; };
-		5CEEEB90B0AB88C3F8F6F010 /* FollowUpBookletGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FollowUpBookletGenerator.swift; sourceTree = "<group>"; };
-		6028D85705670111DFC7E7DE /* MedicationCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationCatalog.swift; sourceTree = "<group>"; };
-		61CF736B886244F5B4263183 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
-		66EE757FBC684B86D414D62D /* ParentSharingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ParentSharingView.swift; sourceTree = "<group>"; };
-		6822766B64F3EEC1929BC613 /* BookletImportSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletImportSheet.swift; sourceTree = "<group>"; };
-		6B04C20CED4BAE6DD13E2DA2 /* MedicationIntake.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationIntake.swift; sourceTree = "<group>"; };
-		6E7E0D4D024FA48D42BB6F4A /* MedicationLogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationLogView.swift; sourceTree = "<group>"; };
-		723328546A3E4035E8A11651 /* CloudKitSyncService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
-		73D63E0C2D8D1ADE3DCF763D /* SeizureEvent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureEvent.swift; sourceTree = "<group>"; };
-		754AA4CC0087F06A312C68BB /* MedicalReportAnalysis.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicalReportAnalysis.swift; sourceTree = "<group>"; };
-		796149E6C27B5DF869A6A987 /* NewsListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsListView.swift; sourceTree = "<group>"; };
-		79AF165CC6502C6F53FD0264 /* SeizureTrackerViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureTrackerViewModel.swift; sourceTree = "<group>"; };
-		7B708D6C2E3000087681CCAB /* CKRecordMappers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CKRecordMappers.swift; sourceTree = "<group>"; };
-		7CB3A62157934A282A05E04D /* NewsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsViewModel.swift; sourceTree = "<group>"; };
-		7F72283216AB1A6CEBCE35F3 /* RettApp.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RettApp.entitlements; sourceTree = "<group>"; };
-		809B9AED2D7954DEEC8AB34F /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		80EBCD513E58D21293C33214 /* MoodImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodImporter.swift; sourceTree = "<group>"; };
-		819078BA8F1ACB0CD31FD1D0 /* MedicationImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationImporter.swift; sourceTree = "<group>"; };
-		844A12D2319B5C00A17E3C14 /* CSVParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
-		84CD786F36C1D7BDAA818A1F /* MemberAreaView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemberAreaView.swift; sourceTree = "<group>"; };
-		85ADE7361A659B8512C5AE56 /* SymptomSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SymptomSheet.swift; sourceTree = "<group>"; };
-		8679364181C66AE602AC25CE /* DonationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DonationService.swift; sourceTree = "<group>"; };
-		86E92C7120A42940FB5278BF /* AFSRWebView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AFSRWebView.swift; sourceTree = "<group>"; };
-		873B5843D78468BB5B631C50 /* UsageModeStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageModeStoreTests.swift; sourceTree = "<group>"; };
-		8DD01A961C7A9BD76C864E52 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		8E0177A8C7BF107F6C0B9C7D /* BookletConfigStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletConfigStore.swift; sourceTree = "<group>"; };
-		8E30CDAF5D78D4754BE6F205 /* FollowUpBookletView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FollowUpBookletView.swift; sourceTree = "<group>"; };
-		8F859BDE2347365F10065D55 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		908022AD8D24E136534A9127 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		929D8DF68661B2A9B4213E91 /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
-		937BD733D52AD38C32142518 /* MoodSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodSheet.swift; sourceTree = "<group>"; };
-		94AF77C7124B20A64A749979 /* DeterministicID.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeterministicID.swift; sourceTree = "<group>"; };
-		94E95E02EBEA09D5D912A1AC /* NewsArticle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsArticle.swift; sourceTree = "<group>"; };
-		A174B52C04EE0C167E965846 /* SyncStatusBanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncStatusBanner.swift; sourceTree = "<group>"; };
-		A2D2EC081874E8A4595DBD8B /* BookletScannerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletScannerView.swift; sourceTree = "<group>"; };
-		A5DD56410B44ACE6726147A9 /* MedicationIntakeEditorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationIntakeEditorView.swift; sourceTree = "<group>"; };
-		A73B55ACA86CA7A5ECE67F04 /* UsageChoiceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageChoiceView.swift; sourceTree = "<group>"; };
-		AA89B12ED896FFC23FCE9A6C /* DashboardViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
-		B03E33D9263AE76FA4613C70 /* CombinedBackupService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CombinedBackupService.swift; sourceTree = "<group>"; };
-		B061A6F2F144D4B691E4B48A /* SectionCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
-		B18729A7F11124EFBFE196DB /* BookletLayoutEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletLayoutEngine.swift; sourceTree = "<group>"; };
-		B1B77F7D4621BF9CB7C601FD /* RettAppApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RettAppApp.swift; sourceTree = "<group>"; };
-		B40BA4737F94D74294C45237 /* SeizureImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureImporter.swift; sourceTree = "<group>"; };
-		B68B7160460AC915EAA5F2DB /* DailyObservation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyObservation.swift; sourceTree = "<group>"; };
-		BE851CFCE428D8C1F7F89CCB /* ChildProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChildProfile.swift; sourceTree = "<group>"; };
-		C3996630DF093B4302880066 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C872927E7021280E73F6A4B0 /* AdHocLogSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdHocLogSheet.swift; sourceTree = "<group>"; };
-		CC2415F2EA7A72B22AC5455A /* BookletQR.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletQR.swift; sourceTree = "<group>"; };
-		CC27D0E5FC3BF3FAEDF5B20F /* bdpm.sqlite */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = bdpm.sqlite; sourceTree = "<group>"; };
-		CDF079AEFFD7AA0CE45FE01E /* SharingDiagnosticView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharingDiagnosticView.swift; sourceTree = "<group>"; };
-		CE67BF0C46542650E145A75A /* BookletPixelSampler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletPixelSampler.swift; sourceTree = "<group>"; };
-		D3A340929662E8288FFED2AB /* BDPMDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BDPMDatabase.swift; sourceTree = "<group>"; };
-		D4C812B5D25F22ABCE32FF25 /* ManualSeizureEntrySheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ManualSeizureEntrySheet.swift; sourceTree = "<group>"; };
-		D56D14EE1C78AF7D5E5CB975 /* RettAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RettAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		D6A87F940F3FB5578C9E6E3F /* SymptomEvent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SymptomEvent.swift; sourceTree = "<group>"; };
-		D71025A1637A3E00B2F21C40 /* MedicationLogImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationLogImporter.swift; sourceTree = "<group>"; };
-		D8A0E8BBB5ED7FB283F8A256 /* FamilyDataDeduplicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FamilyDataDeduplicator.swift; sourceTree = "<group>"; };
-		DA447A65D0D16F184618DCA3 /* AFSRButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AFSRButton.swift; sourceTree = "<group>"; };
-		DBCB766637C204A2E129A490 /* BookletConfigurationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletConfigurationView.swift; sourceTree = "<group>"; };
-		DEF35CA956B4748E1674D97A /* PendingWriteStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingWriteStore.swift; sourceTree = "<group>"; };
-		E1386F541A65EECC52DC17DC /* CloudSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudSyncTests.swift; sourceTree = "<group>"; };
-		E202FE4D7C0E7A865FE3004C /* ProfileSetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileSetupView.swift; sourceTree = "<group>"; };
-		E2C428DCAFE8C42F0239FC4C /* DeviceRoleStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceRoleStore.swift; sourceTree = "<group>"; };
-		E322938099E05125BA0750F6 /* DiscoveryHomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiscoveryHomeView.swift; sourceTree = "<group>"; };
-		E59BC14801EC99A81F60F444 /* SeizureViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureViewModelTests.swift; sourceTree = "<group>"; };
-		E67D16D11BE3C8E6A82F822C /* BookletInsertionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletInsertionService.swift; sourceTree = "<group>"; };
-		E6B4B96CE71C92ADC2425EBA /* SyncTimestamped.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTimestamped.swift; sourceTree = "<group>"; };
-		ECC866758460A2CFBE4967B7 /* ChartImageRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChartImageRenderer.swift; sourceTree = "<group>"; };
-		EECDA8025BB3E07AE2790A2E /* AFSRTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AFSRTheme.swift; sourceTree = "<group>"; };
-		EEF7285B635722A06A1E3C58 /* NewsArticleDecodingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsArticleDecodingTests.swift; sourceTree = "<group>"; };
-		F2399AA2B265B27C72130C46 /* FamilyDataDeduplicatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FamilyDataDeduplicatorTests.swift; sourceTree = "<group>"; };
-		F4BF9CF54D9DBD54BF465A0C /* CKRecordRoundtripTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CKRecordRoundtripTests.swift; sourceTree = "<group>"; };
-		F5AC7769702FF521C75B498A /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		FDFDA2F0C9C666220F24D3F2 /* JournalView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JournalView.swift; sourceTree = "<group>"; };
-		FF2EA3203AB6298F5B38D5A4 /* UpdateAvailabilityBanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UpdateAvailabilityBanner.swift; sourceTree = "<group>"; };
+		0630361913B7F8EA9DDE9942 /* BookletPixelSampler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletPixelSampler.swift; sourceTree = "<group>"; };
+		085B5A4C5EE27EC58BFC08F0 /* BookletScanResult.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletScanResult.swift; sourceTree = "<group>"; };
+		0DCC654DF7CDEE48B8649CF9 /* MoodSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodSheet.swift; sourceTree = "<group>"; };
+		0F9477B1C4F2EA186BB3638F /* BDPMDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BDPMDatabase.swift; sourceTree = "<group>"; };
+		106EB4FE829F2AC8DE62161F /* CKRetry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CKRetry.swift; sourceTree = "<group>"; };
+		11CEF49E3F10CCFC7A48F0BE /* SeizureHistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureHistoryView.swift; sourceTree = "<group>"; };
+		14D5E906E41B971C0ECD1FAE /* NewsDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsDetailView.swift; sourceTree = "<group>"; };
+		154D04C01D4958BB6D10E41C /* SeizureTrackerViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureTrackerViewModel.swift; sourceTree = "<group>"; };
+		16B16F914638E6ED0465097A /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		16FEAA80F68625E1F2D7DB8C /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		19586E492D6BC327F09882DB /* UpdateAvailabilityBanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UpdateAvailabilityBanner.swift; sourceTree = "<group>"; };
+		19FB342D87483303E7E31259 /* GazeProcessorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GazeProcessorTests.swift; sourceTree = "<group>"; };
+		1D36DD836FE285F2E64D887D /* CloudKitSyncService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
+		1EE541136E9EF0167B597B4E /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		20A0CDAEB1D03704DBDE463B /* BookletLayoutEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletLayoutEngine.swift; sourceTree = "<group>"; };
+		2160540AFC95C7C34E78AFBE /* Medication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Medication.swift; sourceTree = "<group>"; };
+		23C544198B24C610B906792A /* CombinedBackup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CombinedBackup.swift; sourceTree = "<group>"; };
+		26B0F7A55751B124E6664CA4 /* NewsListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsListView.swift; sourceTree = "<group>"; };
+		28F3ADDFB5ADF1640E811852 /* AdHocLogSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AdHocLogSheet.swift; sourceTree = "<group>"; };
+		2E795FEDE25F5515B682C73D /* MoodEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodEntry.swift; sourceTree = "<group>"; };
+		2F04F63D7DFC55E3526EB82E /* CKRecordRoundtripTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CKRecordRoundtripTests.swift; sourceTree = "<group>"; };
+		2F6F3EF7B6FB42028C45A85D /* SyncGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncGate.swift; sourceTree = "<group>"; };
+		2FAE97FCF877B0052B39DE29 /* RettApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RettApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		304C210EAEF2F1ACFD6B5F6A /* SyncStatusBanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncStatusBanner.swift; sourceTree = "<group>"; };
+		317940804BE58AEB33F0F4B3 /* PreviewData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreviewData.swift; sourceTree = "<group>"; };
+		3202C27A1EF45C60C3EB4908 /* CSVParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
+		33BFAAEB3D48ACF46389ACE6 /* SeizureTrackerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureTrackerView.swift; sourceTree = "<group>"; };
+		33FBEB7B985D53B1D6047C83 /* BookletSchema.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletSchema.swift; sourceTree = "<group>"; };
+		34320B4B56746EB46D426050 /* NewsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsViewModel.swift; sourceTree = "<group>"; };
+		3654990365D5F30304AE5D77 /* FamilyDataDeduplicatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FamilyDataDeduplicatorTests.swift; sourceTree = "<group>"; };
+		3658959A9C382A2CC9350460 /* SeizureImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureImporter.swift; sourceTree = "<group>"; };
+		3BEDA284B4FA12EB4C2967F5 /* MedicationLogImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationLogImporter.swift; sourceTree = "<group>"; };
+		409FE9B69E300D5526B7681B /* ProximityShareSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProximityShareSheet.swift; sourceTree = "<group>"; };
+		413A64A13B52DB36DF3B058E /* SeizureEvent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureEvent.swift; sourceTree = "<group>"; };
+		42EF397A0DA8C515419723B1 /* UsageModeStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageModeStoreTests.swift; sourceTree = "<group>"; };
+		43AFAFBF37540349150332E8 /* SymptomSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SymptomSheet.swift; sourceTree = "<group>"; };
+		43EE391D351C7AA523F8C971 /* ObservationImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservationImporter.swift; sourceTree = "<group>"; };
+		45C285108299A00CC2777439 /* MedicalReportView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicalReportView.swift; sourceTree = "<group>"; };
+		49C9E4F6374B3281E4CCFF57 /* PendingWriteStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingWriteStore.swift; sourceTree = "<group>"; };
+		505DD211ECD7D2338B4298B4 /* MedicationIntakeEditorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationIntakeEditorView.swift; sourceTree = "<group>"; };
+		527ED1473B4FFFFD06A31F6D /* ChildProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChildProfile.swift; sourceTree = "<group>"; };
+		541CB174622109B8CE06624E /* BookletScannerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletScannerView.swift; sourceTree = "<group>"; };
+		56F3ED4833AC069D19C643D6 /* DailyObservationSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyObservationSheet.swift; sourceTree = "<group>"; };
+		582031641D50AC6368DA352B /* SharingDiagnosticView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharingDiagnosticView.swift; sourceTree = "<group>"; };
+		5A8D39F2C073121977DEBED1 /* DemoDataGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoDataGenerator.swift; sourceTree = "<group>"; };
+		5B2466F181116878ED514B08 /* AFSRButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AFSRButton.swift; sourceTree = "<group>"; };
+		5B9C4DDA166BDAEF1789C59D /* RettAppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RettAppDelegate.swift; sourceTree = "<group>"; };
+		5C250C13D643978ACDEEA46A /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		5C7EC79CB425C4670C07BF98 /* MedicationImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationImporter.swift; sourceTree = "<group>"; };
+		5EA114B7128155BD55E50ED0 /* MemberAreaView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemberAreaView.swift; sourceTree = "<group>"; };
+		66E09CCB4EC0547295454AE7 /* ChartImageRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChartImageRenderer.swift; sourceTree = "<group>"; };
+		6784F78142F45A00E5D07858 /* JournalView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JournalView.swift; sourceTree = "<group>"; };
+		69B552A1B1718D21278D72F8 /* CombinedBackupService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CombinedBackupService.swift; sourceTree = "<group>"; };
+		6C2DBAE47D86F978D2CBB34B /* HistoricalDataImportView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoricalDataImportView.swift; sourceTree = "<group>"; };
+		6D80D7C3C5E320D06A8C06F1 /* SettingsSubviews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsSubviews.swift; sourceTree = "<group>"; };
+		6E9DA02AC6BE3A3DB9F60CFD /* DeviceRoleStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceRoleStore.swift; sourceTree = "<group>"; };
+		70558472D8622025689B7581 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		716C789305576F4B59892542 /* BookletConfigStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletConfigStore.swift; sourceTree = "<group>"; };
+		73B040FF90A0D738D6C8246F /* MedicationRevision.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationRevision.swift; sourceTree = "<group>"; };
+		748A0BE95DDADBF762AE46C5 /* DonationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DonationView.swift; sourceTree = "<group>"; };
+		76FDEAB833482290900291CE /* BookletInsertionService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletInsertionService.swift; sourceTree = "<group>"; };
+		7955FE055B57B0556301B515 /* FollowUpBookletView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FollowUpBookletView.swift; sourceTree = "<group>"; };
+		7C1D32BAE74162B41658DB9B /* AFSRWebView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AFSRWebView.swift; sourceTree = "<group>"; };
+		7FAB499054E8F13575DC7FD3 /* MedicationCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationCatalog.swift; sourceTree = "<group>"; };
+		83AD8070FF616BE46D5F248D /* CKRecordMappers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CKRecordMappers.swift; sourceTree = "<group>"; };
+		8418A2A0D7633473A9A5415E /* BookletConfigurationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletConfigurationView.swift; sourceTree = "<group>"; };
+		846AC79618E3479487F0D2AF /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		88BB8F0DBFEEA60D1B4F523D /* SafetySnapshots.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SafetySnapshots.swift; sourceTree = "<group>"; };
+		8B50463F91F7B57DBC7BC4BB /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		8B650CB9599716E33B8786A9 /* BookletImportSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletImportSheet.swift; sourceTree = "<group>"; };
+		94D920C7F6695F95943FF66B /* MedicalReportGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicalReportGenerator.swift; sourceTree = "<group>"; };
+		96F6FF84202595848C7EB7B3 /* MedicationViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationViewModel.swift; sourceTree = "<group>"; };
+		96FDE621AF5AB945B7202907 /* MedicationIntake.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationIntake.swift; sourceTree = "<group>"; };
+		99C1FBDEA0DA60C032636060 /* AFSRTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AFSRTheme.swift; sourceTree = "<group>"; };
+		99EAA34A661CAD64DD321C13 /* ManualSeizureEntrySheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ManualSeizureEntrySheet.swift; sourceTree = "<group>"; };
+		9F3DFEDE4C37E192BACD3BC9 /* HealthDataView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthDataView.swift; sourceTree = "<group>"; };
+		A438A3AEE124971963B948D7 /* MedicationLogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationLogView.swift; sourceTree = "<group>"; };
+		A4B7BF6F070D4A580124C818 /* MoodImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodImporter.swift; sourceTree = "<group>"; };
+		A5845EC11DE94F583B81D6A8 /* NewsArticleDecodingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsArticleDecodingTests.swift; sourceTree = "<group>"; };
+		ADAD569059D6E6207A6AC9C1 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		ADE1CCC46D62F289B2D4BEA0 /* UpdateAvailabilityService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UpdateAvailabilityService.swift; sourceTree = "<group>"; };
+		B390B0A5557A2AF8B58B0640 /* FeatureFlags.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeatureFlags.swift; sourceTree = "<group>"; };
+		B44EDDDD4A3966F486182A4F /* FamilyDataDeduplicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FamilyDataDeduplicator.swift; sourceTree = "<group>"; };
+		B72A2988DB30F511B6D0F4B9 /* CloudSyncTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudSyncTests.swift; sourceTree = "<group>"; };
+		B7E362144314253FD12522C6 /* DeterministicID.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeterministicID.swift; sourceTree = "<group>"; };
+		B81E29FFF4D1C9C58E5905A5 /* RettAppApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RettAppApp.swift; sourceTree = "<group>"; };
+		BB3656CCBA32C75546E33A29 /* DailyObservation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyObservation.swift; sourceTree = "<group>"; };
+		BBA72AF94F44EDB8BF626B09 /* bdpm.sqlite */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = bdpm.sqlite; sourceTree = "<group>"; };
+		BE9291C8875FDAAAE4F84FA2 /* SyncTimestamped.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncTimestamped.swift; sourceTree = "<group>"; };
+		BF739E19C78B053604DF2C3C /* SymptomEvent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SymptomEvent.swift; sourceTree = "<group>"; };
+		C26355569A56C45D392B1428 /* BookletQR.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BookletQR.swift; sourceTree = "<group>"; };
+		CD6DAC7DC12B3F50D8C8A398 /* UsageChoiceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageChoiceView.swift; sourceTree = "<group>"; };
+		D265FBFDBE40C53F65961020 /* HourMinute.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HourMinute.swift; sourceTree = "<group>"; };
+		D2A64653D365683E0E4B8EB6 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		D2DE7581D6D18F833E945EA5 /* SectionCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
+		D3067FE54E13ED4F8BCCEADC /* CommonFrenchMedications.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CommonFrenchMedications.swift; sourceTree = "<group>"; };
+		D73503EB8D419F52D05F6F3D /* CSVImportMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CSVImportMenu.swift; sourceTree = "<group>"; };
+		DB276C473610AA3865578058 /* UsageModeStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageModeStore.swift; sourceTree = "<group>"; };
+		E061F94CDEC447B14564A25A /* RettAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RettAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0D8F89350285A45CCD65EA4 /* Localizable.strings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; path = Localizable.strings; sourceTree = "<group>"; };
+		E2859983515B9BC86207C46A /* SeizureViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SeizureViewModelTests.swift; sourceTree = "<group>"; };
+		E40874AD56E90BC9492A0FE6 /* FollowUpBookletGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FollowUpBookletGenerator.swift; sourceTree = "<group>"; };
+		EA9EF62F087AE9444B43F63F /* MedicalReportAnalysis.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicalReportAnalysis.swift; sourceTree = "<group>"; };
+		EBBE6D1EC46B04DDCA3F843A /* DonationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DonationService.swift; sourceTree = "<group>"; };
+		EC5BB85D038C09D627F0FB0C /* NewsArticle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsArticle.swift; sourceTree = "<group>"; };
+		ECDB14B6827B23C57152B746 /* RettApp.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = RettApp.entitlements; sourceTree = "<group>"; };
+		F0BC04AA5D8ECA545CF00E55 /* DiscoveryHomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiscoveryHomeView.swift; sourceTree = "<group>"; };
+		F148A514A061FDAFE1216627 /* ParentSharingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ParentSharingView.swift; sourceTree = "<group>"; };
+		F2B6A2D7175652579955B1D1 /* DashboardViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		F9CAF8F47F5EDFD4097421C1 /* ProfileSetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileSetupView.swift; sourceTree = "<group>"; };
+		FA283EFF8810B0C4D9D37325 /* MedicationLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationLog.swift; sourceTree = "<group>"; };
+		FB64D90F07CDB7E5E6A84CF5 /* MedicationRevisionHistoryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MedicationRevisionHistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		14524B8F58E1D54C43EEF58A /* Frameworks */ = {
+		83730FD47D13CE7F72F81A96 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9BD08B25873D2D9B17C9E95C /* Foundation.framework in Frameworks */,
+				E56F9F86CB0D89A70471207F /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		753A992EB115F02FB6EBC928 /* Frameworks */ = {
+		FDD081EA365BB4960148AC66 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5AB8E9AF4824756201323572 /* Foundation.framework in Frameworks */,
+				DD8BD9B507C9420EB0A5920C /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		026B731A60E3761AD883EFFE /* Reports */ = {
+		02A6778F5D9B9CAD803C195B /* HealthKit */ = {
 			isa = PBXGroup;
 			children = (
-				8E0177A8C7BF107F6C0B9C7D /* BookletConfigStore.swift */,
-				DBCB766637C204A2E129A490 /* BookletConfigurationView.swift */,
-				ECC866758460A2CFBE4967B7 /* ChartImageRenderer.swift */,
-				5CEEEB90B0AB88C3F8F6F010 /* FollowUpBookletGenerator.swift */,
-				8E30CDAF5D78D4754BE6F205 /* FollowUpBookletView.swift */,
-				754AA4CC0087F06A312C68BB /* MedicalReportAnalysis.swift */,
-				19065A2A2E21AD28D4352E58 /* MedicalReportGenerator.swift */,
-				09DB66F173F5DAF062AE9D88 /* MedicalReportView.swift */,
-			);
-			name = Reports;
-			path = Reports;
-			sourceTree = "<group>";
-		};
-		0315FDEB20EE9FFF7C2B9B5C /* RettApp */ = {
-			isa = PBXGroup;
-			children = (
-				809B9AED2D7954DEEC8AB34F /* ContentView.swift */,
-				A5855D5C460B0D9E439A1501 /* Core */,
-				C7BA191F8CA15BC681EEF477 /* Features */,
-				7A7067BC8CB4A6DC209EBC8E /* Resources */,
-				B1B77F7D4621BF9CB7C601FD /* RettAppApp.swift */,
-				B2CB2FB4B774F0F8345EBF08 /* Shared */,
-			);
-			name = RettApp;
-			path = RettApp;
-			sourceTree = "<group>";
-		};
-		068A06E320F08736FA54C69B /* Dashboard */ = {
-			isa = PBXGroup;
-			children = (
-				929D8DF68661B2A9B4213E91 /* DashboardView.swift */,
-				AA89B12ED896FFC23FCE9A6C /* DashboardViewModel.swift */,
-			);
-			name = Dashboard;
-			path = Dashboard;
-			sourceTree = "<group>";
-		};
-		199642E5DFC7A0C41369AB0C /* RettAppTests */ = {
-			isa = PBXGroup;
-			children = (
-				F4BF9CF54D9DBD54BF465A0C /* CKRecordRoundtripTests.swift */,
-				E1386F541A65EECC52DC17DC /* CloudSyncTests.swift */,
-				F2399AA2B265B27C72130C46 /* FamilyDataDeduplicatorTests.swift */,
-				3E3B0B047C6DE4CB80A9986F /* GazeProcessorTests.swift */,
-				EEF7285B635722A06A1E3C58 /* NewsArticleDecodingTests.swift */,
-				E59BC14801EC99A81F60F444 /* SeizureViewModelTests.swift */,
-				873B5843D78468BB5B631C50 /* UsageModeStoreTests.swift */,
-			);
-			name = RettAppTests;
-			path = RettAppTests;
-			sourceTree = "<group>";
-		};
-		2AEB1FBE4CC97CC15B50D2BE /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				4F2CD5B9AAFEC1C9C14B1C7E /* iOS */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		2F0970946E7630475D483130 /* MoodTracker */ = {
-			isa = PBXGroup;
-			children = (
-				19502F0F78275F792D0980CC /* DailyObservationSheet.swift */,
-				776738940AD3E3AA182590D7 /* Models */,
-				80EBCD513E58D21293C33214 /* MoodImporter.swift */,
-				937BD733D52AD38C32142518 /* MoodSheet.swift */,
-				574F40E555C99A8350A0630E /* ObservationImporter.swift */,
-			);
-			name = MoodTracker;
-			path = MoodTracker;
-			sourceTree = "<group>";
-		};
-		3CC1152F6B396785743CF363 /* MemberArea */ = {
-			isa = PBXGroup;
-			children = (
-				86E92C7120A42940FB5278BF /* AFSRWebView.swift */,
-				84CD786F36C1D7BDAA818A1F /* MemberAreaView.swift */,
-			);
-			name = MemberArea;
-			path = MemberArea;
-			sourceTree = "<group>";
-		};
-		41B84919F52348B0D0C5EBCA /* BDPM */ = {
-			isa = PBXGroup;
-			children = (
-				D3A340929662E8288FFED2AB /* BDPMDatabase.swift */,
-				6028D85705670111DFC7E7DE /* MedicationCatalog.swift */,
-			);
-			name = BDPM;
-			path = BDPM;
-			sourceTree = "<group>";
-		};
-		47D3AF42DBD84D2867140BA5 /* Discovery */ = {
-			isa = PBXGroup;
-			children = (
-				E322938099E05125BA0750F6 /* DiscoveryHomeView.swift */,
-				A73B55ACA86CA7A5ECE67F04 /* UsageChoiceView.swift */,
-			);
-			name = Discovery;
-			path = Discovery;
-			sourceTree = "<group>";
-		};
-		4BF6683E45FE04AAA7AAAE3F /* Theme */ = {
-			isa = PBXGroup;
-			children = (
-				EECDA8025BB3E07AE2790A2E /* AFSRTheme.swift */,
-				36898A2B9A8494B89A2AF5B1 /* HourMinute.swift */,
-			);
-			name = Theme;
-			path = Theme;
-			sourceTree = "<group>";
-		};
-		4F2CD5B9AAFEC1C9C14B1C7E /* iOS */ = {
-			isa = PBXGroup;
-			children = (
-				908022AD8D24E136534A9127 /* Foundation.framework */,
-			);
-			name = iOS;
-			sourceTree = "<group>";
-		};
-		55E03E71A881E894B205C057 /* HealthKit */ = {
-			isa = PBXGroup;
-			children = (
-				3B794BF688BCC4E896FCC08D /* HealthKitManager.swift */,
+				1EE541136E9EF0167B597B4E /* HealthKitManager.swift */,
 			);
 			name = HealthKit;
 			path = HealthKit;
 			sourceTree = "<group>";
 		};
-		5F283BCAE23BF30A7F06DC5F /* Backup */ = {
+		0606D5103DDA8475F014ED2C /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				45BD21E2D0B55A2C5F6DB8F6 /* CombinedBackup.swift */,
-				B03E33D9263AE76FA4613C70 /* CombinedBackupService.swift */,
-				053E2C447F8C5DB39D7E14CA /* SafetySnapshots.swift */,
-			);
-			name = Backup;
-			path = Backup;
-			sourceTree = "<group>";
-		};
-		660AE73ABC837BF494CCDDC5 /* MedicationTracker */ = {
-			isa = PBXGroup;
-			children = (
-				C872927E7021280E73F6A4B0 /* AdHocLogSheet.swift */,
-				41B84919F52348B0D0C5EBCA /* BDPM */,
-				FDFDA2F0C9C666220F24D3F2 /* JournalView.swift */,
-				819078BA8F1ACB0CD31FD1D0 /* MedicationImporter.swift */,
-				D71025A1637A3E00B2F21C40 /* MedicationLogImporter.swift */,
-				6E7E0D4D024FA48D42BB6F4A /* MedicationLogView.swift */,
-				593BA1457CFD44869FD79AA6 /* MedicationViewModel.swift */,
-				DED71EC08F1960D1DD0EE840 /* Models */,
-				E24226114B557A05027B3E60 /* Views */,
-			);
-			name = MedicationTracker;
-			path = MedicationTracker;
-			sourceTree = "<group>";
-		};
-		6C8F55342B0B0F1E43760E10 /* SeizureTracker */ = {
-			isa = PBXGroup;
-			children = (
-				D4C812B5D25F22ABCE32FF25 /* ManualSeizureEntrySheet.swift */,
-				F4C4469A9E114B8675E56D62 /* Models */,
-				2355F0722D878B307E42A2AD /* SeizureHistoryView.swift */,
-				B40BA4737F94D74294C45237 /* SeizureImporter.swift */,
-				46EFECD88FF341F2A569F696 /* SeizureTrackerView.swift */,
-				79AF165CC6502C6F53FD0264 /* SeizureTrackerViewModel.swift */,
-			);
-			name = SeizureTracker;
-			path = SeizureTracker;
-			sourceTree = "<group>";
-		};
-		70FBEABF49709C553870C12E /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				293564E53D7DF8584AD0D5B8 /* HistoricalDataImportView.swift */,
-				66EE757FBC684B86D414D62D /* ParentSharingView.swift */,
-				27765A86A67CD4AB3BAB5CAA /* SettingsSubviews.swift */,
-				8F859BDE2347365F10065D55 /* SettingsView.swift */,
-				CDF079AEFFD7AA0CE45FE01E /* SharingDiagnosticView.swift */,
-			);
-			name = Settings;
-			path = Settings;
-			sourceTree = "<group>";
-		};
-		776738940AD3E3AA182590D7 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				B68B7160460AC915EAA5F2DB /* DailyObservation.swift */,
-				3C556295252C30D100281FC5 /* MoodEntry.swift */,
-			);
-			name = Models;
-			path = Models;
-			sourceTree = "<group>";
-		};
-		7A7067BC8CB4A6DC209EBC8E /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				F5AC7769702FF521C75B498A /* Assets.xcassets */,
-				3FB3EC52194ECEA146D2D595 /* Localizable.strings */,
-				8DD01A961C7A9BD76C864E52 /* LaunchScreen.storyboard */,
-				CC27D0E5FC3BF3FAEDF5B20F /* bdpm.sqlite */,
-				C3996630DF093B4302880066 /* Info.plist */,
-				7F72283216AB1A6CEBCE35F3 /* RettApp.entitlements */,
-			);
-			name = Resources;
-			path = Resources;
-			sourceTree = "<group>";
-		};
-		880AC527B16E5A8528A071E9 /* HealthData */ = {
-			isa = PBXGroup;
-			children = (
-				534CC7F566BACF58CDBC90C7 /* HealthDataView.swift */,
-			);
-			name = HealthData;
-			path = HealthData;
-			sourceTree = "<group>";
-		};
-		8EB0CCB84CE2D3058EADC5F3 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				001E83AA0C08D06B7B5F025D /* RettApp.app */,
-				D56D14EE1C78AF7D5E5CB975 /* RettAppTests.xctest */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		92AD97F0B21CDBA66CC8F354 /* BookletImport */ = {
-			isa = PBXGroup;
-			children = (
-				6822766B64F3EEC1929BC613 /* BookletImportSheet.swift */,
-				E67D16D11BE3C8E6A82F822C /* BookletInsertionService.swift */,
-				B18729A7F11124EFBFE196DB /* BookletLayoutEngine.swift */,
-				CE67BF0C46542650E145A75A /* BookletPixelSampler.swift */,
-				CC2415F2EA7A72B22AC5455A /* BookletQR.swift */,
-				17A7514A192E03F56C4E7A5C /* BookletScanResult.swift */,
-				A2D2EC081874E8A4595DBD8B /* BookletScannerView.swift */,
-				245505DDCB5D561FD1D2DECD /* BookletSchema.swift */,
-			);
-			name = BookletImport;
-			path = BookletImport;
-			sourceTree = "<group>";
-		};
-		9338443B080DC4C27971F160 /* News */ = {
-			isa = PBXGroup;
-			children = (
-				D1E4E514F0C9C1DE80A4DDC2 /* Models */,
-				14251EC93C0E2EBEFBE67892 /* NewsDetailView.swift */,
-				796149E6C27B5DF869A6A987 /* NewsListView.swift */,
-				7CB3A62157934A282A05E04D /* NewsViewModel.swift */,
-			);
-			name = News;
-			path = News;
-			sourceTree = "<group>";
-		};
-		99997844F9CAE94365EC13EE /* Donation */ = {
-			isa = PBXGroup;
-			children = (
-				8679364181C66AE602AC25CE /* DonationService.swift */,
-				400B10F6EC363F47E471413F /* DonationView.swift */,
-			);
-			name = Donation;
-			path = Donation;
-			sourceTree = "<group>";
-		};
-		9B47909DEAA6DD70E616459E /* Profile */ = {
-			isa = PBXGroup;
-			children = (
-				BE851CFCE428D8C1F7F89CCB /* ChildProfile.swift */,
-				E2C428DCAFE8C42F0239FC4C /* DeviceRoleStore.swift */,
-				E202FE4D7C0E7A865FE3004C /* ProfileSetupView.swift */,
-				2CEEFB5706F33FF55471AEAE /* UsageModeStore.swift */,
-			);
-			name = Profile;
-			path = Profile;
-			sourceTree = "<group>";
-		};
-		A08A3215CC9DEE478ADDD97D /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				D6A87F940F3FB5578C9E6E3F /* SymptomEvent.swift */,
-			);
-			name = Models;
-			path = Models;
-			sourceTree = "<group>";
-		};
-		A5855D5C460B0D9E439A1501 /* Core */ = {
-			isa = PBXGroup;
-			children = (
-				5F283BCAE23BF30A7F06DC5F /* Backup */,
-				55E03E71A881E894B205C057 /* HealthKit */,
-				9B47909DEAA6DD70E616459E /* Profile */,
-				D1AFFC5F6027B974C66ECAA2 /* Sync */,
-				CDDEA5E3F53CF8C588A03940 /* Update */,
-			);
-			name = Core;
-			path = Core;
-			sourceTree = "<group>";
-		};
-		B2CB2FB4B774F0F8345EBF08 /* Shared */ = {
-			isa = PBXGroup;
-			children = (
-				844A12D2319B5C00A17E3C14 /* CSVParser.swift */,
-				044FB82F55EA54445C3C587B /* CommonFrenchMedications.swift */,
-				C58EC6CF5F6396B5C5539347 /* Components */,
-				489B9542EDF53A7FF6636BB1 /* DemoDataGenerator.swift */,
-				1B166ED64008DFD836C1795E /* FeatureFlags.swift */,
-				4C0BD881538EB7B491D023B2 /* PreviewData.swift */,
-				4BF6683E45FE04AAA7AAAE3F /* Theme */,
-			);
-			name = Shared;
-			path = Shared;
-			sourceTree = "<group>";
-		};
-		C58EC6CF5F6396B5C5539347 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				DA447A65D0D16F184618DCA3 /* AFSRButton.swift */,
-				09093891B852F96C3E048C12 /* CSVImportMenu.swift */,
-				61CF736B886244F5B4263183 /* EmptyStateView.swift */,
-				B061A6F2F144D4B691E4B48A /* SectionCard.swift */,
-				A174B52C04EE0C167E965846 /* SyncStatusBanner.swift */,
-				FF2EA3203AB6298F5B38D5A4 /* UpdateAvailabilityBanner.swift */,
-			);
-			name = Components;
-			path = Components;
-			sourceTree = "<group>";
-		};
-		C7BA191F8CA15BC681EEF477 /* Features */ = {
-			isa = PBXGroup;
-			children = (
-				92AD97F0B21CDBA66CC8F354 /* BookletImport */,
-				068A06E320F08736FA54C69B /* Dashboard */,
-				47D3AF42DBD84D2867140BA5 /* Discovery */,
-				99997844F9CAE94365EC13EE /* Donation */,
-				880AC527B16E5A8528A071E9 /* HealthData */,
-				660AE73ABC837BF494CCDDC5 /* MedicationTracker */,
-				3CC1152F6B396785743CF363 /* MemberArea */,
-				2F0970946E7630475D483130 /* MoodTracker */,
-				9338443B080DC4C27971F160 /* News */,
-				026B731A60E3761AD883EFFE /* Reports */,
-				6C8F55342B0B0F1E43760E10 /* SeizureTracker */,
-				70FBEABF49709C553870C12E /* Settings */,
-				DC5A5EE333F4C7E105542FD5 /* SymptomTracker */,
-			);
-			name = Features;
-			path = Features;
-			sourceTree = "<group>";
-		};
-		CDDEA5E3F53CF8C588A03940 /* Update */ = {
-			isa = PBXGroup;
-			children = (
-				41715FEF7CA025A46C8F6B1B /* UpdateAvailabilityService.swift */,
-			);
-			name = Update;
-			path = Update;
-			sourceTree = "<group>";
-		};
-		D1AFFC5F6027B974C66ECAA2 /* Sync */ = {
-			isa = PBXGroup;
-			children = (
-				7B708D6C2E3000087681CCAB /* CKRecordMappers.swift */,
-				04D1F2F86BA39C88682E06E1 /* CKRetry.swift */,
-				723328546A3E4035E8A11651 /* CloudKitSyncService.swift */,
-				94AF77C7124B20A64A749979 /* DeterministicID.swift */,
-				D8A0E8BBB5ED7FB283F8A256 /* FamilyDataDeduplicator.swift */,
-				DEF35CA956B4748E1674D97A /* PendingWriteStore.swift */,
-				3738A171B3C5CEF7BE93B3F6 /* ProximityShareSheet.swift */,
-				07C0815F7DA602684FD3E0D2 /* RettAppDelegate.swift */,
-				417D720506BF9F822878C8D2 /* SyncGate.swift */,
-				E6B4B96CE71C92ADC2425EBA /* SyncTimestamped.swift */,
-			);
-			name = Sync;
-			path = Sync;
-			sourceTree = "<group>";
-		};
-		D1E4E514F0C9C1DE80A4DDC2 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				94E95E02EBEA09D5D912A1AC /* NewsArticle.swift */,
-			);
-			name = Models;
-			path = Models;
-			sourceTree = "<group>";
-		};
-		DC5A5EE333F4C7E105542FD5 /* SymptomTracker */ = {
-			isa = PBXGroup;
-			children = (
-				A08A3215CC9DEE478ADDD97D /* Models */,
-				85ADE7361A659B8512C5AE56 /* SymptomSheet.swift */,
-			);
-			name = SymptomTracker;
-			path = SymptomTracker;
-			sourceTree = "<group>";
-		};
-		DED71EC08F1960D1DD0EE840 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				29F65FA4FFE78A878FBC372B /* Medication.swift */,
-				6B04C20CED4BAE6DD13E2DA2 /* MedicationIntake.swift */,
-				302912534F5CA94AE0F5289E /* MedicationLog.swift */,
-				286921973013C32F2DE20F92 /* MedicationRevision.swift */,
-			);
-			name = Models;
-			path = Models;
-			sourceTree = "<group>";
-		};
-		E24226114B557A05027B3E60 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				A5DD56410B44ACE6726147A9 /* MedicationIntakeEditorView.swift */,
-				0EBBD00F2325DD22559AF610 /* MedicationRevisionHistoryView.swift */,
+				505DD211ECD7D2338B4298B4 /* MedicationIntakeEditorView.swift */,
+				FB64D90F07CDB7E5E6A84CF5 /* MedicationRevisionHistoryView.swift */,
 			);
 			name = Views;
 			path = Views;
 			sourceTree = "<group>";
 		};
-		F045F3D720EC0966D603C5E2 = {
+		100596549EFB2672EF1FBA64 /* Donation */ = {
 			isa = PBXGroup;
 			children = (
-				8EB0CCB84CE2D3058EADC5F3 /* Products */,
-				2AEB1FBE4CC97CC15B50D2BE /* Frameworks */,
-				0315FDEB20EE9FFF7C2B9B5C /* RettApp */,
-				199642E5DFC7A0C41369AB0C /* RettAppTests */,
+				EBBE6D1EC46B04DDCA3F843A /* DonationService.swift */,
+				748A0BE95DDADBF762AE46C5 /* DonationView.swift */,
+			);
+			name = Donation;
+			path = Donation;
+			sourceTree = "<group>";
+		};
+		166189CCF4B1A73696944C94 /* News */ = {
+			isa = PBXGroup;
+			children = (
+				25F39A4DEF0FE3255F956982 /* Models */,
+				14D5E906E41B971C0ECD1FAE /* NewsDetailView.swift */,
+				26B0F7A55751B124E6664CA4 /* NewsListView.swift */,
+				34320B4B56746EB46D426050 /* NewsViewModel.swift */,
+			);
+			name = News;
+			path = News;
+			sourceTree = "<group>";
+		};
+		168D35BD157F8DE5CC3A2DD0 /* Backup */ = {
+			isa = PBXGroup;
+			children = (
+				23C544198B24C610B906792A /* CombinedBackup.swift */,
+				69B552A1B1718D21278D72F8 /* CombinedBackupService.swift */,
+				88BB8F0DBFEEA60D1B4F523D /* SafetySnapshots.swift */,
+			);
+			name = Backup;
+			path = Backup;
+			sourceTree = "<group>";
+		};
+		1DC708C9E1BA7428E74D2699 /* Discovery */ = {
+			isa = PBXGroup;
+			children = (
+				F0BC04AA5D8ECA545CF00E55 /* DiscoveryHomeView.swift */,
+				CD6DAC7DC12B3F50D8C8A398 /* UsageChoiceView.swift */,
+			);
+			name = Discovery;
+			path = Discovery;
+			sourceTree = "<group>";
+		};
+		20856CBF2D500D302B1BEA90 = {
+			isa = PBXGroup;
+			children = (
+				C356D17C3B3AFA713BD9B286 /* Products */,
+				2371230981DAF62F6721F849 /* Frameworks */,
+				CC2529250469D2FD8C181473 /* RettApp */,
+				D5BF1C4DFC7CE58BC91CDDC6 /* RettAppTests */,
 			);
 			sourceTree = "<group>";
 		};
-		F4C4469A9E114B8675E56D62 /* Models */ = {
+		2120665B504451372D12DBBE /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				73D63E0C2D8D1ADE3DCF763D /* SeizureEvent.swift */,
+				BF739E19C78B053604DF2C3C /* SymptomEvent.swift */,
 			);
 			name = Models;
 			path = Models;
 			sourceTree = "<group>";
 		};
+		2371230981DAF62F6721F849 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				25CCF5EADBEE1D4A08B0A59B /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		25CCF5EADBEE1D4A08B0A59B /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				5C250C13D643978ACDEEA46A /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		25F39A4DEF0FE3255F956982 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				EC5BB85D038C09D627F0FB0C /* NewsArticle.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		285B2AD990CAA45BFCE7A9EF /* Update */ = {
+			isa = PBXGroup;
+			children = (
+				ADE1CCC46D62F289B2D4BEA0 /* UpdateAvailabilityService.swift */,
+			);
+			name = Update;
+			path = Update;
+			sourceTree = "<group>";
+		};
+		2C8A8A2AB433FA270F831FEA /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				99C1FBDEA0DA60C032636060 /* AFSRTheme.swift */,
+				D265FBFDBE40C53F65961020 /* HourMinute.swift */,
+			);
+			name = Theme;
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		2CA4A5DE3DFAFA099EC81DCB /* MemberArea */ = {
+			isa = PBXGroup;
+			children = (
+				7C1D32BAE74162B41658DB9B /* AFSRWebView.swift */,
+				5EA114B7128155BD55E50ED0 /* MemberAreaView.swift */,
+			);
+			name = MemberArea;
+			path = MemberArea;
+			sourceTree = "<group>";
+		};
+		3974F740A07464E5C90F5566 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				413A64A13B52DB36DF3B058E /* SeizureEvent.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		49AC1C3F4CE38E0FD309C9C1 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				C080262B4EF806FB68BE6F26 /* BookletImport */,
+				CD924120ED0145B22CE54E3A /* Dashboard */,
+				1DC708C9E1BA7428E74D2699 /* Discovery */,
+				100596549EFB2672EF1FBA64 /* Donation */,
+				A76CDEE7FE2424AEDDDEBB5C /* HealthData */,
+				FBD7F201F164EF86114E1E99 /* MedicationTracker */,
+				2CA4A5DE3DFAFA099EC81DCB /* MemberArea */,
+				F0E22E1EAE396D4D7440DA56 /* MoodTracker */,
+				166189CCF4B1A73696944C94 /* News */,
+				BE5292F37BB3810A5313C582 /* Reports */,
+				D97E0DF732A1303F3B31A0EC /* SeizureTracker */,
+				6F88740AF803F1EE95371E82 /* Settings */,
+				4F60484F129BBB36ECB9E7B6 /* SymptomTracker */,
+			);
+			name = Features;
+			path = Features;
+			sourceTree = "<group>";
+		};
+		4F60484F129BBB36ECB9E7B6 /* SymptomTracker */ = {
+			isa = PBXGroup;
+			children = (
+				2120665B504451372D12DBBE /* Models */,
+				43AFAFBF37540349150332E8 /* SymptomSheet.swift */,
+			);
+			name = SymptomTracker;
+			path = SymptomTracker;
+			sourceTree = "<group>";
+		};
+		5AE2269AA829AB2EC4077140 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				3202C27A1EF45C60C3EB4908 /* CSVParser.swift */,
+				D3067FE54E13ED4F8BCCEADC /* CommonFrenchMedications.swift */,
+				EB955A682B4EAD35652B7339 /* Components */,
+				5A8D39F2C073121977DEBED1 /* DemoDataGenerator.swift */,
+				B390B0A5557A2AF8B58B0640 /* FeatureFlags.swift */,
+				317940804BE58AEB33F0F4B3 /* PreviewData.swift */,
+				2C8A8A2AB433FA270F831FEA /* Theme */,
+			);
+			name = Shared;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		65C50721423F9B4575548D1D /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				83AD8070FF616BE46D5F248D /* CKRecordMappers.swift */,
+				106EB4FE829F2AC8DE62161F /* CKRetry.swift */,
+				1D36DD836FE285F2E64D887D /* CloudKitSyncService.swift */,
+				B7E362144314253FD12522C6 /* DeterministicID.swift */,
+				B44EDDDD4A3966F486182A4F /* FamilyDataDeduplicator.swift */,
+				49C9E4F6374B3281E4CCFF57 /* PendingWriteStore.swift */,
+				409FE9B69E300D5526B7681B /* ProximityShareSheet.swift */,
+				5B9C4DDA166BDAEF1789C59D /* RettAppDelegate.swift */,
+				2F6F3EF7B6FB42028C45A85D /* SyncGate.swift */,
+				BE9291C8875FDAAAE4F84FA2 /* SyncTimestamped.swift */,
+			);
+			name = Sync;
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		6F88740AF803F1EE95371E82 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				6C2DBAE47D86F978D2CBB34B /* HistoricalDataImportView.swift */,
+				F148A514A061FDAFE1216627 /* ParentSharingView.swift */,
+				6D80D7C3C5E320D06A8C06F1 /* SettingsSubviews.swift */,
+				ADAD569059D6E6207A6AC9C1 /* SettingsView.swift */,
+				582031641D50AC6368DA352B /* SharingDiagnosticView.swift */,
+			);
+			name = Settings;
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		7BA25EBE3444D304CA36C6CD /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				527ED1473B4FFFFD06A31F6D /* ChildProfile.swift */,
+				6E9DA02AC6BE3A3DB9F60CFD /* DeviceRoleStore.swift */,
+				F9CAF8F47F5EDFD4097421C1 /* ProfileSetupView.swift */,
+				DB276C473610AA3865578058 /* UsageModeStore.swift */,
+			);
+			name = Profile;
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		8BB73CB58A13944501C6D9DB /* BDPM */ = {
+			isa = PBXGroup;
+			children = (
+				0F9477B1C4F2EA186BB3638F /* BDPMDatabase.swift */,
+				7FAB499054E8F13575DC7FD3 /* MedicationCatalog.swift */,
+			);
+			name = BDPM;
+			path = BDPM;
+			sourceTree = "<group>";
+		};
+		A76CDEE7FE2424AEDDDEBB5C /* HealthData */ = {
+			isa = PBXGroup;
+			children = (
+				9F3DFEDE4C37E192BACD3BC9 /* HealthDataView.swift */,
+			);
+			name = HealthData;
+			path = HealthData;
+			sourceTree = "<group>";
+		};
+		BE5292F37BB3810A5313C582 /* Reports */ = {
+			isa = PBXGroup;
+			children = (
+				716C789305576F4B59892542 /* BookletConfigStore.swift */,
+				8418A2A0D7633473A9A5415E /* BookletConfigurationView.swift */,
+				66E09CCB4EC0547295454AE7 /* ChartImageRenderer.swift */,
+				E40874AD56E90BC9492A0FE6 /* FollowUpBookletGenerator.swift */,
+				7955FE055B57B0556301B515 /* FollowUpBookletView.swift */,
+				EA9EF62F087AE9444B43F63F /* MedicalReportAnalysis.swift */,
+				94D920C7F6695F95943FF66B /* MedicalReportGenerator.swift */,
+				45C285108299A00CC2777439 /* MedicalReportView.swift */,
+			);
+			name = Reports;
+			path = Reports;
+			sourceTree = "<group>";
+		};
+		C080262B4EF806FB68BE6F26 /* BookletImport */ = {
+			isa = PBXGroup;
+			children = (
+				8B650CB9599716E33B8786A9 /* BookletImportSheet.swift */,
+				76FDEAB833482290900291CE /* BookletInsertionService.swift */,
+				20A0CDAEB1D03704DBDE463B /* BookletLayoutEngine.swift */,
+				0630361913B7F8EA9DDE9942 /* BookletPixelSampler.swift */,
+				C26355569A56C45D392B1428 /* BookletQR.swift */,
+				085B5A4C5EE27EC58BFC08F0 /* BookletScanResult.swift */,
+				541CB174622109B8CE06624E /* BookletScannerView.swift */,
+				33FBEB7B985D53B1D6047C83 /* BookletSchema.swift */,
+			);
+			name = BookletImport;
+			path = BookletImport;
+			sourceTree = "<group>";
+		};
+		C356D17C3B3AFA713BD9B286 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2FAE97FCF877B0052B39DE29 /* RettApp.app */,
+				E061F94CDEC447B14564A25A /* RettAppTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CA2ABB9DDE7FA9415849F8EA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				16B16F914638E6ED0465097A /* Assets.xcassets */,
+				E0D8F89350285A45CCD65EA4 /* Localizable.strings */,
+				70558472D8622025689B7581 /* LaunchScreen.storyboard */,
+				BBA72AF94F44EDB8BF626B09 /* bdpm.sqlite */,
+				16FEAA80F68625E1F2D7DB8C /* Info.plist */,
+				ECDB14B6827B23C57152B746 /* RettApp.entitlements */,
+			);
+			name = Resources;
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		CC2529250469D2FD8C181473 /* RettApp */ = {
+			isa = PBXGroup;
+			children = (
+				8B50463F91F7B57DBC7BC4BB /* ContentView.swift */,
+				FF5CC88D30FF133713DFAAF6 /* Core */,
+				49AC1C3F4CE38E0FD309C9C1 /* Features */,
+				CA2ABB9DDE7FA9415849F8EA /* Resources */,
+				B81E29FFF4D1C9C58E5905A5 /* RettAppApp.swift */,
+				5AE2269AA829AB2EC4077140 /* Shared */,
+			);
+			name = RettApp;
+			path = RettApp;
+			sourceTree = "<group>";
+		};
+		CD924120ED0145B22CE54E3A /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				846AC79618E3479487F0D2AF /* DashboardView.swift */,
+				F2B6A2D7175652579955B1D1 /* DashboardViewModel.swift */,
+			);
+			name = Dashboard;
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		CDB516C351A682FDDE808732 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2160540AFC95C7C34E78AFBE /* Medication.swift */,
+				96FDE621AF5AB945B7202907 /* MedicationIntake.swift */,
+				FA283EFF8810B0C4D9D37325 /* MedicationLog.swift */,
+				73B040FF90A0D738D6C8246F /* MedicationRevision.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		D5BF1C4DFC7CE58BC91CDDC6 /* RettAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				2F04F63D7DFC55E3526EB82E /* CKRecordRoundtripTests.swift */,
+				B72A2988DB30F511B6D0F4B9 /* CloudSyncTests.swift */,
+				3654990365D5F30304AE5D77 /* FamilyDataDeduplicatorTests.swift */,
+				19FB342D87483303E7E31259 /* GazeProcessorTests.swift */,
+				A5845EC11DE94F583B81D6A8 /* NewsArticleDecodingTests.swift */,
+				E2859983515B9BC86207C46A /* SeizureViewModelTests.swift */,
+				42EF397A0DA8C515419723B1 /* UsageModeStoreTests.swift */,
+			);
+			name = RettAppTests;
+			path = RettAppTests;
+			sourceTree = "<group>";
+		};
+		D97E0DF732A1303F3B31A0EC /* SeizureTracker */ = {
+			isa = PBXGroup;
+			children = (
+				99EAA34A661CAD64DD321C13 /* ManualSeizureEntrySheet.swift */,
+				3974F740A07464E5C90F5566 /* Models */,
+				11CEF49E3F10CCFC7A48F0BE /* SeizureHistoryView.swift */,
+				3658959A9C382A2CC9350460 /* SeizureImporter.swift */,
+				33BFAAEB3D48ACF46389ACE6 /* SeizureTrackerView.swift */,
+				154D04C01D4958BB6D10E41C /* SeizureTrackerViewModel.swift */,
+			);
+			name = SeizureTracker;
+			path = SeizureTracker;
+			sourceTree = "<group>";
+		};
+		DABE267A527ED3878E661F9C /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BB3656CCBA32C75546E33A29 /* DailyObservation.swift */,
+				2E795FEDE25F5515B682C73D /* MoodEntry.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		EB955A682B4EAD35652B7339 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				5B2466F181116878ED514B08 /* AFSRButton.swift */,
+				D73503EB8D419F52D05F6F3D /* CSVImportMenu.swift */,
+				D2A64653D365683E0E4B8EB6 /* EmptyStateView.swift */,
+				D2DE7581D6D18F833E945EA5 /* SectionCard.swift */,
+				304C210EAEF2F1ACFD6B5F6A /* SyncStatusBanner.swift */,
+				19586E492D6BC327F09882DB /* UpdateAvailabilityBanner.swift */,
+			);
+			name = Components;
+			path = Components;
+			sourceTree = "<group>";
+		};
+		F0E22E1EAE396D4D7440DA56 /* MoodTracker */ = {
+			isa = PBXGroup;
+			children = (
+				56F3ED4833AC069D19C643D6 /* DailyObservationSheet.swift */,
+				DABE267A527ED3878E661F9C /* Models */,
+				A4B7BF6F070D4A580124C818 /* MoodImporter.swift */,
+				0DCC654DF7CDEE48B8649CF9 /* MoodSheet.swift */,
+				43EE391D351C7AA523F8C971 /* ObservationImporter.swift */,
+			);
+			name = MoodTracker;
+			path = MoodTracker;
+			sourceTree = "<group>";
+		};
+		FBD7F201F164EF86114E1E99 /* MedicationTracker */ = {
+			isa = PBXGroup;
+			children = (
+				28F3ADDFB5ADF1640E811852 /* AdHocLogSheet.swift */,
+				8BB73CB58A13944501C6D9DB /* BDPM */,
+				6784F78142F45A00E5D07858 /* JournalView.swift */,
+				5C7EC79CB425C4670C07BF98 /* MedicationImporter.swift */,
+				3BEDA284B4FA12EB4C2967F5 /* MedicationLogImporter.swift */,
+				A438A3AEE124971963B948D7 /* MedicationLogView.swift */,
+				96F6FF84202595848C7EB7B3 /* MedicationViewModel.swift */,
+				CDB516C351A682FDDE808732 /* Models */,
+				0606D5103DDA8475F014ED2C /* Views */,
+			);
+			name = MedicationTracker;
+			path = MedicationTracker;
+			sourceTree = "<group>";
+		};
+		FF5CC88D30FF133713DFAAF6 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				168D35BD157F8DE5CC3A2DD0 /* Backup */,
+				02A6778F5D9B9CAD803C195B /* HealthKit */,
+				7BA25EBE3444D304CA36C6CD /* Profile */,
+				65C50721423F9B4575548D1D /* Sync */,
+				285B2AD990CAA45BFCE7A9EF /* Update */,
+			);
+			name = Core;
+			path = Core;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2397A88B8D01D4530EB8068D /* RettApp */ = {
+		3FA448A4583F6C106F71B231 /* RettAppTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 9E592AB7C21957270D1A5243 /* Build configuration list for PBXNativeTarget "RettApp" */;
+			buildConfigurationList = 08613D250D23D9D356BC75C0 /* Build configuration list for PBXNativeTarget "RettAppTests" */;
 			buildPhases = (
-				906BA81B878BB665D3256980 /* Sources */,
-				14524B8F58E1D54C43EEF58A /* Frameworks */,
-				34D1FDCB1790C69D39951698 /* Resources */,
+				854BC31FC069E3DDF002541E /* Sources */,
+				FDD081EA365BB4960148AC66 /* Frameworks */,
+				A51763F201E1FDE4C6CC31CB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4FFC0F2AA43077BA92AE9A5F /* PBXTargetDependency */,
+			);
+			name = RettAppTests;
+			productName = RettAppTests;
+			productReference = E061F94CDEC447B14564A25A /* RettAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		DD88CFEB6522C110CEA43470 /* RettApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B04334C9F6082E711F2195A5 /* Build configuration list for PBXNativeTarget "RettApp" */;
+			buildPhases = (
+				4301F26110E162AB65422B46 /* Sources */,
+				83730FD47D13CE7F72F81A96 /* Frameworks */,
+				0626FAE1C28F45BE659C2832 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -719,37 +737,19 @@
 			);
 			name = RettApp;
 			productName = RettApp;
-			productReference = 001E83AA0C08D06B7B5F025D /* RettApp.app */;
+			productReference = 2FAE97FCF877B0052B39DE29 /* RettApp.app */;
 			productType = "com.apple.product-type.application";
-		};
-		F773251C7CDA3F862178A56D /* RettAppTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = CE604EE89C32276D9FDB4FAB /* Build configuration list for PBXNativeTarget "RettAppTests" */;
-			buildPhases = (
-				AD858517C3A51E5C342B04C9 /* Sources */,
-				753A992EB115F02FB6EBC928 /* Frameworks */,
-				F45DAC432D8A62B9978868D9 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				89398BFBFAC674C0D28F47F0 /* PBXTargetDependency */,
-			);
-			name = RettAppTests;
-			productName = RettAppTests;
-			productReference = D56D14EE1C78AF7D5E5CB975 /* RettAppTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		357C1E68E87D5B01624DA927 /* Project object */ = {
+		855D70902A54E60D0888D8A1 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = 39E1E65978D253394C2E4ACD /* Build configuration list for PBXProject "RettApp" */;
+			buildConfigurationList = 3089D768583E536998368F11 /* Build configuration list for PBXProject "RettApp" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = fr;
 			hasScannedForEncodings = 0;
@@ -758,32 +758,32 @@
 				Base,
 				en,
 			);
-			mainGroup = F045F3D720EC0966D603C5E2;
+			mainGroup = 20856CBF2D500D302B1BEA90;
 			minimizedProjectReferenceProxies = 0;
 			preferredProjectObjectVersion = 100;
-			productRefGroup = 8EB0CCB84CE2D3058EADC5F3 /* Products */;
+			productRefGroup = C356D17C3B3AFA713BD9B286 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2397A88B8D01D4530EB8068D /* RettApp */,
-				F773251C7CDA3F862178A56D /* RettAppTests */,
+				DD88CFEB6522C110CEA43470 /* RettApp */,
+				3FA448A4583F6C106F71B231 /* RettAppTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		34D1FDCB1790C69D39951698 /* Resources */ = {
+		0626FAE1C28F45BE659C2832 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F939D5C2CBCCFB7B730A1098 /* Assets.xcassets in Resources */,
-				ABAF110686E481F5FDA010C6 /* Localizable.strings in Resources */,
-				10788AB9083D634D60A42336 /* LaunchScreen.storyboard in Resources */,
-				29CC9D8D337E8E6AC049FE7D /* bdpm.sqlite in Resources */,
+				E9EAC98E405F8D6AEF3862B8 /* Assets.xcassets in Resources */,
+				209A55B025C99CA1A85AB463 /* Localizable.strings in Resources */,
+				8D6F26494F69D70103B4E2B7 /* LaunchScreen.storyboard in Resources */,
+				AEBEB597EF84B61BDF0082F5 /* bdpm.sqlite in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		F45DAC432D8A62B9978868D9 /* Resources */ = {
+		A51763F201E1FDE4C6CC31CB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -793,136 +793,136 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		906BA81B878BB665D3256980 /* Sources */ = {
+		4301F26110E162AB65422B46 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B1EEB1054D145506338F8EE1 /* ContentView.swift in Sources */,
-				5185B5EB7D5BCD87FD6274AE /* CombinedBackup.swift in Sources */,
-				BC4AAA7E19CC9AE2D0C4A4CD /* CombinedBackupService.swift in Sources */,
-				541544B873D6F96C653C91C5 /* SafetySnapshots.swift in Sources */,
-				DC846F4B18B9F2B4E437E5B9 /* HealthKitManager.swift in Sources */,
-				3D8EDA43D4D89063E7E9BE00 /* ChildProfile.swift in Sources */,
-				A2958B463A1ECC0933D1B370 /* DeviceRoleStore.swift in Sources */,
-				79F205162197C6143F4C85DC /* ProfileSetupView.swift in Sources */,
-				D8ECDF11805AB86182CDC72C /* UsageModeStore.swift in Sources */,
-				E1B61A0623380E6632B084A3 /* CKRecordMappers.swift in Sources */,
-				F091EF6FCD603F1B7DA3A490 /* CKRetry.swift in Sources */,
-				3197857230FD0906A1C613EC /* CloudKitSyncService.swift in Sources */,
-				2FF75968AD36DD36B329C4D3 /* DeterministicID.swift in Sources */,
-				C27194F2547655E3401EFED0 /* FamilyDataDeduplicator.swift in Sources */,
-				2BA26E703D11B2F25EF4C464 /* PendingWriteStore.swift in Sources */,
-				CEFE8C6D9F2DDF688B7CBF41 /* ProximityShareSheet.swift in Sources */,
-				392967D1EC4AC209191A5D47 /* RettAppDelegate.swift in Sources */,
-				B66B60640503554E009DF9A7 /* SyncGate.swift in Sources */,
-				E21C57E99282DE6CEA2379D0 /* SyncTimestamped.swift in Sources */,
-				AC7D68C4F943A2D211718569 /* UpdateAvailabilityService.swift in Sources */,
-				D0833A7D20694E5D59EBC03C /* BookletImportSheet.swift in Sources */,
-				2625ABDA46739ABF58AA4355 /* BookletInsertionService.swift in Sources */,
-				FF2A6418F28D6C58BAC15287 /* BookletLayoutEngine.swift in Sources */,
-				1A0D2042DD80A5FDB1525A23 /* BookletPixelSampler.swift in Sources */,
-				1F989EB58D814BF0A6DA68E5 /* BookletQR.swift in Sources */,
-				162E7019261E83ADD011D9BF /* BookletScanResult.swift in Sources */,
-				C8CFDE2C1D7B84C684C623F3 /* BookletScannerView.swift in Sources */,
-				B3C0DCE9D050F4EA9A361831 /* BookletSchema.swift in Sources */,
-				993969C3B82D99C661C31C4D /* DashboardView.swift in Sources */,
-				6C4020F424FE2176D60AEF30 /* DashboardViewModel.swift in Sources */,
-				B925CC780E950B2BADA2EB69 /* DiscoveryHomeView.swift in Sources */,
-				AEC283D846640C96B029DCE9 /* UsageChoiceView.swift in Sources */,
-				F81CCC26F7B3B8D8E22DAA83 /* DonationService.swift in Sources */,
-				C77AB99C90F7984F24BA4959 /* DonationView.swift in Sources */,
-				7F9B951D55E2F59F82B325E9 /* HealthDataView.swift in Sources */,
-				8CB14B94993495CFC2B44E7E /* AdHocLogSheet.swift in Sources */,
-				EE98D90F3D7E355EDE3965CB /* BDPMDatabase.swift in Sources */,
-				827BD24E180098A98B3A1530 /* MedicationCatalog.swift in Sources */,
-				8602AB0E76BA8C1F49ACF00D /* JournalView.swift in Sources */,
-				2BB0378F8143F53E81B8F905 /* MedicationImporter.swift in Sources */,
-				74DD2DD6365C10AAA214954D /* MedicationLogImporter.swift in Sources */,
-				5FD48613E157F482E6AA00E3 /* MedicationLogView.swift in Sources */,
-				C6B7CF1AEF26737A6F454F03 /* MedicationViewModel.swift in Sources */,
-				98C37DD1764C1809E1E16AD3 /* Medication.swift in Sources */,
-				87196DDCF55271842EFE412E /* MedicationIntake.swift in Sources */,
-				9DA88FCDABBBF2A98374AE78 /* MedicationLog.swift in Sources */,
-				C5C87A6E029B3C810939143F /* MedicationRevision.swift in Sources */,
-				E9DFFB8F2D9E315B0993BACF /* MedicationIntakeEditorView.swift in Sources */,
-				14CEF3454EEFC2DB46E09DBD /* MedicationRevisionHistoryView.swift in Sources */,
-				0D9AF51B20C1AF03CE716EF0 /* AFSRWebView.swift in Sources */,
-				6377B3F6656A7C1AC799396A /* MemberAreaView.swift in Sources */,
-				D9D8D7FF26635BE937A61AB2 /* DailyObservationSheet.swift in Sources */,
-				D7B3425C6AD24DB02875A69D /* DailyObservation.swift in Sources */,
-				83A995CADCA7B1828C387F03 /* MoodEntry.swift in Sources */,
-				5E7E856889A2FE8D298EA932 /* MoodImporter.swift in Sources */,
-				CF3F5848069ADAE1CBBA4117 /* MoodSheet.swift in Sources */,
-				270CD06853F443F946A667FC /* ObservationImporter.swift in Sources */,
-				1A776FE0BA8EC8164D860A2D /* NewsArticle.swift in Sources */,
-				E036146298C034494FA97817 /* NewsDetailView.swift in Sources */,
-				A76F151BBDE1615E91A27532 /* NewsListView.swift in Sources */,
-				B54513BFAF2B146B6758E123 /* NewsViewModel.swift in Sources */,
-				ECDB3C42CACF8384807F1699 /* BookletConfigStore.swift in Sources */,
-				2C62199E84D7DDE1E955B611 /* BookletConfigurationView.swift in Sources */,
-				D17EC058F41A8CE855932486 /* ChartImageRenderer.swift in Sources */,
-				9E181C88E55A1756D14589AA /* FollowUpBookletGenerator.swift in Sources */,
-				8B16A8714E5B9A0CCF36639C /* FollowUpBookletView.swift in Sources */,
-				66F8064AE7ADEA0EEC2D021A /* MedicalReportAnalysis.swift in Sources */,
-				A4B56C8C872A1B631512409F /* MedicalReportGenerator.swift in Sources */,
-				D5D60920F3A404D82C9469A3 /* MedicalReportView.swift in Sources */,
-				714D334686BE5B54676C8962 /* ManualSeizureEntrySheet.swift in Sources */,
-				AC0CEE313E002EB2A062B985 /* SeizureEvent.swift in Sources */,
-				E6C68CFB6DB881C21DCB5BB7 /* SeizureHistoryView.swift in Sources */,
-				4B90E6038F778947D23716AA /* SeizureImporter.swift in Sources */,
-				678B4DDBC29A5665F7759640 /* SeizureTrackerView.swift in Sources */,
-				1048FFCD3072E0C5C4653CD0 /* SeizureTrackerViewModel.swift in Sources */,
-				DE4EB464FB713BF9097458F2 /* HistoricalDataImportView.swift in Sources */,
-				CA36E32FB2107D198B855AE0 /* ParentSharingView.swift in Sources */,
-				D75FB395B598BFD1E7E2CBF4 /* SettingsSubviews.swift in Sources */,
-				0EA6A23E335D25E9F32C143D /* SettingsView.swift in Sources */,
-				4F8A2EEC470B76CB173119B3 /* SharingDiagnosticView.swift in Sources */,
-				ED589F74E49E21D994298F7C /* SymptomEvent.swift in Sources */,
-				D7538E40578CF866C04A44B6 /* SymptomSheet.swift in Sources */,
-				022A1B4B76131C498C59F0DD /* RettAppApp.swift in Sources */,
-				248E785446C56DEE6D292C67 /* CSVParser.swift in Sources */,
-				A3489877D684853E9EF3BA2D /* CommonFrenchMedications.swift in Sources */,
-				6C45A97AED19CC06BA97E9CB /* AFSRButton.swift in Sources */,
-				FCB0ECB397F03B6DDED3BFED /* CSVImportMenu.swift in Sources */,
-				FF283CB332B64B96F095B252 /* EmptyStateView.swift in Sources */,
-				385EB3F422952273B376D0F9 /* SectionCard.swift in Sources */,
-				F8E0382751E90E2740FD0C39 /* SyncStatusBanner.swift in Sources */,
-				E59A3585B33E72B281CF94DB /* UpdateAvailabilityBanner.swift in Sources */,
-				DDCB25C81A1901262C4E72F3 /* DemoDataGenerator.swift in Sources */,
-				EBE910B63EE0CDE324759144 /* FeatureFlags.swift in Sources */,
-				94ED23DBA2007828B2E92E01 /* PreviewData.swift in Sources */,
-				C5046EFFB2B5509922E237FF /* AFSRTheme.swift in Sources */,
-				E83992310B0C0F06869138E2 /* HourMinute.swift in Sources */,
+				93CE8B0733D1FA4F62B5A658 /* ContentView.swift in Sources */,
+				49BB528B0044086D9A3D76D2 /* CombinedBackup.swift in Sources */,
+				EF11DBA93B38F0C5085C1C11 /* CombinedBackupService.swift in Sources */,
+				307E7A335E4108081776DA58 /* SafetySnapshots.swift in Sources */,
+				93E092DBFE9A00ECB9833CB4 /* HealthKitManager.swift in Sources */,
+				631866A59E550321AC8EEAD0 /* ChildProfile.swift in Sources */,
+				3D2DCD11CCD41AEFF5A7AA39 /* DeviceRoleStore.swift in Sources */,
+				73EECC04F4B75E928B94248E /* ProfileSetupView.swift in Sources */,
+				45A22091F03D86BF10658DFE /* UsageModeStore.swift in Sources */,
+				2DDDC53025ED1E596D82A647 /* CKRecordMappers.swift in Sources */,
+				8DEB49ABC381D03C7A712061 /* CKRetry.swift in Sources */,
+				34D453C6FE8CDEF6C1362EB8 /* CloudKitSyncService.swift in Sources */,
+				87B479EA5ADC100592391AAB /* DeterministicID.swift in Sources */,
+				F874722C94A7C27AFFD8A8FB /* FamilyDataDeduplicator.swift in Sources */,
+				92F48032CA632F2CDA364218 /* PendingWriteStore.swift in Sources */,
+				62B32724625F73F1C9AF006F /* ProximityShareSheet.swift in Sources */,
+				2C310047C286643ECD68556F /* RettAppDelegate.swift in Sources */,
+				E9AEC46DA407FF5EA2BA701C /* SyncGate.swift in Sources */,
+				D9C133E43768980CB8BFCE2F /* SyncTimestamped.swift in Sources */,
+				728596B7B7F2ADD830621DB1 /* UpdateAvailabilityService.swift in Sources */,
+				1B80B32F67E884929EA8EDAB /* BookletImportSheet.swift in Sources */,
+				4EEB0136EA4E7E43CA1A196E /* BookletInsertionService.swift in Sources */,
+				7CE8A9ECAB4C1998B40E5404 /* BookletLayoutEngine.swift in Sources */,
+				36FF025DFBC5B7E341BCFD2B /* BookletPixelSampler.swift in Sources */,
+				5D82A0910404CC3F3894F3FC /* BookletQR.swift in Sources */,
+				85C677A1895A39E742D64D23 /* BookletScanResult.swift in Sources */,
+				6D567BDA27332714B35B6067 /* BookletScannerView.swift in Sources */,
+				27833CF4B818A2377C0FED18 /* BookletSchema.swift in Sources */,
+				3FD168B72354709ED758EF48 /* DashboardView.swift in Sources */,
+				F9154E79F23401E4FA83BCB2 /* DashboardViewModel.swift in Sources */,
+				6AFFE59FAC9D1177F0BCD640 /* DiscoveryHomeView.swift in Sources */,
+				580C085496427958F54576C1 /* UsageChoiceView.swift in Sources */,
+				63A843489C67DCCE92226D4A /* DonationService.swift in Sources */,
+				8B239EAE8DA58B786E9DD393 /* DonationView.swift in Sources */,
+				70B21966BF1CA8EDE3BAFCE0 /* HealthDataView.swift in Sources */,
+				8292230540C8C7680579936A /* AdHocLogSheet.swift in Sources */,
+				0C9B470B3774F02A10BE3249 /* BDPMDatabase.swift in Sources */,
+				355E86E40BC00906D00AA117 /* MedicationCatalog.swift in Sources */,
+				705B923E27C7D5B6D4D69327 /* JournalView.swift in Sources */,
+				0975C8A19C57C82DFA7ACC68 /* MedicationImporter.swift in Sources */,
+				DB4F0B9E9BD2DE6B8622D29D /* MedicationLogImporter.swift in Sources */,
+				CEBFA26D5749EB3721A7BD59 /* MedicationLogView.swift in Sources */,
+				03539D9A8540AB05F7D3D3C9 /* MedicationViewModel.swift in Sources */,
+				393D3B21651D1A16F2327B5C /* Medication.swift in Sources */,
+				795497F55255E32F5A7D4BF4 /* MedicationIntake.swift in Sources */,
+				50D83E5FCC927D725B1C2BA1 /* MedicationLog.swift in Sources */,
+				5FACD2C2998E3451DC621DF2 /* MedicationRevision.swift in Sources */,
+				EA95E90948BE87AA1A09B069 /* MedicationIntakeEditorView.swift in Sources */,
+				2CB6D4B5E4C3AF043B8C60DD /* MedicationRevisionHistoryView.swift in Sources */,
+				6ED1035E7A5B90D43DE0AD54 /* AFSRWebView.swift in Sources */,
+				F319F4CA8EC629D2C41CE23D /* MemberAreaView.swift in Sources */,
+				A0890B9415DB56CF08C0F982 /* DailyObservationSheet.swift in Sources */,
+				F12BC4E748703E36AAAC8AF7 /* DailyObservation.swift in Sources */,
+				7072A537E52208CF33ED5318 /* MoodEntry.swift in Sources */,
+				D38EC05BA3B3CC0DD7609769 /* MoodImporter.swift in Sources */,
+				204A11F8015AC0D3F6B52D0D /* MoodSheet.swift in Sources */,
+				7BF51C30CB277B5784409608 /* ObservationImporter.swift in Sources */,
+				85628E2FC927825EE3FBDF92 /* NewsArticle.swift in Sources */,
+				D1B28CC3B701B0B7E0B33788 /* NewsDetailView.swift in Sources */,
+				8B31CFE113FCCD6B2AEDC840 /* NewsListView.swift in Sources */,
+				815BCD3FA922E0B2308CBA01 /* NewsViewModel.swift in Sources */,
+				93C8A324CBA77A6E49BF62F5 /* BookletConfigStore.swift in Sources */,
+				346B0782E21F4F717DFB936B /* BookletConfigurationView.swift in Sources */,
+				235B1E61B654DC3C241DC501 /* ChartImageRenderer.swift in Sources */,
+				DBDAFF7104297EDC143BF278 /* FollowUpBookletGenerator.swift in Sources */,
+				1D65A3F50B5F5060E12F4340 /* FollowUpBookletView.swift in Sources */,
+				2410FD888B0D991D1D6B42D8 /* MedicalReportAnalysis.swift in Sources */,
+				C7DE124B633A561649ABF1AB /* MedicalReportGenerator.swift in Sources */,
+				6AEA1DC675E2288A433E1F5F /* MedicalReportView.swift in Sources */,
+				B02AFC4417310E3CFCFCED87 /* ManualSeizureEntrySheet.swift in Sources */,
+				D1E1AC344E0E26ED1F19A374 /* SeizureEvent.swift in Sources */,
+				D6F1B1102FEC8042D593A222 /* SeizureHistoryView.swift in Sources */,
+				6AAD129D296FB681F97FC38D /* SeizureImporter.swift in Sources */,
+				773AE097F36E8CDADEC91476 /* SeizureTrackerView.swift in Sources */,
+				5A45D7DEBC2EF72DE2BBAA9A /* SeizureTrackerViewModel.swift in Sources */,
+				FA5C26F02533EF160C7F0094 /* HistoricalDataImportView.swift in Sources */,
+				CB0488ADB8FF344C4C20E7D3 /* ParentSharingView.swift in Sources */,
+				BA694BD342D7C19A8656051B /* SettingsSubviews.swift in Sources */,
+				E42B8CB39E4F2931EE2FEBE5 /* SettingsView.swift in Sources */,
+				D2257EEF1340CDD447E4B6DE /* SharingDiagnosticView.swift in Sources */,
+				8A51FA0FB14455297F63CAAE /* SymptomEvent.swift in Sources */,
+				A02DE6CFCA30343397E09850 /* SymptomSheet.swift in Sources */,
+				9692DC7377ADCE9602025A8D /* RettAppApp.swift in Sources */,
+				721C0683BF33F688D6A6728A /* CSVParser.swift in Sources */,
+				71724ABCA11777B046BFD320 /* CommonFrenchMedications.swift in Sources */,
+				5E8ADBC4A1CDA1AC09C7902D /* AFSRButton.swift in Sources */,
+				BB4C1FCEAC83518533745ED4 /* CSVImportMenu.swift in Sources */,
+				B4D2F5C07041156EE7E89D30 /* EmptyStateView.swift in Sources */,
+				9F955C58A9EDF3F6E44E0393 /* SectionCard.swift in Sources */,
+				67DAF10FB93CF21C3732BA1A /* SyncStatusBanner.swift in Sources */,
+				D1126DABBE390C0446DEC3B6 /* UpdateAvailabilityBanner.swift in Sources */,
+				A49C02395D7FFF976C9E60C8 /* DemoDataGenerator.swift in Sources */,
+				BF21695C97614AA330163B79 /* FeatureFlags.swift in Sources */,
+				6E33A405C0F378A17F47EB78 /* PreviewData.swift in Sources */,
+				A4E46C587C29C6AC7FFE6BB3 /* AFSRTheme.swift in Sources */,
+				0D1420662101A5AC5C1014C9 /* HourMinute.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AD858517C3A51E5C342B04C9 /* Sources */ = {
+		854BC31FC069E3DDF002541E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1E6A38F64CAC3D1334604E40 /* CKRecordRoundtripTests.swift in Sources */,
-				D27E7B9E714A64D2902D4044 /* CloudSyncTests.swift in Sources */,
-				DF61BE015107E5633B8422E4 /* FamilyDataDeduplicatorTests.swift in Sources */,
-				F79EA836FCE8DDD321E5DAA6 /* GazeProcessorTests.swift in Sources */,
-				EA41AF7F7E2321BC104204E5 /* NewsArticleDecodingTests.swift in Sources */,
-				BE5789BF12B157EFD2FCF21B /* SeizureViewModelTests.swift in Sources */,
-				0E8E7E66B127C22AC734C484 /* UsageModeStoreTests.swift in Sources */,
+				1404FCF51C1A239A3F962F7A /* CKRecordRoundtripTests.swift in Sources */,
+				5CCEA70591DB744FE59A0192 /* CloudSyncTests.swift in Sources */,
+				1595098D3C46BFCC639DFA07 /* FamilyDataDeduplicatorTests.swift in Sources */,
+				07ED62F4B115D9F8AB7EC144 /* GazeProcessorTests.swift in Sources */,
+				3FE51C96CF517B21DE8B170C /* NewsArticleDecodingTests.swift in Sources */,
+				2A3DDAED68059660DC374187 /* SeizureViewModelTests.swift in Sources */,
+				7FF53DAB141FA2F7B2D69E7C /* UsageModeStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		89398BFBFAC674C0D28F47F0 /* PBXTargetDependency */ = {
+		4FFC0F2AA43077BA92AE9A5F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = RettApp;
-			target = 2397A88B8D01D4530EB8068D /* RettApp */;
-			targetProxy = 2B067FB5D6E30248C671B5F7 /* PBXContainerItemProxy */;
+			target = DD88CFEB6522C110CEA43470 /* RettApp */;
+			targetProxy = D86327914D6E020D26CEF3F1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		048CEBEA8FB62526F8DFB48F /* Release */ = {
+		6C287DEB363ED4B168330718 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -943,30 +943,15 @@
 				PRODUCT_NAME = RettApp;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
-		217BFD2107CE2B28FAEDE6E7 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.afsr.RettApp.tests;
-				PRODUCT_NAME = RettAppTests;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.9;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RettApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RettApp";
 			};
 			name = Debug;
 		};
-		3868C6D07E438F842122D477 /* Debug */ = {
+		79FFB15ACA92145E76147949 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1029,52 +1014,7 @@
 			};
 			name = Debug;
 		};
-		3C391FD669EAC174150E7B37 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.afsr.RettApp.tests;
-				PRODUCT_NAME = RettAppTests;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.9;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RettApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RettApp";
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
-		4F0B3B0A58573E1AF3EAF2E8 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = RettApp/Resources/RettApp.entitlements;
-				CURRENT_PROJECT_VERSION = 11;
-				DEVELOPMENT_ASSET_PATHS = "";
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = RettApp/Resources/Info.plist;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.5.0;
-				PRODUCT_BUNDLE_IDENTIFIER = fr.afsr.RettApp;
-				PRODUCT_NAME = RettApp;
-				SDKROOT = iphoneos;
-				SUPPORTS_MACCATALYST = NO;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		ABF8D70C09D71590958F3D6F /* Release */ = {
+		832703A837575C8B0626D2CF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -1130,37 +1070,97 @@
 			};
 			name = Release;
 		};
+		966BF6681AD209D75631472E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.afsr.RettApp.tests;
+				PRODUCT_NAME = RettAppTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RettApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RettApp";
+			};
+			name = Debug;
+		};
+		B8AF6FD055B094A0A852BBA9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = RettApp/Resources/RettApp.entitlements;
+				CURRENT_PROJECT_VERSION = 11;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RettApp/Resources/Info.plist;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.5.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.afsr.RettApp;
+				PRODUCT_NAME = RettApp;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D0D4649718200669E8409AA4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.afsr.RettApp.tests;
+				PRODUCT_NAME = RettAppTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RettApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RettApp";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		39E1E65978D253394C2E4ACD /* Build configuration list for PBXProject "RettApp" */ = {
+		08613D250D23D9D356BC75C0 /* Build configuration list for PBXNativeTarget "RettAppTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				3868C6D07E438F842122D477 /* Debug */,
-				ABF8D70C09D71590958F3D6F /* Release */,
+				D0D4649718200669E8409AA4 /* Release */,
+				966BF6681AD209D75631472E /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		9E592AB7C21957270D1A5243 /* Build configuration list for PBXNativeTarget "RettApp" */ = {
+		3089D768583E536998368F11 /* Build configuration list for PBXProject "RettApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				048CEBEA8FB62526F8DFB48F /* Release */,
-				4F0B3B0A58573E1AF3EAF2E8 /* Debug */,
+				79FFB15ACA92145E76147949 /* Debug */,
+				832703A837575C8B0626D2CF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CE604EE89C32276D9FDB4FAB /* Build configuration list for PBXNativeTarget "RettAppTests" */ = {
+		B04334C9F6082E711F2195A5 /* Build configuration list for PBXNativeTarget "RettApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				3C391FD669EAC174150E7B37 /* Release */,
-				217BFD2107CE2B28FAEDE6E7 /* Debug */,
+				B8AF6FD055B094A0A852BBA9 /* Release */,
+				6C287DEB363ED4B168330718 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 357C1E68E87D5B01624DA927 /* Project object */;
+	rootObject = 855D70902A54E60D0888D8A1 /* Project object */;
 }
