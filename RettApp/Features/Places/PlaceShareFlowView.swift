@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 /// Partager un lieu, depuis l'annuaire.
@@ -135,6 +136,8 @@ struct PlaceProposalView: View {
     @State private var codePostal = ""
     @State private var commune = ""
     @State private var site = ""
+    @State private var point: CLLocationCoordinate2D?
+    @State private var placerSurCarte = false
 
     var body: some View {
         Form {
@@ -150,6 +153,35 @@ struct PlaceProposalView: View {
                 }
             } footer: {
                 Text("Le type décide des questions qu'on vous posera ensuite : on ne demande pas à un restaurant s'il y a une prise près du lit.")
+            }
+
+            Section {
+                Button {
+                    placerSurCarte = true
+                } label: {
+                    HStack(spacing: 12) {
+                        AFSRIconBadge(
+                            systemImage: point == nil ? "map" : "mappin.circle.fill",
+                            color: point == nil ? .afsrPurpleLight : .afsrSuccess,
+                            size: 30
+                        )
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(point == nil ? "Placer sur la carte" : "Placé sur la carte")
+                                .foregroundStyle(.primary)
+                            Text(point == nil
+                                ? "Le plus simple si vous y êtes : une épingle, et l'adresse suit"
+                                : "Touchez pour déplacer l'épingle")
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } footer: {
+                Text("Un point posé situe le lieu exactement. Sans lui, l'association le placera d'après l'adresse — souvent au centre de la commune.")
             }
 
             Section("Où est-ce ?") {
@@ -188,7 +220,9 @@ struct PlaceProposalView: View {
                                 address: adresse,
                                 postalCode: codePostal,
                                 city: commune,
-                                website: site
+                                website: site,
+                                latitude: point?.latitude,
+                                longitude: point?.longitude
                             )
                         ),
                         existing: nil,
@@ -206,6 +240,19 @@ struct PlaceProposalView: View {
         }
         .navigationTitle("Un lieu de plus")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $placerSurCarte) {
+            NavigationStack {
+                PlacePinPickerView(depart: point) { resultat in
+                    point = resultat.coordinate
+                    // L'adresse trouvée ne remplace que les champs vides :
+                    // ce que l'adhérent a tapé lui-même fait foi, le
+                    // géocodage inverse se trompe parfois d'un numéro.
+                    if adresse.isEmpty, let rue = resultat.address { adresse = rue }
+                    if codePostal.isEmpty, let code = resultat.postalCode { codePostal = code }
+                    if commune.isEmpty, let ville = resultat.city { commune = ville }
+                }
+            }
+        }
     }
 
     private var typeLibelle: String? {

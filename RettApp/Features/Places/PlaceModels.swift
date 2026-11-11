@@ -250,6 +250,12 @@ struct PlaceReviewDraft {
     var country: String = ""
     var website: String = ""
 
+    /// Le point posé sur la carte, quand l'adhérent a situé le lieu lui-même.
+    /// Le serveur les reprend telles quelles et ne les remplace que si
+    /// l'adresse permet de mieux faire.
+    var latitude: Double?
+    var longitude: Double?
+
     var rating: Int = 0
     /// Les réponses aux critères : « oui », « non », ou absent quand on ne
     /// sait pas. L'absence est une réponse en soi, et le serveur écarte
@@ -276,6 +282,8 @@ struct PlaceReviewDraft {
         let city: String?
         let country: String?
         let website: String?
+        let latitude: Double?
+        let longitude: Double?
         let rating: Int
         /// L'objet `handle → « oui » | « non »`. Imbriqué, parce que le
         /// serveur attend un tableau.
@@ -299,6 +307,8 @@ struct PlaceReviewDraft {
             case city
             case country
             case website
+            case latitude
+            case longitude
             case rating
             case criteres
             case comment
@@ -321,6 +331,8 @@ struct PlaceReviewDraft {
             city: nouveau ? Self.propre(city) : nil,
             country: nouveau ? Self.propre(country) : nil,
             website: nouveau ? Self.propre(website) : nil,
+            latitude: nouveau ? latitude : nil,
+            longitude: nouveau ? longitude : nil,
             rating: rating,
             criteres: answers,
             comment: Self.propre(comment),

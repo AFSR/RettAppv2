@@ -48,6 +48,9 @@ struct PlaceReviewSheet: View {
             var postalCode: String = ""
             var city: String = ""
             var website: String = ""
+            /// Le point posé sur la carte, s'il y en a un.
+            var latitude: Double?
+            var longitude: Double?
         }
     }
 
@@ -290,10 +293,16 @@ struct PlaceReviewSheet: View {
                 .font(AFSRFont.caption())
                 .foregroundStyle(.secondary)
 
-            if place.proposal != nil {
+            if let proposition = place.proposal {
                 Text("Le lieu que vous proposez sera créé en brouillon : il n'apparaîtra dans l'annuaire qu'après relecture.")
                     .font(AFSRFont.caption())
                     .foregroundStyle(.secondary)
+
+                if proposition.latitude == nil {
+                    Text("Vous ne l'avez pas placé sur la carte : l'association le situera d'après l'adresse, au mieux de ce qu'elle permet.")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -372,6 +381,8 @@ struct PlaceReviewSheet: View {
             brouillon.postalCode = proposition.postalCode
             brouillon.city = proposition.city
             brouillon.website = proposition.website
+            brouillon.latitude = proposition.latitude
+            brouillon.longitude = proposition.longitude
         } else {
             brouillon.mode = .existant
             brouillon.establishmentID = place.establishmentID
