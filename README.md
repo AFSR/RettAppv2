@@ -40,13 +40,20 @@ scripts/         # Génération du projet Xcode et de la base BDPM
 open RettApp.xcodeproj
 ```
 
-Après ajout/renommage de fichiers sources, régénérer le projet :
+Après ajout, renommage ou suppression de fichiers sources, régénérer le projet :
 
 ```bash
 ruby scripts/generate_xcodeproj.rb   # gem xcodeproj
-# ou
-xcodegen generate                    # à partir de project.yml
 ```
+
+C'est le **seul** générateur. `project.yml` (XcodeGen) a été supprimé en
+novembre 2026 : il annonçait `MARKETING_VERSION 1.3.0` alors que le script
+annonçait `1.9.1`, et ce README présentait les deux comme équivalents — lancer
+`xcodegen generate` aurait publié une version inférieure à celle de l'App
+Store.
+
+La version et le numéro de build vivent dans ce script, et nulle part ailleurs :
+une valeur corrigée dans Xcode est perdue à la régénération suivante.
 
 Puis, dans Xcode : target **RettApp** → **Signing & Capabilities** → choisir son **Team** (iCloud/CloudKit, HealthKit, Push Notifications).
 
