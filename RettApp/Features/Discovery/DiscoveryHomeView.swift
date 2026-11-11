@@ -25,16 +25,19 @@ struct DiscoveryHomeView: View {
                 .padding(.vertical, 4)
             }
 
-            Section {
-                NavigationLink {
-                    MemberAreaView()
-                } label: {
-                    Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+            // Connecté, l'espace adhérent a son propre onglet.
+            if !MemberSession.shared.isSignedIn {
+                Section {
+                    NavigationLink {
+                        MemberAreaView()
+                    } label: {
+                        Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+                    }
+                } header: {
+                    Text("Adhésion")
+                } footer: {
+                    Text("Votre adhésion, vos dons et attestations fiscales, les publications et communications réservées aux adhérents. Connexion par code reçu en SMS ou par e-mail, sans mot de passe.")
                 }
-            } header: {
-                Text("Adhésion")
-            } footer: {
-                Text("Votre adhésion, vos dons et attestations fiscales, les publications et communications réservées aux adhérents. Connexion par code reçu en SMS ou par e-mail, sans mot de passe.")
             }
 
             Section {

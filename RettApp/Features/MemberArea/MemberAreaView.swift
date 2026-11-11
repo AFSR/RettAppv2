@@ -12,18 +12,30 @@ import SwiftUI
 /// La connexion se fait par code reçu en SMS ou par e-mail, sans mot de passe.
 /// Le jeton obtenu est rangé dans le trousseau de l'appareil.
 struct MemberAreaView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         // Lu dans `body`, isolé sur le MainActor, et non dans un initialiseur
         // de propriété : `MemberSession` est isolée MainActor.
         let session = MemberSession.shared
         return Group {
-            if session.isSignedIn {
-                MemberHomeView(session: session)
-            } else {
+            if !session.isSignedIn {
                 MemberLoginView(session: session)
+            } else if !session.isUnlocked {
+                MemberLockView(session: session)
+            } else {
+                MemberHomeView(session: session)
             }
         }
         .animation(.default, value: session.isSignedIn)
+        .animation(.default, value: session.isUnlocked)
+        // Dans le sélecteur d'apps, iOS prend une capture : on la floute pour
+        // que ni le nom, ni les dons, ni la famille n'y apparaissent.
+        .overlay {
+            if session.isUnlocked && scenePhase != .active {
+                Rectangle().fill(.regularMaterial).ignoresSafeArea()
+            }
+        }
     }
 }
 
@@ -43,12 +55,24 @@ struct MemberHomeView: View {
             contentSection
             if !sections.isEmpty { sectionsSection }
             moreSection
+            privacySection
         }
         .navigationTitle("Espace adhérent")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await reload() }
         .task { await reload() }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                // Verrouiller sans se déconnecter : l'espace se referme, la
+                // session reste, Face ID la rouvre.
+                Button {
+                    session.lock()
+                } label: {
+                    Image(systemName: "lock.fill")
+                }
+                .accessibilityLabel("Verrouiller l'espace adhérent")
+                .disabled(!session.hasStoredSession)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showLogoutConfirm = true
@@ -95,8 +119,22 @@ struct MemberHomeView: View {
                     }
                 }
                 membershipBadge
+                if let notice = session.persistenceNotice {
+                    Label(notice, systemImage: "lock.open.trianglebadge.exclamationmark")
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.afsrWarning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    private var privacySection: some View {
+        Section {
+            MemberPrivacyNotice()
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
         }
     }
 

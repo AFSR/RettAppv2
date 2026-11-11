@@ -54,6 +54,8 @@ struct MemberAccountChoice: Decodable, Identifiable, Equatable {
 struct LoginResult: Decodable {
     let status: String
     let token: String?
+    /// Second secret, qui ne sert qu'à détruire le jeton côté site.
+    let revokeToken: String?
     let member: MemberProfile?
     let selection: String?
     let accounts: [MemberAccountChoice]?

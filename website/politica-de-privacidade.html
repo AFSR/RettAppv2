@@ -55,7 +55,7 @@
 </header>
 <main>
 
-<p class="meta">Última atualização: 3 de maio de 2026 — Versão 1.3</p>
+<p class="meta">Última atualização: 11 de novembro de 2026 — Versão 1.4</p>
 
 <div class="callout">
   <strong>Em resumo.</strong> A RettApp guarda os seus dados <strong>localmente no seu iPhone</strong>. Se ativar a <em>partilha entre pais</em>, os seus dados passam pelo seu <strong>iCloud pessoal</strong> (Apple). A AFSR <strong>não opera nenhum servidor</strong> que recolha os seus dados. Nenhum dado é vendido, partilhado com terceiros comerciais ou utilizado para fins publicitários.
@@ -116,10 +116,10 @@ A RettApp não recolhe <strong>nenhum identificador publicitário</strong>, <str
 
 <h3>2.4 Dados faciais (TrueDepth, ARKit, Vision)</h3>
 <div class="callout">
-  <strong>A RettApp não recolhe, não armazena nem transmite quaisquer dados faciais.</strong>
+  <strong>A RettApp não recolhe, não armazena nem transmite quaisquer dados faciais.</strong> O Face ID só é usado para bloquear a área de associado (ver 2.5): o reconhecimento é feito pelo iOS, a aplicação nunca recebe a imagem do rosto.
 </div>
 <p>
-A RettApp <strong>não utiliza a API TrueDepth</strong> (câmara com profundidade, reconhecimento facial, ARFaceTracking). A aplicação não pede permissão Face ID, não lê qualquer blendshape, não trata qualquer geometria facial, não captura qualquer malha 3D do rosto e não efetua qualquer reconhecimento facial.
+A RettApp <strong>não utiliza a API TrueDepth</strong> (câmara com profundidade, reconhecimento facial, ARFaceTracking). A aplicação não lê qualquer blendshape, não trata qualquer geometria facial, não captura qualquer malha 3D do rosto e não efetua qualquer reconhecimento facial.
 </p>
 <p>
 A permissão de câmara (<code>NSCameraUsageDescription</code>) é solicitada <strong>apenas</strong> para a funcionalidade de digitalização do caderno de acompanhamento em papel (preenchido pela escola ou centro). É tirada uma fotografia, processada localmente por <code>VNRecognizeTextRequest</code> (OCR Apple Vision) para extrair o texto da página, e em seguida apresentada ao utilizador para verificação. A fotografia e o respetivo texto OCR:
@@ -131,6 +131,20 @@ A permissão de câmara (<code>NSCameraUsageDescription</code>) é solicitada <s
 </ul>
 <p>
 O anterior módulo «Jogo do olhar» que utilizava <code>ARFaceTrackingConfiguration</code> foi <strong>removido da RettApp</strong> e publicado como aplicação separada (<em>RettGame</em>), com o seu próprio identificador na App Store, o seu próprio <code>Info.plist</code> e a sua própria política de privacidade. A RettApp e a RettGame não partilham código nem dados.
+</p>
+
+<h3>2.5 Área de associado (conta AFSR) e bloqueio Face ID</h3>
+<p>
+A área de associado é um serviço da AFSR, responsável pelo tratamento. Após o início de sessão por código (SMS ou e-mail), a aplicação mostra, <strong>a pedido</strong>, dados lidos em afsr.fr: identidade e contactos, morada, estado da quota, membros do agregado, histórico de donativos e recibos fiscais, publicações e comunicações reservadas. <strong>A aplicação não guarda qualquer cópia</strong>: mostra-os e descarta-os. Os documentos abertos (recibos, publicações) ficam na pasta temporária do dispositivo e são <strong>apagados a cada bloqueio ou fim de sessão</strong>.
+</p>
+<p>
+O que é guardado: um <strong>token de sessão</strong> aleatório no Keychain do iOS, <strong>apenas neste dispositivo</strong> — nunca sincronizado pelo iCloud, nunca copiado. No servidor só é guardada a sua impressão (SHA-256), com um nome genérico de dispositivo («RettApp iOS») e a data da última utilização. Expira 90 dias após a última utilização e, no máximo, 365 dias após a criação.
+</p>
+<p>
+<strong>Face ID, Touch ID ou o código do iPhone</strong> bloqueiam este token, através da API LocalAuthentication do iOS. O reconhecimento é feito <strong>pelo iOS</strong>: a aplicação e a AFSR recebem apenas «aceite» ou «recusado», nunca uma imagem do rosto, impressão digital ou modelo biométrico. A área bloqueia após mais de um minuto em segundo plano e em cada arranque. Após 5 recusas de desbloqueio, a aplicação destrói o token local e pede a afsr.fr que o revogue.
+</p>
+<p>
+Estes dados <strong>não têm relação com os dados de acompanhamento</strong> (diário, crises, medicação, documentos médicos), que nunca são enviados à AFSR através da área de associado. Direitos de acesso, retificação e apagamento: contact@afsr.fr.
 </p>
 
 <h2>3. Por que tratamos estes dados?</h2>
