@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Manifeste de confidentialité. Obligatoire pour l'App Store : sans lui,
+    l'envoi est rejeté à la validation, avant toute revue humaine.
+
+    Deux déclarations distinctes, qu'on confond souvent.
+
+    « AccessedAPITypes » : les API dites à motif requis, celles qui
+    pourraient servir à prendre une empreinte de l'appareil. Seules deux
+    sont utilisées ici, et chacune porte le motif qui correspond à l'usage
+    réel — pas le plus permissif de la liste.
+
+    « CollectedDataTypes » : ce que l'application recueille. Les données de
+    suivi — crises, prises de médicaments, symptômes, Apple Santé — n'y
+    figurent PAS, et ce n'est pas un oubli : elles restent sur l'appareil et
+    dans l'iCloud personnel de la famille. Aucun serveur de l'association ne
+    les reçoit, donc Apple ne les considère pas comme collectées par
+    l'éditeur. Les déclarer dirait que l'AFSR les détient, ce qui est faux.
+
+    Ce qui y figure vient de l'espace adhérent, devenu un écran natif : il
+    recueille un identifiant de connexion et reçoit le dossier de l'adhérent
+    depuis afsr.fr. Une vue native qui demande une identité compte comme une
+    collecte de la part de l'application, même si le site en est le
+    responsable de traitement. Cette liste doit donc dire la même chose que
+    la déclaration de confidentialité d'App Store Connect — un relecteur qui
+    compare les deux doit y trouver le même contenu.
+
+    Rien n'est lié à du pistage : « Tracking » est faux partout, et la liste
+    des domaines de pistage est vide. Aucune bibliothèque tierce n'est
+    embarquée, donc aucun manifeste à agréger.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <!-- Usage choisi, rôle de l'appareil, préférences d'affichage.
+                 CA92.1 : accès aux informations de l'app elle-même, jamais
+                 partagées hors de son conteneur. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- Dates de fichiers lues pour les sauvegardes de sécurité et
+                 la corbeille. C617.1 : fichiers du conteneur de l'app. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
+        </dict>
+    </array>
+
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeName</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePhysicalAddress</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePhoneNumber</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- Le jeton de session de l'espace adhérent désigne un compte
+                 AFSR. Il vit dans le trousseau, derrière Face ID, et ne
+                 quitte pas l'appareil — mais il identifie une personne. -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

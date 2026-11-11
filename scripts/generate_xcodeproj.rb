@@ -82,6 +82,15 @@ if File.exist?(bdpm_path)
   bdpm_ref.last_known_file_type = 'file'
   app_target.add_resources([bdpm_ref])
 end
+# PrivacyInfo.xcprivacy — manifeste de confidentialité.
+#
+# C'est bien un RESOURCE : il doit se retrouver dans le bundle, à sa racine.
+# Déclaré seulement comme référence, il apparaîtrait dans Xcode sans être
+# copié, et l'envoi serait rejeté à la validation sans que rien ne le montre
+# dans le projet.
+privacy_ref = resources_group.new_reference('PrivacyInfo.xcprivacy')
+privacy_ref.last_known_file_type = 'text.plist.xml'
+app_target.add_resources([privacy_ref])
 # Info.plist (référencée seulement, PAS un resource — utilisée via INFOPLIST_FILE)
 info_ref = resources_group.new_reference('Info.plist')
 info_ref.last_known_file_type = 'text.plist.xml'
@@ -104,8 +113,17 @@ common_app_settings = {
   'IPHONEOS_DEPLOYMENT_TARGET'           => DEPLOYMENT_TARGET,
   'SWIFT_VERSION'                        => SWIFT_VERSION,
   'TARGETED_DEVICE_FAMILY'               => '1,2',
-  'MARKETING_VERSION'                    => '1.5.0',
-  'CURRENT_PROJECT_VERSION'              => '11',
+  # ⚠️ Ces deux valeurs sont la source de vérité : le projet est régénéré, et
+  # une version corrigée à la main dans Xcode est perdue à la prochaine
+  # exécution de ce script. Elles étaient restées à 1.5.0 / 11 alors que
+  # l'App Store en est à 1.9 (build 2) : régénérer aurait fait régresser la
+  # version annoncée, et App Store Connect refuse un numéro inférieur au
+  # dernier publié.
+  #
+  # À avancer ICI avant chaque archivage. Le build doit augmenter à chaque
+  # envoi, même pour renvoyer le même code après un rejet.
+  'MARKETING_VERSION'                    => '1.9.1',
+  'CURRENT_PROJECT_VERSION'              => '3',
   'ENABLE_USER_SCRIPT_SANDBOXING'        => 'YES',
   'SWIFT_EMIT_LOC_STRINGS'               => 'YES',
   'SUPPORTS_MACCATALYST'                 => 'NO',
