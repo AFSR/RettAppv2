@@ -77,7 +77,7 @@ struct MemberLockView: View {
 /// doit pouvoir lire ce qui est fait de ses données avant comme après s'être
 /// déverrouillée.
 struct MemberPrivacyNotice: View {
-    private static let privacyURL = URL(string: "https://rettapp.afsr.fr/confidentialite.html")!
+    private static let privacyURL = AFSRLinks.confidentialite
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

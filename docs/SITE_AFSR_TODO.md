@@ -136,15 +136,31 @@ l'image. RettApp pourrait l'utiliser pour VoiceOver à l'avenir.
 Apple **refusera** la soumission App Store si ces deux pages n'existent pas. RGPD les
 exige aussi.
 
-| URL à publier | Liée depuis | Statut |
-|---|---|---|
-| `https://afsr.fr/confidentialite` | App (Réglages → À propos), App Store Connect | ❌ à créer |
-| `https://afsr.fr/mentions-legales` | App (Réglages → À propos) | ❌ à créer |
+**C'est fait.** Les deux pages sont servies par le dépôt du site, dans les trois
+langues de l'application, et déployées avec lui. Voir
+`docs/pages-legales/README.md` côté site, et `App\Http\Controllers\LegalController`.
 
-Les deux doivent être :
-- Accessibles publiquement (pas derrière login)
-- Référencées par leur URL exacte (les URLs sont déjà hardcodées dans `SettingsView.swift`)
-- En français (la cible primaire est francophone)
+| URL | Liée depuis | Statut |
+|---|---|---|
+| `https://afsr.fr/politique-de-confidentialite` | App (Réglages → À propos), App Store Connect | ✅ servie par le dépôt |
+| `https://afsr.fr/privacy-policy` | App Store Connect (fiche anglaise) | ✅ servie par le dépôt |
+| `https://afsr.fr/politica-de-privacidade` | App Store Connect (fiche portugaise) | ✅ servie par le dépôt |
+| `https://afsr.fr/mentions-legales` | App (Réglages → À propos) | ✅ servie par le dépôt |
+| `https://afsr.fr/legal-notice` | — | ✅ servie par le dépôt |
+| `https://afsr.fr/avisos-legais` | — | ✅ servie par le dépôt |
+
+`https://afsr.fr/confidentialite` redirige vers la version française, de même
+que les six anciennes adresses en `.html` du sous-domaine `rettapp.afsr.fr`.
+
+Les URL sont rassemblées dans `RettApp/Core/AFSRLinks.swift` : trois littéraux
+éparpillés dans les réglages, c'étaient trois occasions d'en changer deux sur
+trois alors que la première est citée dans la fiche App Store.
+
+**Ce qui reste à faire côté association :** renseigner le RNA, le SIREN et le
+directeur de la publication (`AFSR_LEGAL_RNA`, `AFSR_LEGAL_SIREN`,
+`AFSR_LEGAL_PUBLICATION_DIRECTOR`). Tant qu'ils sont vides, les lignes
+correspondantes ne s'affichent pas — la page est publiable, mais l'identification
+de l'éditeur est une obligation pénalement sanctionnée.
 
 ---
 
@@ -309,7 +325,8 @@ Champs à remplir :
 - Catégorie principale : **Medical**
 - Catégorie secondaire : Health & Fitness
 - Age rating : à préciser (probablement 4+)
-- **Privacy Policy URL** : `https://afsr.fr/confidentialite`
+- **Privacy Policy URL** : `https://afsr.fr/politique-de-confidentialite`
+  (fiche anglaise : `/privacy-policy` ; fiche portugaise : `/politica-de-privacidade`)
 - **Support URL** : `https://afsr.fr/rettapp`
 - **Marketing URL** (optionnel) : `https://afsr.fr/rettapp`
 - Description (4 000 car. max) — voir §5
@@ -367,9 +384,10 @@ médical et le toggle de consentement.
 
 À cocher avant soumission App Store :
 
-- [ ] API Statamic activée et testée (`/api/collections/actualites/entries` répond `200`)
-- [ ] Page **politique de confidentialité** publiée à `https://afsr.fr/confidentialite`
-- [ ] Page **mentions légales** publiée à `https://afsr.fr/mentions-legales`
+- [ ] API Statamic activée et testée (`/api/collections/news/entries` répond `200`)
+- [x] Page **politique de confidentialité** servie à `https://afsr.fr/politique-de-confidentialite`
+- [x] Page **mentions légales** servie à `https://afsr.fr/mentions-legales`
+- [ ] `AFSR_LEGAL_RNA`, `AFSR_LEGAL_SIREN` et `AFSR_LEGAL_PUBLICATION_DIRECTOR` renseignés en production
 - [ ] Page **présentation app** publiée à `https://afsr.fr/rettapp`
 - [ ] Compte **Apple Developer Organisation** ouvert et validé (D-U-N-S)
 - [ ] Bundle ID `fr.afsr.RettApp` enregistré, capabilities activées

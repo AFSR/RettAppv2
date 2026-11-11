@@ -153,11 +153,15 @@ catégorie Medical. Health & Fitness en secondaire pour la découvrabilité.
 
 ## 7. URL obligatoires
 
-À publier sur afsr.fr **avant** la soumission (cf. `docs/SITE_AFSR_TODO.md`).
+La politique de confidentialité et les mentions légales sont servies par le
+dépôt du site, dans les trois langues de la fiche (cf. `docs/SITE_AFSR_TODO.md`
+§2). Il reste à publier la page de présentation de l'app.
 
 | Champ App Store Connect | URL à renseigner |
 |---|---|
-| **Privacy Policy URL** | `https://afsr.fr/confidentialite` |
+| **Privacy Policy URL** (fr) | `https://afsr.fr/politique-de-confidentialite` |
+| **Privacy Policy URL** (en) | `https://afsr.fr/privacy-policy` |
+| **Privacy Policy URL** (pt-BR) | `https://afsr.fr/politica-de-privacidade` |
 | **Support URL** | `https://afsr.fr/rettapp` (ou `https://afsr.fr/contact`) |
 | **Marketing URL** (optionnel) | `https://afsr.fr/rettapp` |
 
@@ -261,13 +265,13 @@ Le module "Jeu Regard" utilise ARFaceTrackingConfiguration et nécessite donc un
 Conformément au déclaratif, RettApp n'est PAS un dispositif médical régulé (pas de certification CE/FDA/UKCA). Un avertissement médical est affiché à l'onboarding (avec confirmation requise) et accessible en permanence dans les Réglages. L'app ne diagnostique pas, ne traite pas, ne recommande pas de doses.
 
 5. HEALTHKIT
-Les entitlements HealthKit sont activés mais aucune donnée n'est actuellement écrite dans Apple Santé (l'API publique iOS 17 n'expose pas de type catégorie pour les crises d'épilepsie). Les permissions HealthKit ne seront pas demandées dans cette version.
+RettApp **lit** dans Apple Santé, et n'y écrit rien : l'API publique d'iOS 17 n'expose aucun type de catégorie pour les crises d'épilepsie, si bien que les observations saisies dans l'application y restent. L'autorisation de lecture est demandée par iOS lors de la première ouverture de l'écran « Santé », jamais au lancement, et aucun type n'est lu sans que l'utilisateur l'ait accordé : hydratation, alimentation (énergie, glucides, protéines, lipides), sommeil et siestes, rythme cardiaque au repos et moyen, nombre de pas, énergie dépensée. Ces données servent à l'affichage et au rapport destiné au médecin ; elles ne quittent pas l'appareil.
 
 6. CONSENTEMENT PARENTAL ET DONNÉES DE SANTÉ DE MINEURS
-L'écran d'onboarding inclut un avertissement explicite que ces données concernent des mineurs et qu'un consentement parental est requis. Politique de confidentialité accessible : https://afsr.fr/confidentialite
+L'écran d'onboarding inclut un avertissement explicite que ces données concernent des mineurs et qu'un consentement parental est requis. Politique de confidentialité accessible : https://afsr.fr/politique-de-confidentialite
 
 7. AFSR
-L'AFSR est une association loi 1901 reconnue d'intérêt général, fondée en 1988. Site officiel : https://afsr.fr
+L'AFSR est une association régie par la loi française du 1er juillet 1901, fondée en 1988. Site officiel : https://afsr.fr
 
 Pour toute question : contact@afsr.fr
 

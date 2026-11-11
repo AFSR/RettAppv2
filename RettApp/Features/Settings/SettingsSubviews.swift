@@ -483,12 +483,12 @@ struct MedicalDisclaimerSubView: View {
                 Text("RGPD et confidentialité")
                     .font(AFSRFont.headline(16))
                     .padding(.top, 8)
-                Text("Toutes les données saisies dans RettApp restent stockées localement sur votre appareil. Aucune donnée n'est transmise à l'AFSR ou à un tiers. L'usage de l'application est soumis à votre consentement parental et à notre politique de confidentialité.")
+                Text("Le suivi que vous tenez dans RettApp reste sur cet appareil, et dans votre iCloud personnel si vous activez le partage entre parents. L'AFSR n'a aucun serveur qui le reçoive : nous ne pouvons ni le lire, ni le copier. L'onglet « Adhérent » et les actualités, eux, interrogent le site afsr.fr comme le ferait un navigateur.")
                     .font(AFSRFont.caption())
                     .foregroundStyle(.secondary)
 
                 Link("Lire la politique de confidentialité",
-                     destination: URL(string: "https://rettapp.afsr.fr/confidentialite.html")!)
+                     destination: AFSRLinks.confidentialite)
                     .font(AFSRFont.body())
                     .padding(.top, 4)
 
@@ -550,23 +550,28 @@ struct AboutSubView: View {
                 }
             }
             Section("Liens AFSR") {
-                Link(destination: URL(string: "https://afsr.fr")!) {
+                Link(destination: AFSRLinks.site) {
                     Label("Site officiel", systemImage: "safari")
                 }
-                Link(destination: URL(string: "https://afsr.fr/nous-soutenir/faire-un-don")!) {
+                Link(destination: AFSRLinks.don) {
                     Label("Faire un don", systemImage: "heart.fill")
                 }
             }
             Section("Documents légaux") {
-                Link(destination: URL(string: "https://rettapp.afsr.fr/mentions-legales.html")!) {
+                Link(destination: AFSRLinks.mentionsLegales) {
                     Label("Mentions légales", systemImage: "doc.text")
                 }
-                Link(destination: URL(string: "https://rettapp.afsr.fr/confidentialite.html")!) {
+                Link(destination: AFSRLinks.confidentialite) {
                     Label("Politique de confidentialité", systemImage: "lock.shield")
                 }
             }
             Section("Crédits") {
-                Text("RettApp est une application de l'Association Française du Syndrome de Rett (AFSR), association loi 1901 reconnue d'intérêt général.")
+                // « reconnue d'intérêt général » a été retiré : les deux
+                // brouillons des pages légales se contredisaient sur le statut
+                // de l'association — utilité publique contre intérêt général —
+                // et aucune des deux mentions n'est vérifiable depuis le dépôt.
+                // À rétablir une fois le statut établi.
+                Text("RettApp est une application de l'Association Française du Syndrome de Rett (AFSR), association régie par la loi du 1er juillet 1901.")
                     .font(AFSRFont.caption())
                     .foregroundStyle(.secondary)
             }

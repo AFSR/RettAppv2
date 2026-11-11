@@ -131,7 +131,7 @@ RettApp est une application **mobile autonome**, sans backend propre. Les seules
 
 | Exigence | Statut | Action à faire |
 |---|---|---|
-| Politique de confidentialité accessible dans l'app | ⚠️ Lien vers `afsr.fr/confidentialite` mais page **à rédiger** | Rédiger avec DPO AFSR |
+| Politique de confidentialité accessible dans l'app | ✅ Servie par le dépôt du site, en trois langues, à `afsr.fr/politique-de-confidentialite` | Renseigner RNA, SIREN et directeur de publication en production ; relecture RGPD recommandée |
 | Consentement explicite recueilli | ❌ Absent | Ajouter un écran de consentement au premier lancement, cocher explicitement "Je donne mon consentement pour le traitement des données de santé de mon enfant" |
 | Droit d'accès / portabilité | ✅ Export CSV complet dans les Réglages | OK |
 | Droit à l'effacement | ✅ "Effacer les données de l'application" dans les Réglages | OK |
@@ -254,7 +254,7 @@ Modèle : **STRIDE simplifié appliqué à une app mobile sans backend**.
 ### 🔴 P0 — Bloquant avant publication App Store
 
 1. **Créer `PrivacyInfo.xcprivacy`** — obligatoire iOS 17, l'app sera rejetée sans. (§7)
-2. **Rédiger et publier la politique de confidentialité** sur `afsr.fr/confidentialite` — lien déjà présent dans l'app mais la page doit exister. (§6)
+2. ~~**Rédiger et publier la politique de confidentialité**~~ — fait : servie par le dépôt du site à `afsr.fr/politique-de-confidentialite`, avec ses versions anglaise et portugaise. Reste à déployer le site et à renseigner RNA, SIREN et directeur de publication. (§6)
 3. **Ajouter un écran de consentement parental explicite** au premier lancement — exigence RGPD art. 8 + 9. (§6)
 
 ### 🟠 P1 — Avant déploiement national
@@ -322,7 +322,7 @@ Modèle : **STRIDE simplifié appliqué à une app mobile sans backend**.
 - [ ] Aucun secret embarqué (grep sur `apiKey`, `token`, `password`, `secret` dans les sources)
 - [ ] Aucun log contenant des données de santé (grep sur `print(`, `os_log`)
 - [ ] Le Privacy Manifest est à jour par rapport aux APIs effectivement utilisées
-- [ ] La politique de confidentialité `afsr.fr/confidentialite` reste publiée et accessible
+- [ ] La politique de confidentialité `afsr.fr/politique-de-confidentialite` reste publiée, accessible, et décrit toujours ce que l'app fait vraiment (ses affirmations sont vérifiables dans ce dépôt : stockage local, partage par AirDrop seulement, rien de lu par défaut dans Apple Santé)
 - [ ] Les entitlements actifs correspondent aux features réellement utilisées (pas de HealthKit actif si non utilisé)
 - [ ] ATS reste strict (`NSAllowsArbitraryLoads = false`)
 - [ ] Les tests de schéma SwiftData ne cassent pas la migration pour les données existantes d'utilisateurs
