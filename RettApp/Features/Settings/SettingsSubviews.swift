@@ -556,6 +556,9 @@ struct AboutSubView: View {
                 Link(destination: AFSRLinks.don) {
                     Label("Faire un don", systemImage: "heart.fill")
                 }
+                Link(destination: AFSRLinks.assistance) {
+                    Label("Assistance et questions fréquentes", systemImage: "questionmark.circle")
+                }
             }
             Section("Documents légaux") {
                 Link(destination: AFSRLinks.mentionsLegales) {
