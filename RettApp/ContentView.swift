@@ -9,6 +9,7 @@ struct ContentView: View {
     @Query private var profiles: [ChildProfile]
     @Query(sort: \SeizureEvent.startTime, order: .reverse) private var seizures: [SeizureEvent]
     @Environment(UpdateAvailabilityService.self) private var updateService
+    private var memberSession = MemberSessionStore.shared
 
     init(usage: AppUsage = .suivi) {
         self.usage = usage
@@ -48,6 +49,12 @@ struct ContentView: View {
             } else {
                 NavigationStack { DiscoveryHomeView() }
                     .tabItem { Label("AFSR", systemImage: "heart.circle.fill") }
+            }
+
+            // Onglet réservé aux personnes connectées à leur compte AFSR.
+            if memberSession.isLoggedIn {
+                NavigationStack { MemberAreaView() }
+                    .tabItem { Label("Adhérent", systemImage: "person.crop.circle.fill") }
             }
 
             NavigationStack { SettingsView(usage: usage) }

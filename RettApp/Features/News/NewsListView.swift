@@ -21,8 +21,13 @@ struct NewsListView: View {
                         if let error = viewModel.errorMessage {
                             errorBanner(error)
                         }
-                        ForEach(Array(viewModel.articles.enumerated()), id: \.element.id) { index, article in
-                            NavigationLink(value: article) {
+                        // Identité par position : deux entrées au même `id` (traductions,
+                        // doublons du site) ne doivent pas se confondre et envoyer vers
+                        // l'article voisin.
+                        ForEach(Array(viewModel.articles.enumerated()), id: \.offset) { index, article in
+                            NavigationLink {
+                                NewsDetailView(article: article)
+                            } label: {
                                 NewsCard(article: article, isFeatured: index == 0)
                             }
                             .buttonStyle(.plain)
@@ -37,7 +42,6 @@ struct NewsListView: View {
         .background(Color.afsrBackground)
         .navigationTitle("Actualités")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: NewsArticle.self) { NewsDetailView(article: $0) }
         .refreshable { await viewModel.refresh() }
         .task { if viewModel.articles.isEmpty { await viewModel.refresh() } }
     }
@@ -74,6 +78,7 @@ private struct NewsCard: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
         .accessibilityElement(children: .combine)
     }
@@ -160,6 +165,11 @@ private struct NewsCard: View {
                 }
             }
             .clipped()
+            // `clipped()` ne limite que le dessin, pas la zone tactile : une
+            // photo « scaledToFill » plus haute que son cadre déborde, et celle
+            // de la carte suivante recouvre le bas de la carte précédente —
+            // d'où « Lire l'article » qui ouvrait l'article suivant.
+            .contentShape(Rectangle())
     }
 
     private func badge(_ text: String, filled: Bool) -> some View {

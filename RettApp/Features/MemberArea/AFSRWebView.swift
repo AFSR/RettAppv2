@@ -113,6 +113,7 @@ struct AFSRWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             parentView.isLoading = false
             parentView.canGoBack = webView.canGoBack
+            MemberSessionStore.shared.pageLoaded(webView.url)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

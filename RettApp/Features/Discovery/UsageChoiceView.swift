@@ -19,10 +19,10 @@ struct UsageChoiceView: View {
         ScrollView {
             VStack(spacing: 24) {
                 VStack(spacing: 12) {
-                    Image(systemName: "hand.wave.fill")
+                    Image("RettLogo")
                         .resizable().scaledToFit()
-                        .frame(width: 72, height: 72)
-                        .foregroundStyle(.afsrPurpleAdaptive)
+                        .frame(width: 96, height: 96)
+                        .accessibilityHidden(true)
                         .padding(.top, 40)
 
                     Text("Bienvenue sur RettApp")
