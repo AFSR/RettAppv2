@@ -3,6 +3,7 @@ import LocalAuthentication
 import Observation
 import Security
 import SwiftUI
+import UIKit
 
 // MARK: - Trousseau
 
@@ -252,7 +253,10 @@ final class MemberSession {
         let result: LoginResult = try await client.post("/connexion/verification", body: [
             "challenge": challenge,
             "code": code,
-            "device_name": "RettApp iOS"
+            // Le modèle seulement (« iPhone », « iPad ») : le nom donné à l'appareil est
+            // une donnée personnelle (« iPhone de Marie »). Il sert à reconnaître la
+            // session dans « Appareils connectés » sur le site.
+            "device_name": "RettApp · \(UIDevice.current.model)"
         ])
         return try finish(result)
     }
