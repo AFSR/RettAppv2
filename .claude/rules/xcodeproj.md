@@ -42,20 +42,30 @@ le bundle** — et l'envoi est rejeté sans que rien ne le montre dans le projet
 ## La version vit dans le script
 
 ```ruby
-'MARKETING_VERSION'       => '1.9.1',
-'CURRENT_PROJECT_VERSION' => '12',
+'MARKETING_VERSION'       => '1.9',
+'CURRENT_PROJECT_VERSION' => '15',
 ```
 
-C'est la **seule** source de vérité. Une version corrigée dans l'interface de
-Xcode est perdue à la prochaine régénération.
+C'est la **seule** source de vérité pour une régénération. Une version corrigée
+dans l'interface de Xcode est perdue à la prochaine exécution du script.
 
-Ça s'est produit : le projet portait `1.9 / 11`, corrigé à la main, pendant que
-le script annonçait encore `1.5.0 / 11`. Une régénération aurait fait régresser
-la version annoncée, et **App Store Connect refuse un numéro inférieur au
-dernier publié**.
+Ça s'est produit **deux fois** : le projet a porté `1.9 / 11` puis `1.9 / 14`,
+corrigés à la main, pendant que le script annonçait `1.5.0 / 11` puis
+`1.9.1 / 12`.
 
-Le build doit être supérieur à tout ce qui a existé, pas seulement à ce qui est
-en ligne.
+### Le numéro de build est un plancher, pas un choix
+
+Les builds **12 et 14** de la 1.9 sont déjà partis chez Apple — le journal des
+commits le dit (« v 1.9 build 14 pushed to Apple »). App Store Connect refuse
+un numéro **déjà consommé** autant qu'un numéro inférieur au dernier publié.
+
+**Avant d'archiver, lisez le dernier build reçu dans App Store Connect** et
+placez-vous au-dessus. Ne déduisez pas le prochain numéro de ce fichier : il
+peut avoir été dépassé par une publication faite depuis Xcode.
+
+Changer la version marketing (1.9 → 1.9.1 ou 1.10.0) est une **décision de
+publication**, à prendre explicitement — jamais un effet de bord d'une
+régénération.
 
 > `project.yml` (XcodeGen) a été supprimé en novembre 2026. Il annonçait
 > `1.3.0 / 1` alors que le script annonçait `1.9.1 / 12`, et le README

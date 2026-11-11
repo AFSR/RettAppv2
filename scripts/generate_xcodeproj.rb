@@ -115,19 +115,24 @@ common_app_settings = {
   'TARGETED_DEVICE_FAMILY'               => '1,2',
   # ⚠️ Ces deux valeurs sont la source de vérité : le projet est régénéré, et
   # une version corrigée à la main dans Xcode est perdue à la prochaine
-  # exécution de ce script. C'est exactement ce qui est arrivé : le projet
-  # portait 1.9 / 11, corrigé directement dans project.pbxproj, pendant que ce
-  # script annonçait encore 1.5.0 / 11 — la prochaine régénération aurait fait
-  # régresser la version annoncée, et App Store Connect refuse un numéro
-  # inférieur au dernier publié.
+  # exécution de ce script. C'est arrivé DEUX fois : le projet a porté 1.9 / 11
+  # puis 1.9 / 14, corrigés directement dans project.pbxproj, pendant que ce
+  # script annonçait 1.5.0 / 11 puis 1.9.1 / 12.
   #
-  # Build 12 et non 3 : il doit passer au-dessus du 11 que portait déjà le
-  # projet, pas seulement au-dessus de ce qui est en ligne.
+  # Build 15, et c'est un plancher, pas un choix : les builds 12 et 14 de la
+  # 1.9 sont DÉJÀ partis chez Apple (voir le journal des commits). Un numéro
+  # déjà consommé est refusé par App Store Connect, et un numéro inférieur au
+  # dernier publié aussi. Avant d'archiver, vérifiez le dernier build reçu
+  # dans App Store Connect et placez-vous au-dessus.
+  #
+  # La version reste 1.9 : c'est le train sur lequel les builds partent.
+  # Passer à 1.9.1 ou 1.10.0 est une décision de publication, à prendre
+  # explicitement, pas un effet de bord d'une régénération.
   #
   # À avancer ICI avant chaque archivage. Le build doit augmenter à chaque
   # envoi, même pour renvoyer le même code après un rejet.
-  'MARKETING_VERSION'                    => '1.9.1',
-  'CURRENT_PROJECT_VERSION'              => '12',
+  'MARKETING_VERSION'                    => '1.9',
+  'CURRENT_PROJECT_VERSION'              => '15',
   'ENABLE_USER_SCRIPT_SANDBOXING'        => 'YES',
   'SWIFT_EMIT_LOC_STRINGS'               => 'YES',
   'SUPPORTS_MACCATALYST'                 => 'NO',

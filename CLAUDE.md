@@ -104,8 +104,10 @@ Chargez la règle correspondante **avant** de toucher à ces chemins :
   conflit de bout en bout. Résolution : prendre la version de `main`, puis
   rejouer le générateur.
 - **La version vit dans `scripts/generate_xcodeproj.rb`**, pas dans Xcode. Une
-  version corrigée à la main est perdue à la prochaine régénération — et App
-  Store Connect refuse un numéro inférieur au dernier publié.
+  version corrigée à la main y est perdue à la prochaine régénération. Et le
+  numéro de build de ce fichier est un **plancher**, pas une consigne : les
+  builds 12 et 14 de la 1.9 sont déjà partis chez Apple, qui refuse un numéro
+  déjà consommé. Lisez App Store Connect avant d'archiver.
 - **La récupération du `ModelContainer` efface le magasin** en cas d'échec
   (`RettAppApp.swift`). Tout changement de schéma SwiftData risque les données
   locales de chaque famille. C'est pourquoi la corbeille est un fichier JSON et
@@ -121,7 +123,8 @@ Chargez la règle correspondante **avant** de toucher à ces chemins :
 
 ## État au 11 novembre 2026
 
-- Publiée en **1.9**. Le générateur prépare **1.9.1 / build 12**.
+- Publiée en **1.9**, builds 12 et 14 envoyés à Apple. Le générateur prépare
+  **1.9 / build 15** — à relever si un build plus récent est parti depuis.
 - Tout le dossier `RettApp/Features/Places/**`, la corbeille et les pierres
   tombales **n'ont jamais été compilés**.
 - Le don depuis l'app est **désactivé** en attendant les réponses de
