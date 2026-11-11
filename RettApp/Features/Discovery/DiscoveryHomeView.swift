@@ -14,15 +14,13 @@ struct DiscoveryHomeView: View {
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Association Française du Syndrome de Rett")
-                        .font(AFSRFont.headline(16))
-                    Text("L'AFSR accompagne les familles, informe sur le syndrome de Rett et soutient la recherche.")
-                        .font(AFSRFont.caption())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.vertical, 4)
+                AFSRHeroHeader(
+                    title: "Association Française du Syndrome de Rett",
+                    subtitle: "L'AFSR accompagne les familles, informe sur le syndrome de Rett et soutient la recherche.",
+                    systemImage: "heart.fill"
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
 
             // Connecté, l'espace adhérent a son propre onglet.
@@ -31,7 +29,7 @@ struct DiscoveryHomeView: View {
                     NavigationLink {
                         MemberAreaView()
                     } label: {
-                        Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+                        AFSRRowLabel(title: "Espace adhérent", systemImage: "person.text.rectangle.fill", color: .afsrPurple)
                     }
                 } header: {
                     Text("Adhésion")
@@ -44,7 +42,7 @@ struct DiscoveryHomeView: View {
                 NavigationLink {
                     DonationView()
                 } label: {
-                    Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
+                    AFSRRowLabel(title: "Soutenir l'AFSR", systemImage: "heart.fill", color: .afsrEmergency)
                 }
             } header: {
                 Text("Soutien")
@@ -54,7 +52,7 @@ struct DiscoveryHomeView: View {
                 NavigationLink {
                     AboutSubView()
                 } label: {
-                    Label("À propos et mentions légales", systemImage: "info.circle.fill")
+                    AFSRRowLabel(title: "À propos et mentions légales", systemImage: "info.circle.fill", color: Color(hex: "#8E8E93"))
                 }
             } header: {
                 Text("Informations")
@@ -64,7 +62,7 @@ struct DiscoveryHomeView: View {
                 Button {
                     showStartSuiviConfirm = true
                 } label: {
-                    Label("Créer un suivi pour un enfant", systemImage: "plus.circle.fill")
+                    AFSRRowLabel(title: "Créer un suivi pour un enfant", systemImage: "plus", color: .afsrSuccess)
                 }
             } header: {
                 Text("Suivi médical")
@@ -72,6 +70,7 @@ struct DiscoveryHomeView: View {
                 Text("Ouvre l'application complète : journal quotidien, plan médicamenteux, bilan, documents pour le médecin et partage avec l'autre parent.")
             }
         }
+        .afsrListBackground()
         .navigationTitle("AFSR")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(

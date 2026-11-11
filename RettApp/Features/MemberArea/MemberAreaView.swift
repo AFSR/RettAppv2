@@ -57,6 +57,7 @@ struct MemberHomeView: View {
             moreSection
             privacySection
         }
+        .afsrListBackground()
         .navigationTitle("Espace adhérent")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await reload() }
@@ -104,13 +105,11 @@ struct MemberHomeView: View {
     private var headerSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.afsrPurpleAdaptive)
+                HStack(spacing: 14) {
+                    AFSRAvatar(name: session.profile?.fullName ?? "", size: 56)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(session.profile?.fullName ?? "Mon compte")
-                            .font(AFSRFont.headline(18))
+                            .font(AFSRFont.headline(19))
                         if let email = session.profile?.email {
                             Text(email)
                                 .font(AFSRFont.caption())
@@ -164,27 +163,27 @@ struct MemberHomeView: View {
             NavigationLink {
                 MemberMembershipView(session: session)
             } label: {
-                Label("Mon adhésion", systemImage: "checkmark.seal")
+                AFSRRowLabel(title: "Mon adhésion", systemImage: "checkmark.seal.fill", color: .afsrSuccess)
             }
             NavigationLink {
                 MemberProfileView(session: session)
             } label: {
-                Label("Mes informations", systemImage: "person.text.rectangle")
+                AFSRRowLabel(title: "Mes informations", systemImage: "person.text.rectangle.fill", color: .afsrPurple)
             }
             NavigationLink {
                 MemberFamilyView(session: session)
             } label: {
-                Label("Ma famille", systemImage: "person.2")
+                AFSRRowLabel(title: "Ma famille", systemImage: "person.2.fill", color: Color(hex: "#3949AB"))
             }
             NavigationLink {
                 MemberDonationsView(session: session)
             } label: {
-                Label("Dons et attestations fiscales", systemImage: "gift")
+                AFSRRowLabel(title: "Dons et attestations fiscales", systemImage: "gift.fill", color: .afsrEmergency)
             }
             NavigationLink {
                 MemberPreferencesView(session: session)
             } label: {
-                Label("Réception des envois", systemImage: "envelope")
+                AFSRRowLabel(title: "Réception des envois", systemImage: "envelope.fill", color: Color(hex: "#1E88E5"))
             }
         }
     }
@@ -231,7 +230,7 @@ struct MemberHomeView: View {
             // L'annuaire est public. Le dépôt d'avis, lui, demande de se
             // connecter sur le site : il n'est pas encore dans l'app.
             Link(destination: URL(string: "https://afsr.fr/rett-friendly")!) {
-                Label("Annuaire des lieux Rett friendly", systemImage: "mappin.and.ellipse")
+                AFSRRowLabel(title: "Annuaire des lieux Rett friendly", systemImage: "mappin.and.ellipse", color: Color(hex: "#00897B"))
             }
         } footer: {
             Text("S'ouvre sur afsr.fr. Pour déposer un avis sur un lieu, connectez-vous au site.")
@@ -240,7 +239,8 @@ struct MemberHomeView: View {
 
     private func lockableLabel(_ title: String, systemImage: String, locked: Bool) -> some View {
         HStack {
-            Label(title, systemImage: systemImage)
+            AFSRRowLabel(title: title, systemImage: systemImage,
+                         color: locked ? Color(hex: "#8E8E93") : .afsrPurpleLight)
             if locked {
                 Spacer()
                 Image(systemName: "lock.fill")

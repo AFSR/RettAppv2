@@ -24,6 +24,31 @@ extension Color {
         }
     })
 
+    /// Surface des cartes. Blanc pur en mode clair : posée sur le fond
+    /// lavande, elle se détache nettement (le gris système
+    /// `secondarySystemBackground` se fondait dans le lavande et donnait un
+    /// rendu terne). En mode sombre, la surface groupée système.
+    static let afsrSurface = Color(UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor.secondarySystemGroupedBackground
+        default:
+            return UIColor.white
+        }
+    })
+
+    /// Ombre des cartes : teintée violet en mode clair (plus douce et plus
+    /// « AFSR » qu'un noir pur), quasi invisible en mode sombre où l'ombre
+    /// ne lit pas.
+    static let afsrShadow = Color(UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor.black.withAlphaComponent(0.35)
+        default:
+            return UIColor(red: 0.29, green: 0.13, blue: 0.44, alpha: 0.10) // #4A2070 @ 10 %
+        }
+    })
+
     init(hex: String) {
         let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "#", with: "")
@@ -72,10 +97,33 @@ extension ShapeStyle where Self == Color {
     static var afsrPurpleDark: Color     { .afsrPurpleDark }
     static var afsrPurpleAdaptive: Color { .afsrPurpleAdaptive }
     static var afsrBackground: Color     { .afsrBackground }
+    static var afsrSurface: Color        { .afsrSurface }
     static var afsrAccent: Color         { .afsrAccent }
     static var afsrEmergency: Color      { .afsrEmergency }
     static var afsrSuccess: Color        { .afsrSuccess }
     static var afsrWarning: Color        { .afsrWarning }
+}
+
+// MARK: - Gradients
+
+enum AFSRGradient {
+    /// Dégradé signature : violet profond → violet clair. Utilisé pour les
+    /// en-têtes, avatars et boutons principaux.
+    static let brand = LinearGradient(
+        colors: [.afsrPurpleDark, .afsrPurple, .afsrPurpleLight],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Dégradé d'une couleur vers une version plus lumineuse d'elle-même,
+    /// pour les pastilles d'icônes et les boutons colorés.
+    static func tinted(_ color: Color) -> LinearGradient {
+        LinearGradient(
+            colors: [color, color.opacity(0.78)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 }
 
 // MARK: - Typography
@@ -122,16 +170,49 @@ struct AFSRCardStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(AFSRTokens.spacing)
-            .background(Color(.secondarySystemBackground))
+            .background(Color.afsrSurface)
             .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius, style: .continuous))
-            .shadow(
-                color: .black.opacity(AFSRTokens.shadowOpacity),
-                radius: AFSRTokens.shadowRadius,
-                x: 0, y: 2
-            )
+            .shadow(color: .afsrShadow, radius: 12, x: 0, y: 4)
+    }
+}
+
+/// Carte compacte pour les lignes de liste (journal, synthèses) : même
+/// surface et même ombre que `afsrCard`, sans padding imposé.
+struct AFSRSurfaceStyle: ViewModifier {
+    var cornerRadius: CGFloat = AFSRTokens.cornerRadiusSmall + 4
+
+    func body(content: Content) -> some View {
+        content
+            .background(Color.afsrSurface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .shadow(color: .afsrShadow, radius: 8, x: 0, y: 3)
     }
 }
 
 extension View {
     func afsrCard() -> some View { modifier(AFSRCardStyle()) }
+
+    func afsrSurface(cornerRadius: CGFloat = AFSRTokens.cornerRadiusSmall + 4) -> some View {
+        modifier(AFSRSurfaceStyle(cornerRadius: cornerRadius))
+    }
+
+    /// Fond lavande AFSR derrière une `List`/`Form`, à la place du gris
+    /// système : les onglets gardent la même identité visuelle.
+    func afsrListBackground() -> some View {
+        self
+            .scrollContentBackground(.hidden)
+            .background(Color.afsrBackground.ignoresSafeArea())
+    }
+}
+
+// MARK: - Button styles
+
+/// Léger enfoncement au toucher : retour visuel immédiat sur les grands
+/// boutons, utile quand on tape vite ou sans regarder.
+struct AFSRPressableStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
 }
