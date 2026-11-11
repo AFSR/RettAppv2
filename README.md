@@ -4,101 +4,51 @@ Application iOS native (SwiftUI) développée pour l'**Association Française du
 
 ## Fonctionnalités
 
-- 🔐 **Authentification** : Sign in with Apple + session Keychain
-- 👤 **Profil enfant** : prénom, date de naissance, toggle épilepsie, liste médicaments
-- 📰 **Actualités AFSR** : lecture des articles depuis l'API Statamic (pull-to-refresh, cache offline)
-- 🚨 **Suivi d'épilepsie** : chronomètre d'urgence (gros boutons), qualification type/déclencheur, historique, export CSV, intégration `HKCategoryType(.seizure)`
-- 💊 **Plan médicamenteux** : CRUD médicaments, vue journalière par moment (matin/midi/soir), notifications locales, marquage des prises
-- 👁️ **Jeu du regard "tarte à la crème"** : ARKit `ARFaceTrackingConfiguration`, logique de dwell, animations, mode mock simulateur
-- ⚙️ **Réglages** : gestion permissions, export CSV complet, effacement, déconnexion
+- 👤 **Profil enfant** et modes d'usage (famille / découverte)
+- 📊 **Tableau de bord** et analyses des crises
+- 🚨 **Suivi d'épilepsie** : chronomètre, qualification, historique, export CSV, HealthKit
+- 💊 **Médicaments** : plan, prises, journal, historique de révisions, base BDPM embarquée
+- 🙂 **Humeur, observations quotidiennes, symptômes**
+- 📄 **Rapports** : rapport médical PDF, carnet de suivi (génération, scan/import par QR)
+- ☁️ **Synchronisation CloudKit** entre parents, corbeille, sauvegardes combinées (voir `docs/CLOUDKIT_SYNC.md`)
+- 📰 **Actualités AFSR** (API Statamic) et 🔐 **espace adhérent** (voir `docs/MEMBER_AREA.md`)
+- 💜 **Dons** (voir `disabled-features/donation-applepay/README.md` pour Apple Pay)
+- ⚙️ **Réglages** : partage, diagnostic, import historique, corbeille
 
 ## Stack
 
-- SwiftUI (iOS 17+)
-- `@Observable` (Swift 5.9 macro)
-- SwiftData (persistance locale)
-- HealthKit, ARKit, AuthenticationServices, UserNotifications, WebKit
-- Aucune dépendance tierce
+SwiftUI (iOS 17+), `@Observable`, SwiftData, CloudKit, HealthKit, WebKit. Aucune dépendance tierce.
 
 ## Structure
 
 ```
 RettApp/
-├── RettAppApp.swift             # Entry point @main
-├── ContentView.swift            # TabView racine
-├── Core/
-│   ├── Auth/                    # AuthManager + SignInView
-│   ├── Profile/                 # ChildProfile + ProfileSetupView
-│   └── HealthKit/               # HealthKitManager
-├── Features/
-│   ├── News/                    # Actualités AFSR
-│   ├── SeizureTracker/          # Suivi crises
-│   ├── MedicationTracker/       # Plan & prises
-│   ├── EyeGame/                 # Jeu ARKit
-│   └── Settings/                # Réglages
-├── Shared/
-│   ├── Components/              # Boutons, cartes, état vide
-│   └── Theme/                   # AFSRTheme (couleurs, typo, tokens)
-└── Resources/
-    ├── Info.plist
-    ├── RettApp.entitlements
-    ├── Assets.xcassets
-    └── Localizable.strings
-RettAppTests/                    # Tests unitaires
+├── Core/        # AFSRLinks, Backup, HealthKit, Profile, Sync, Trash, Update
+├── Features/    # BookletImport, Dashboard, Discovery, Donation, HealthData,
+│                # MedicationTracker, MemberArea, MoodTracker, News, Reports,
+│                # SeizureTracker, Settings, SymptomTracker
+├── Shared/      # Composants (AFSR*), thème, utilitaires
+└── Resources/   # Info.plist, entitlements, assets, Localizable.strings, bdpm.sqlite
+RettAppTests/    # Tests unitaires
+docs/            # Documentation (sync, espace adhérent, fiche App Store, TODO site)
+scripts/         # Génération du projet Xcode et de la base BDPM
 ```
 
-> Les composants partagés gardent le préfixe `AFSR*` (`AFSRButton`, `AFSRTheme`, `AFSRPurple`…) car ils incarnent la charte graphique de l'**Association Française du Syndrome de Rett**.
-
 ## Ouvrir le projet Xcode
-
-Le dépôt contient déjà `RettApp.xcodeproj`. Après clone :
 
 ```bash
 open RettApp.xcodeproj
 ```
 
-### Régénérer le projet
-
-Si tu ajoutes/renommes/déplaces des fichiers sources, régénère le `.xcodeproj` pour que Xcode les détecte :
+Après ajout/renommage de fichiers sources, régénérer le projet :
 
 ```bash
-# Option 1 — script Ruby (cross-platform, dépendance unique : gem xcodeproj)
-gem install xcodeproj --user-install
-ruby scripts/generate_xcodeproj.rb
-
-# Option 2 — XcodeGen (macOS)
-brew install xcodegen
-xcodegen generate
+ruby scripts/generate_xcodeproj.rb   # gem xcodeproj
+# ou
+xcodegen generate                    # à partir de project.yml
 ```
 
-Les deux utilisent la même structure de dossiers comme source de vérité.
-
-### Configuration initiale dans Xcode
-
-Après le premier `open RettApp.xcodeproj` :
-
-1. Target **RettApp** → **Signing & Capabilities** → sélectionne ton **Team**
-2. Vérifie que ces capabilities sont présentes (elles sont déclarées dans `RettApp.entitlements` mais doivent être actives dans ton profil) :
-   - Sign in with Apple
-   - HealthKit (Clinical Health Records désactivé)
-   - Push Notifications
-   - Background Modes → Background fetch
-
-## Configuration API
-
-Éditer `RettApp/Features/News/Models/NewsArticle.swift` :
-
-```swift
-enum APIConfig {
-    static var baseURL = URL(string: "https://www.afsr.fr/api")!
-    static var apiKey: String = "" // bearer token si endpoint protégé
-}
-```
-
-## Exécution
-
-- **Simulateur** : le jeu eye-tracking utilise automatiquement un mock (positions aléatoires autour de la cible) — la caméra TrueDepth n'existe pas sur simulateur
-- **Device physique** : nécessite un iPhone X+ ou iPad Pro (Face ID) pour le jeu eye-tracking. Les autres modules fonctionnent sur tout iPhone/iPad iOS 17+
+Puis, dans Xcode : target **RettApp** → **Signing & Capabilities** → choisir son **Team** (iCloud/CloudKit, HealthKit, Push Notifications).
 
 ## Tests
 
@@ -106,23 +56,10 @@ enum APIConfig {
 xcodebuild test -scheme RettApp -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
-Tests inclus :
-- `SeizureViewModelTests` : calcul durée, transitions d'état, timer
-- `GazeProcessorTests` : logique de dwell, hit-test, classification horaire
+## Notes
 
-## Notes importantes
-
-- **HealthKit** : Apple Santé n'expose pas d'API tierce pour les médicaments. Les prises restent locales (SwiftData) et sont exportables en CSV. Seules les crises sont écrites dans HealthKit (`HKCategoryType(.seizure)`, iOS 17+).
-- **Multi-profils** : HealthKit n'est pas conçu pour gérer plusieurs personnes. Le prénom de l'enfant est stocké en métadonnée (`AFSRChildFirstName`).
-- **Confidentialité** : aucune donnée de santé n'est envoyée à un serveur tiers. Tout reste sur l'appareil + Apple Santé.
-
-## Roadmap
-
-- [ ] Widget WidgetKit "Démarrer une crise" depuis l'écran d'accueil
-- [ ] Sons et assets graphiques personnalisés (splash, confettis)
-- [ ] Export PDF médical formaté
-- [ ] Sync iCloud optionnelle (CloudKit + SwiftData)
-- [ ] Accessibilité : test complet VoiceOver, Dynamic Type jusqu'à XXXL
+- **HealthKit** n'expose pas d'API pour les médicaments : les prises restent dans SwiftData. Seules les crises sont écrites dans HealthKit.
+- **Confidentialité** : voir `SECURITY.md`.
 
 ## Licence
 
