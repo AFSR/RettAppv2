@@ -227,13 +227,27 @@ struct MemberHomeView: View {
 
     private var moreSection: some View {
         Section {
-            // L'annuaire est public. Le dépôt d'avis, lui, demande de se
-            // connecter sur le site : il n'est pas encore dans l'app.
-            Link(destination: URL(string: "https://afsr.fr/rett-friendly")!) {
-                AFSRRowLabel(title: "Annuaire des lieux Rett friendly", systemImage: "mappin.and.ellipse", color: Color(hex: "#00897B"))
+            // L'annuaire et le dépôt d'avis sont désormais dans l'app : plus
+            // de détour par Safari, où il fallait se reconnecter au site.
+            NavigationLink {
+                PlacesDirectoryView(session: session)
+            } label: {
+                AFSRRowLabel(title: "Lieux Rett friendly",
+                             systemImage: "mappin.and.ellipse",
+                             color: Color(hex: "#00897B"),
+                             subtitle: "Chercher un lieu qui accueille bien, sur une carte ou dans la liste")
+            }
+
+            NavigationLink {
+                MyPlaceReviewsView(session: session)
+            } label: {
+                AFSRRowLabel(title: "Mes avis sur les lieux",
+                             systemImage: "text.bubble",
+                             color: Color(hex: "#00897B"),
+                             subtitle: "Ce que j'ai déposé, et où ça en est")
             }
         } footer: {
-            Text("S'ouvre sur afsr.fr. Pour déposer un avis sur un lieu, connectez-vous au site.")
+            Text("L'annuaire se construit par les familles. Un lieu proposé, comme un avis déposé, paraît après relecture par l'association.")
         }
     }
 

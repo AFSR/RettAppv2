@@ -82,8 +82,41 @@ final class MemberAPIClient {
         try await send(method: "GET", path: Self.apiPrefix + path, body: nil)
     }
 
+    /// Une lecture avec des paramètres de requête.
+    ///
+    /// Ils ne peuvent pas voyager dans `path` : `URLComponents.path` échappe le
+    /// « ? » et les « & », si bien que « /lieux?q=gite » partirait comme un
+    /// chemin nommé littéralement ainsi — 404, sans indice de la cause. Les
+    /// valeurs nulles ou vides sont écartées : un filtre absent ne doit pas
+    /// devenir « type= », que le serveur lirait comme une chaîne vide.
+    func get<T: Decodable>(_ path: String, query: [String: String?]) async throws -> T {
+        let items = query
+            .compactMapValues { $0 }
+            .filter { !$0.value.isEmpty }
+            .map { URLQueryItem(name: $0.key, value: $0.value) }
+            .sorted { $0.name < $1.name }
+
+        return try await send(
+            method: "GET",
+            path: Self.apiPrefix + path,
+            query: items.isEmpty ? nil : items,
+            body: nil
+        )
+    }
+
     func post<T: Decodable>(_ path: String, body: [String: String] = [:]) async throws -> T {
-        try await send(method: "POST", path: Self.apiPrefix + path, body: body)
+        try await send(method: "POST", path: Self.apiPrefix + path, body: try JSONEncoder().encode(body))
+    }
+
+    /// Variante pour un corps qui n'est pas plat.
+    ///
+    /// Le dépôt d'un avis sur un lieu porte « criteres », un objet
+    /// `handle → réponse`. Aplati en `criteres[handle]`, il n'arriverait
+    /// nulle part : Laravel ne reconstruit pas cette forme depuis du JSON, et
+    /// le serveur recevrait un avis sans aucune réponse aux critères — sans
+    /// erreur, ce qui est le pire des cas.
+    func post<T: Decodable, Body: Encodable>(_ path: String, encoding body: Body) async throws -> T {
+        try await send(method: "POST", path: Self.apiPrefix + path, body: try JSONEncoder().encode(body))
     }
 
     /// Télécharge un document dans un dossier temporaire et renvoie son
@@ -139,8 +172,13 @@ final class MemberAPIClient {
 
     // MARK: - Internes
 
-    private func send<T: Decodable>(method: String, path: String, body: [String: String]?) async throws -> T {
-        let request = try makeRequest(method: method, path: path, body: body, accept: "application/json")
+    private func send<T: Decodable>(
+        method: String,
+        path: String,
+        query: [URLQueryItem]? = nil,
+        body: Data?
+    ) async throws -> T {
+        let request = try makeRequest(method: method, path: path, query: query, body: body, accept: "application/json")
 
         let (data, response): (Data, URLResponse)
         do {
@@ -162,11 +200,18 @@ final class MemberAPIClient {
         }
     }
 
-    private func makeRequest(method: String, path: String, body: [String: String]?, accept: String) throws -> URLRequest {
+    private func makeRequest(
+        method: String,
+        path: String,
+        query: [URLQueryItem]? = nil,
+        body: Data?,
+        accept: String
+    ) throws -> URLRequest {
         var components = URLComponents()
         components.scheme = "https"
         components.host = Self.host
         components.path = path
+        components.queryItems = query
 
         guard let url = components.url else { throw MemberAPIError.unreadable }
 
@@ -178,7 +223,7 @@ final class MemberAPIClient {
         }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(body)
+            request.httpBody = body
         }
         return request
     }
