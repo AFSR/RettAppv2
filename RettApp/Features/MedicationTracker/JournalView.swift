@@ -60,44 +60,64 @@ struct JournalView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showAdHoc = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                }
-                .accessibilityLabel("Ajouter une prise ponctuelle")
-            }
+            // Deux boutons, deux intentions, et c'est tout le sens de la
+            // réorganisation. Avant, le « + » ne faisait qu'une chose — une
+            // prise ponctuelle — tandis que le menu « … » mélangeait la
+            // saisie du jour, une action rare et de la navigation. Un parent
+            // qui veut noter une humeur appuie sur « + », puisque c'est le
+            // geste universel pour ajouter, et ne trouvait rien.
+            //
+            // Désormais : « + » = je note quelque chose aujourd'hui.
+            // « … » = j'ouvre autre chose.
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    // Ordre de fréquence réelle : une prise ponctuelle et une
+                    // humeur se saisissent tous les jours, une crise
+                    // antérieure une fois de temps en temps.
+                    Button { showAdHoc = true } label: {
+                        Label("Prise ponctuelle", systemImage: "pills.fill")
+                    }
                     Button { showMoodSheet = true } label: {
-                        Label("Saisir une humeur", systemImage: "face.smiling")
+                        Label("Humeur", systemImage: "face.smiling")
                     }
                     Button { showSymptomSheet = true } label: {
-                        Label("Saisir un symptôme", systemImage: "stethoscope")
+                        Label("Symptôme", systemImage: "stethoscope")
                     }
                     Button { showObservationSheet = true } label: {
-                        Label("Repas / sommeil du jour", systemImage: "fork.knife")
-                    }
-                    Button { showBookletImport = true } label: {
-                        Label("Scanner le cahier de suivi", systemImage: "doc.text.viewfinder")
+                        Label("Repas et sommeil", systemImage: "fork.knife")
                     }
                     if epilepsyEnabled {
                         Divider()
                         Button { showManualSeizureEntry = true } label: {
-                            Label("Saisir une crise antérieure", systemImage: "calendar.badge.plus")
+                            Label("Crise antérieure", systemImage: "calendar.badge.plus")
                         }
+                    }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                }
+                .accessibilityLabel("Noter quelque chose")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { showPlan = true } label: {
+                        Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
+                    }
+                    if epilepsyEnabled {
                         Button { showSeizureHistory = true } label: {
                             Label("Historique des crises", systemImage: "list.bullet.rectangle.portrait")
                         }
                     }
                     Divider()
-                    Button { showPlan = true } label: {
-                        Label("Plan médicamenteux", systemImage: "list.bullet.rectangle")
+                    // Action rare : une fois par semaine au mieux, quand le
+                    // cahier revient de l'école. Elle n'a rien à faire parmi
+                    // les gestes quotidiens.
+                    Button { showBookletImport = true } label: {
+                        Label("Scanner le cahier de suivi", systemImage: "doc.text.viewfinder")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Ouvrir")
             }
         }
         .sheet(isPresented: $showPlan) { NavigationStack { MedicationPlanView() } }
@@ -527,7 +547,7 @@ private struct JournalContent: View {
                 .foregroundStyle(.secondary)
             Text("Aucune prise pour cette journée")
                 .font(AFSRFont.headline(15))
-            Text("Ajoutez une prise ponctuelle avec le bouton ➕ ou configurez le plan médicamenteux.")
+            Text("Touchez ➕ pour noter une prise, une humeur ou un symptôme. Le plan médicamenteux se règle depuis le menu ···.")
                 .font(AFSRFont.caption())
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

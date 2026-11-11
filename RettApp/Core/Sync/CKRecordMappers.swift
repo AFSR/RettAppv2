@@ -21,6 +21,14 @@ enum CKRecordType {
     static let symptom            = "SymptomEvent"
     static let medicationRevision = "MedicationRevision"
 
+    /// Pierre tombale : « cet enregistrement a été supprimé, à telle date ».
+    ///
+    /// Volontairement ABSENTE de `all` : `all` sert à énumérer ce qu'on peut
+    /// relire depuis SwiftData, or une pierre tombale vit dans `TrashStore`,
+    /// pas dans le magasin. Elle est tout de même reçue au pull, qui balaie
+    /// la zone entière sans filtrer par type.
+    static let tombstone          = "Tombstone"
+
     /// Tous les record types utilisés. Sert au pull pour balayer la zone.
     static let all = [childProfile, medication, medicationLog, seizure, mood, dailyObservation, symptom, medicationRevision]
 }

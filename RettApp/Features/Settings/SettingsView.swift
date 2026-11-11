@@ -4,8 +4,14 @@ import UserNotifications
 import HealthKit
 
 struct SettingsView: View {
+    /// Usage de cette session. En découverte, toutes les sections de suivi
+    /// disparaissent : profil, rappels, partage, documents, données, rôle de
+    /// l'appareil. Elles ne sont pas grisées, elles ne sont pas là.
+    let usage: AppUsage
+
     @Environment(\.modelContext) private var modelContext
     @Environment(CloudKitSyncService.self) private var sync
+    @Environment(UsageModeStore.self) private var usageStore
     @Query private var profiles: [ChildProfile]
     @Query(sort: \Medication.createdAt) private var medications: [Medication]
     @Query(sort: \SeizureEvent.startTime) private var seizures: [SeizureEvent]
@@ -24,6 +30,13 @@ struct SettingsView: View {
     @State private var pendingRole: DeviceRole?
     @State private var exportURL: URL?
     @State private var showShareSheet = false
+    @State private var showStartSuiviConfirm = false
+
+    init(usage: AppUsage = .suivi) {
+        self.usage = usage
+    }
+
+    private var isSuivi: Bool { usage == .suivi }
 
     var body: some View {
         // Organisation : ce que l'utilisateur consulte le plus souvent en
@@ -39,59 +52,65 @@ struct SettingsView: View {
             //    déjà présenté dans la page de don elle-même)
             supportSection
 
-            // ── 1. PROFIL
-            childSection
+            memberAreaSection
 
-            // ── 2. SUIVI & RAPPELS
-            Section {
-                NavigationLink {
-                    ConfigurationSubView()
-                } label: {
-                    Label("Suivi & rappels", systemImage: "slider.horizontal.3")
+            if isSuivi {
+                // ── 1. PROFIL
+                childSection
+
+                // ── 2. SUIVI & RAPPELS
+                Section {
+                    NavigationLink {
+                        ConfigurationSubView()
+                    } label: {
+                        Label("Suivi & rappels", systemImage: "slider.horizontal.3")
+                    }
+                } header: {
+                    Text("Suivi médical")
+                } footer: {
+                    Text("Plan médicamenteux, notifications de prises et intégration Apple Santé.")
                 }
-            } header: {
-                Text("Suivi médical")
-            } footer: {
-                Text("Plan médicamenteux, notifications de prises et intégration Apple Santé.")
+
+                // ── 3. PARTAGE ENTRE PARENTS
+                sharingSection
+
+                // ── 4. DOCUMENTS MÉDICAUX
+                Section {
+                    NavigationLink {
+                        MedicalReportView()
+                    } label: {
+                        Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
+                    }
+                    NavigationLink {
+                        FollowUpBookletView()
+                    } label: {
+                        Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
+                    }
+                } header: {
+                    Text("Documents à imprimer")
+                } footer: {
+                    Text("Deux PDF prêts à envoyer : bilan médical structuré et carnet de suivi pour l'équipe encadrante.")
+                }
+
+                // ── 5. MES DONNÉES (sous-page)
+                Section {
+                    NavigationLink {
+                        DataSubView()
+                    } label: {
+                        Label("Mes données", systemImage: "internaldrive")
+                    }
+                } header: {
+                    Text("Données")
+                } footer: {
+                    Text("Import CSV, export complet, jeu de démonstration, effacement.")
+                }
+
+                // ── 6. CET APPAREIL (mode parent / enfant — déplacé bas car
+                //    rarement modifié après le paramétrage initial)
+                deviceRoleSection
+            } else {
+                startSuiviSection
             }
-
-            // ── 3. PARTAGE ENTRE PARENTS
-            sharingSection
-
-            // ── 4. DOCUMENTS MÉDICAUX
-            Section {
-                NavigationLink {
-                    MedicalReportView()
-                } label: {
-                    Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
-                }
-                NavigationLink {
-                    FollowUpBookletView()
-                } label: {
-                    Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
-                }
-            } header: {
-                Text("Documents à imprimer")
-            } footer: {
-                Text("Deux PDF prêts à envoyer : bilan médical structuré et carnet de suivi pour l'équipe encadrante.")
-            }
-
-            // ── 5. MES DONNÉES (sous-page)
-            Section {
-                NavigationLink {
-                    DataSubView()
-                } label: {
-                    Label("Mes données", systemImage: "internaldrive")
-                }
-            } header: {
-                Text("Données")
-            } footer: {
-                Text("Import CSV, export complet, jeu de démonstration, effacement.")
-            }
-
-            // ── 6. CET APPAREIL (mode parent / enfant — déplacé bas car
-            //    rarement modifié après le paramétrage initial)
-            deviceRoleSection
 
             // ── 7. AIDE & LÉGAL
             Section {
@@ -112,6 +131,16 @@ struct SettingsView: View {
         }
         .navigationTitle("Réglages")
         .task { await refreshAuthorizations() }
+        .confirmationDialog(
+            "Créer un suivi ?",
+            isPresented: $showStartSuiviConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Créer un suivi") { usageStore.startSuivi() }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text("Vous allez configurer le profil de l'enfant suivi. L'application passera en mode complet.")
+        }
         .sheet(isPresented: $showChildEditor) {
             if let profile = profiles.first {
                 NavigationStack { ChildProfileEditor(profile: profile) }
@@ -241,6 +270,22 @@ struct SettingsView: View {
         }
     }
 
+    /// Usage découverte : la seule porte vers l'app complète. Pas de bascule
+    /// retour — on ne « redevient » pas découverte, on efface ses données.
+    private var startSuiviSection: some View {
+        Section {
+            Button {
+                showStartSuiviConfirm = true
+            } label: {
+                Label("Créer un suivi pour un enfant", systemImage: "plus.circle.fill")
+            }
+        } header: {
+            Text("Suivi médical")
+        } footer: {
+            Text("Ouvre l'application complète : journal quotidien, plan médicamenteux, bilan, documents pour le médecin et partage avec l'autre parent.")
+        }
+    }
+
     private var supportSection: some View {
         Section {
             NavigationLink {
@@ -249,6 +294,24 @@ struct SettingsView: View {
                 Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
                     .foregroundStyle(.afsrEmergency)
             }
+        }
+    }
+
+    /// Section à part, et non une ligne de plus sous « Soutenir l'AFSR » :
+    /// celle-ci n'a volontairement pas de sous-texte, le détail étant déjà
+    /// donné dans la page de don.
+    ///
+    /// Présente dans les deux usages — une famille qui suit un enfant est
+    /// souvent adhérente elle aussi.
+    private var memberAreaSection: some View {
+        Section {
+            NavigationLink {
+                MemberAreaView()
+            } label: {
+                Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+            }
+        } footer: {
+            Text("Votre adhésion, vos dons et attestations fiscales, les publications réservées aux adhérents. Sans rapport avec vos données de suivi, qui restent sur cet appareil.")
         }
     }
 
@@ -482,7 +545,16 @@ struct ChildProfileEditor: View {
     }
 }
 
-#Preview {
-    NavigationStack { SettingsView() }
+#Preview("Usage suivi") {
+    NavigationStack { SettingsView(usage: .suivi) }
         .modelContainer(PreviewData.container)
+        .environment(CloudKitSyncService())
+        .environment(UsageModeStore.shared)
+}
+
+#Preview("Usage découverte") {
+    NavigationStack { SettingsView(usage: .decouverte) }
+        .modelContainer(PreviewData.container)
+        .environment(CloudKitSyncService())
+        .environment(UsageModeStore.shared)
 }

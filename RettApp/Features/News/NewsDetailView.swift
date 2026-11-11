@@ -29,13 +29,47 @@ struct NewsDetailView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                HTMLWebView(html: article.content)
-                    .frame(minHeight: 400)
+                if article.content.isEmpty {
+                    unreadableBodyFallback
+                } else {
+                    HTMLWebView(html: article.content)
+                        .frame(minHeight: 400)
+
+                    if let link = article.permalink {
+                        Link(destination: link) {
+                            Label("Lire sur afsr.fr", systemImage: "safari")
+                                .font(AFSRFont.body(15))
+                        }
+                        .padding(.top, 4)
+                    }
+                }
             }
             .padding()
         }
         .background(Color.afsrBackground)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// Le corps d'un article peut n'être fait que d'ensembles structurés —
+    /// accordéons, trombinoscope, deux colonnes — que l'app ne sait pas
+    /// rendre. Plutôt qu'une page blanche, on envoie sur le site, qui sait.
+    private var unreadableBodyFallback: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Cet article contient une mise en page que l'application ne sait pas afficher.")
+                .font(AFSRFont.body(15))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let link = article.permalink {
+                Link(destination: link) {
+                    Label("Lire sur afsr.fr", systemImage: "safari")
+                        .font(AFSRFont.headline(16))
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius))
     }
 }
 

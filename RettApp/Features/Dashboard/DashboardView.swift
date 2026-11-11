@@ -17,6 +17,8 @@ struct DashboardView: View {
     /// → on initialise avec les plus fréquents au premier render.
     @State private var selectedSymptoms: Set<RettSymptom>?
     @State private var showSymptomPicker = false
+    /// Les graphiques autres que la fréquence sont repliés par défaut.
+    @State private var showAllCharts = false
     /// Mode d'affichage des graphiques de symptômes : fréquence ou intensité moyenne.
     @State private var symptomChartMode: SymptomChartMode = .frequency
 
@@ -102,11 +104,32 @@ struct DashboardView: View {
                 summaryCards
                 if crosshairDate != nil { crosshairLegend }
 
+                insightsSection
+
                 frequencyChart
-                intensityChart
-                moodChart
-                adherenceChart
-                symptomsSection
+
+                // Décision 3 : le Bilan est pour le parent, réduit à
+                // l'essentiel. Les autres graphiques ne disparaissent pas —
+                // ils servent à préparer une consultation — mais ils ne sont
+                // plus la première chose qu'on voit.
+                DisclosureGroup(isExpanded: $showAllCharts) {
+                    VStack(spacing: 16) {
+                        intensityChart
+                        moodChart
+                        adherenceChart
+                        symptomsSection
+                    }
+                    .padding(.top, 8)
+                } label: {
+                    Label(
+                        showAllCharts ? "Masquer les autres graphiques" : "Voir les autres graphiques",
+                        systemImage: "chart.bar.doc.horizontal"
+                    )
+                    .font(AFSRFont.body(15))
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                }
+                .tint(.afsrPurpleAdaptive)
+                .padding(.vertical, 4)
 
                 Spacer(minLength: 24)
             }
@@ -180,6 +203,64 @@ struct DashboardView: View {
                         subtitle: "par crise", color: .afsrSuccess, systemImage: "chart.bar.fill",
                         trend: s.totalCount > 0 && prev.totalCount > 0 ? avgTrend : nil,
                         increaseIsGood: false)
+        }
+    }
+
+    // MARK: - Ce que montrent vos données
+
+    /// Les corrélations existaient déjà — calculées pour le rapport médecin —
+    /// mais n'étaient jamais montrées au parent. Elles le sont ici, en
+    /// phrases, et seulement quand elles veulent dire quelque chose : au
+    /// moins deux semaines d'observation, et une tendance au moins modérée.
+    /// Sous ces seuils la section disparaît plutôt que d'afficher du bruit.
+    private var insights: [SeizureInsights.Insight] {
+        let bounds = viewModel.windowBounds()
+        let input = MedicalReportAnalysis.Input(
+            periodStart: bounds.start,
+            periodEnd: bounds.end,
+            seizures: seizures,
+            medications: [],
+            logs: logs,
+            moods: moods,
+            observations: observations,
+            symptoms: symptoms
+        )
+        let signals = MedicalReportAnalysis.dailySignals(input)
+        return SeizureInsights.from(
+            correlations: MedicalReportAnalysis.correlations(from: signals),
+            daysObserved: signals.count
+        )
+    }
+
+    @ViewBuilder
+    private var insightsSection: some View {
+        let found = insights
+        if !found.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Ce que montrent vos données")
+                    .font(AFSRFont.headline(16))
+
+                ForEach(found) { insight in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: insight.systemImage)
+                            .foregroundStyle(.afsrPurpleAdaptive)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(insight.sentence)
+                                .font(AFSRFont.body(15))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(insight.caveat)
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            .padding(AFSRTokens.spacing)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemBackground),
+                        in: RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius))
         }
     }
 

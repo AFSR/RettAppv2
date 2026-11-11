@@ -176,6 +176,12 @@ enum CombinedBackupService {
         var childProfileApplied: Bool = false
         var errors: [String] = []
 
+        /// Enregistrements présents dans la sauvegarde mais **volontairement
+        /// supprimés depuis**, donc non réinsérés. `nil` quand la question ne
+        /// s'est pas posée (corbeille vide) : zéro et « sans objet » ne se
+        /// disent pas pareil à l'utilisateur.
+        var skippedBecauseDeleted: Int?
+
         var total: Int {
             medications + medicationLogs + seizures + moods + observations + symptoms + revisions
         }
@@ -230,6 +236,31 @@ enum CombinedBackupService {
         // l'une des deux causes du gel de l'app. On charge ici, en 8 requêtes,
         // la table des enregistrements existants indexée par UUID.
         let index = ExistingIndex(context: context)
+
+        // GARDE ANTI-RÉSURRECTION : une sauvegarde prise le 1er ne doit pas
+        // réinsérer ce qui a été supprimé délibérément le 3. Sans cela,
+        // restaurer un instantané de sécurité ramène les crises et les
+        // médicaments que le parent avait retirés depuis — et il les retrouve
+        // sans comprendre d'où ils reviennent.
+        //
+        // On ne regarde que les suppressions POSTÉRIEURES à la sauvegarde :
+        // une suppression antérieure ne dit rien, l'enregistrement a pu être
+        // recréé entre-temps. L'ensemble est calculé une fois, pas une fois
+        // par ligne : un import peut compter plusieurs milliers d'entrées.
+        //
+        // La corbeille est locale à cet appareil. Elle protège donc la
+        // restauration ici, pas la convergence entre parents — pour cela il
+        // faudrait des pierres tombales synchronisées, qui touchent au cœur
+        // de la synchro et méritent leur propre passe.
+        let supprimesDepuis = TrashStore.recordNamesDeleted(after: backup.exportedAt)
+        if !supprimesDepuis.isEmpty {
+            result.skippedBecauseDeleted = 0
+        }
+        func estSupprime(_ id: UUID) -> Bool {
+            guard supprimesDepuis.contains(id.uuidString) else { return false }
+            result.skippedBecauseDeleted = (result.skippedBecauseDeleted ?? 0) + 1
+            return true
+        }
 
         // ChildProfile(s) : v2 fournit `children` (tous les profils), v1
         // seulement `child`. Deux règles de sécurité :
@@ -286,31 +317,31 @@ enum CombinedBackupService {
             }
         }
 
-        for m in backup.medications {
+        for m in backup.medications where !estSupprime(m.id) {
             if upsertMedication(m, in: context, index: index) { result.medications += 1 }
             await tick()
         }
-        for l in backup.medicationLogs {
+        for l in backup.medicationLogs where !estSupprime(l.id) {
             if upsertLog(l, in: context, index: index) { result.medicationLogs += 1 }
             await tick()
         }
-        for s in backup.seizures {
+        for s in backup.seizures where !estSupprime(s.id) {
             if upsertSeizure(s, in: context, index: index) { result.seizures += 1 }
             await tick()
         }
-        for m in backup.moods {
+        for m in backup.moods where !estSupprime(m.id) {
             if upsertMood(m, in: context, index: index) { result.moods += 1 }
             await tick()
         }
-        for o in backup.observations {
+        for o in backup.observations where !estSupprime(o.id) {
             if upsertObservation(o, in: context, index: index) { result.observations += 1 }
             await tick()
         }
-        for s in backup.symptoms {
+        for s in backup.symptoms where !estSupprime(s.id) {
             if upsertSymptom(s, in: context, index: index) { result.symptoms += 1 }
             await tick()
         }
-        for r in backup.revisions {
+        for r in backup.revisions where !estSupprime(r.id) {
             if upsertRevision(r, in: context, index: index) { result.revisions += 1 }
             await tick()
         }
