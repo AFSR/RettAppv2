@@ -55,7 +55,7 @@
 </header>
 <main>
 
-<p class="meta">Last updated: 3 May 2026 — Version 1.3</p>
+<p class="meta">Last updated: 11 November 2026 — Version 1.4</p>
 
 <div class="callout">
   <strong>In short.</strong> RettApp stores your data <strong>locally on your iPhone</strong>. If you enable <em>parent sharing</em>, your data flows through your <strong>personal iCloud</strong> (Apple). The AFSR <strong>operates no server</strong> that collects your data. No data is sold, shared with commercial third parties, or used for advertising.
@@ -116,10 +116,10 @@ RettApp collects <strong>no advertising identifier</strong>, <strong>no location
 
 <h3>2.4 Face data (TrueDepth, ARKit, Vision)</h3>
 <div class="callout">
-  <strong>RettApp collects, stores and transmits no face data.</strong>
+  <strong>RettApp collects, stores and transmits no face data.</strong> Face ID is only used to lock the member area (see 2.5): recognition is done by iOS, the app never receives a face image.
 </div>
 <p>
-RettApp <strong>does not use the TrueDepth API</strong> (depth camera, face recognition, ARFaceTracking). The application does not request Face ID permission, does not read any blendshape, does not process any facial geometry, does not capture any 3D face mesh, and performs no face recognition.
+RettApp <strong>does not use the TrueDepth API</strong> (depth camera, face recognition, ARFaceTracking). The application does not read any blendshape, does not process any facial geometry, does not capture any 3D face mesh, and performs no face recognition.
 </p>
 <p>
 The camera permission (<code>NSCameraUsageDescription</code>) is requested <strong>only</strong> for the paper follow-up booklet scanning feature (the booklet is filled in by the child's school or care center). A photo is taken, processed locally by <code>VNRecognizeTextRequest</code> (Apple Vision OCR) to extract the page text, then shown to the user for verification. The photo and its OCR text:
@@ -131,6 +131,20 @@ The camera permission (<code>NSCameraUsageDescription</code>) is requested <stro
 </ul>
 <p>
 The previous "eye-gaze game" module that used <code>ARFaceTrackingConfiguration</code> has been <strong>removed from RettApp</strong> and released as a separate app (<em>RettGame</em>) with its own App Store identifier, its own <code>Info.plist</code> and its own privacy policy. RettApp and RettGame share neither code nor data.
+</p>
+
+<h3>2.5 Member area (AFSR account) and Face ID lock</h3>
+<p>
+The member area is an AFSR service; AFSR is the data controller. After signing in with a code (SMS or e-mail), the app displays, <strong>on demand</strong>, data read from afsr.fr: name and contact details, address, membership status, household members, donation history and tax receipts, reserved publications and communications. <strong>The app keeps no copy</strong>: it displays them and discards them. Opened documents (receipts, publications) are stored in the device's temporary folder and <strong>deleted at every lock or sign-out</strong>.
+</p>
+<p>
+What is kept: a random <strong>sign-in token</strong> in the iOS Keychain, <strong>on this device only</strong> — never synced through iCloud, never backed up. On the server, only its hash (SHA-256) is stored, with a generic device name ("RettApp iOS") and the date of last use. It expires 90 days after last use, and at most 365 days after creation.
+</p>
+<p>
+<strong>Face ID, Touch ID or the iPhone passcode</strong> lock this token, through the iOS LocalAuthentication API. Recognition is performed <strong>by iOS</strong>: the app and AFSR only receive "accepted" or "refused", never a face image, fingerprint or biometric template. The area locks after more than a minute in the background and at every launch. After 5 refused unlock attempts, the app destroys its local token and asks afsr.fr to revoke it.
+</p>
+<p>
+This data is <strong>unrelated to tracking data</strong> (journal, seizures, medications, medical documents), which is never sent to AFSR through the member area. Rights of access, rectification and erasure: contact@afsr.fr.
 </p>
 
 <h2>3. Why do we process this data?</h2>

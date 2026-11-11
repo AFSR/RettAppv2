@@ -43,6 +43,19 @@ final class MemberAPIDecodingTests: XCTestCase {
         XCTAssertEqual(result.token, "abc")
     }
 
+    /// Le jeton de révocation voyage avec le jeton d'accès : sans lui, après des
+    /// refus de Face ID, l'app ne pourrait plus faire invalider sa session.
+    func test_connexionPorteLeJetonDeRevocation() throws {
+        let result = try decode(LoginResult.self, """
+        {"status":"authenticated","token":"abc","revoke_token":"rev",
+        "member":{"id":"1","first_name":"A","last_name":"B","full_name":"A B","email":null,"mobile_phone":null,
+        "membership":{"active":false,"end_date":null},
+        "address":{"street":null,"city":null,"postal_code":null},"receives_postal_mail":false}}
+        """)
+        XCTAssertEqual(result.revokeToken, "rev")
+        XCTAssertNotEqual(result.revokeToken, result.token)
+    }
+
     func test_connexionAvecChoixDeFiche() throws {
         let result = try decode(LoginResult.self, """
         {"status":"choose_account","selection":"s","accounts":[{"id":"1","name":"A B"},{"id":"2","name":"C D"}]}
@@ -130,5 +143,15 @@ final class MemberAPIDecodingTests: XCTestCase {
         XCTAssertEqual(MemberAPIClient.safeFileName(""), "document")
         XCTAssertEqual(MemberAPIClient.safeFileName(".hidden"), "document")
         XCTAssertEqual(MemberAPIClient.safeFileName("guide.pdf"), "guide.pdf")
+    }
+
+    // MARK: - Verrou
+
+    /// Les seuils sont des engagements de sécurité annoncés à l'écran et dans la
+    /// politique de confidentialité : les changer doit être un choix, pas un accident.
+    @MainActor
+    func test_seuilsDuVerrou() {
+        XCTAssertEqual(MemberSession.maxFailures, 5)
+        XCTAssertEqual(MemberSession.gracePeriod, 60)
     }
 }

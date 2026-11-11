@@ -99,7 +99,7 @@
 </header>
 <main>
 
-<p class="meta">Dernière mise à jour : 3 mai 2026 — Version 1.3</p>
+<p class="meta">Dernière mise à jour : 11 novembre 2026 — Version 1.4</p>
 
 <div class="callout">
   <strong>En résumé.</strong> RettApp stocke vos données <strong>localement sur votre iPhone</strong>. Si vous activez le <em>partage entre parents</em>, vos données transitent par votre <strong>iCloud personnel</strong> (Apple). L'AFSR <strong>ne dispose d'aucun serveur</strong> qui collecterait vos données. Aucune donnée n'est revendue, partagée à des tiers commerciaux, ou utilisée à des fins publicitaires.
@@ -184,10 +184,10 @@ RettApp ne collecte <strong>ni identifiants publicitaires</strong>, <strong>ni d
 
 <h3>2.4 Données faciales (TrueDepth, ARKit, Vision)</h3>
 <div class="callout">
-  <strong>RettApp ne collecte, ne stocke et ne transmet aucune donnée faciale.</strong>
+  <strong>RettApp ne collecte, ne stocke et ne transmet aucune donnée faciale.</strong> Face ID n'est utilisé que pour verrouiller l'espace adhérent (voir 2.5) : la reconnaissance est faite par iOS, l'application ne reçoit jamais l'image du visage.
 </div>
 <p>
-RettApp <strong>n'utilise pas l'API TrueDepth</strong> (caméra à profondeur de champ, reconnaissance faciale, ARFaceTracking). L'application ne demande pas de permission Face ID, ne lit aucun blendshape, ne traite aucune géométrie faciale, ne capture aucun maillage 3D du visage et n'effectue aucune reconnaissance faciale.
+RettApp <strong>n'utilise pas l'API TrueDepth</strong> (caméra à profondeur de champ, reconnaissance faciale, ARFaceTracking). L'application ne lit aucun blendshape, ne traite aucune géométrie faciale, ne capture aucun maillage 3D du visage et n'effectue aucune reconnaissance faciale.
 </p>
 <p>
 La permission caméra (<code>NSCameraUsageDescription</code>) est demandée <strong>uniquement</strong> pour la fonctionnalité de scan du cahier de suivi papier (rempli par l'école ou le centre). Une photo est prise, traitée localement par <code>VNRecognizeTextRequest</code> (reconnaissance optique de caractères Apple Vision) pour extraire le texte de la page, puis présentée à l'utilisateur pour vérification. La photo et son texte OCR :
@@ -199,6 +199,20 @@ La permission caméra (<code>NSCameraUsageDescription</code>) est demandée <str
 </ul>
 <p>
 Le précédent module « Jeu du regard » qui utilisait <code>ARFaceTrackingConfiguration</code> a été <strong>retiré de RettApp</strong> et publié comme application séparée (<em>RettGame</em>) avec son propre identifiant App Store, son propre Info.plist et sa propre politique de confidentialité. RettApp et RettGame ne partagent ni code ni données.
+</p>
+
+<h3>2.5 Espace adhérent (compte AFSR) et verrou Face ID</h3>
+<p>
+L'espace adhérent est un service de l'AFSR, responsable du traitement. Après connexion par code (SMS ou e-mail), l'application affiche, <strong>à la demande</strong>, des données lues sur afsr.fr : identité et coordonnées, adresse, état de l'adhésion, membres du foyer, historique des dons et attestations fiscales, publications et communications réservées. <strong>L'application n'en conserve aucune copie</strong> : elles sont affichées puis abandonnées. Les documents ouverts (attestations, publications) sont stockés dans le dossier temporaire de l'appareil et <strong>effacés à chaque verrouillage ou déconnexion</strong>.
+</p>
+<p>
+Ce qui est conservé : un <strong>jeton de connexion</strong> aléatoire, dans le trousseau iOS (Keychain), <strong>uniquement sur cet appareil</strong> — jamais synchronisé par iCloud, jamais sauvegardé. Côté serveur, seule son empreinte (SHA-256) est enregistrée, avec un nom d'appareil générique (« RettApp iOS ») et la date de dernier usage. Il expire 90 jours après le dernier usage, et au plus tard 365 jours après sa création.
+</p>
+<p>
+<strong>Face ID, Touch ID ou le code de l'iPhone</strong> verrouillent ce jeton, via l'API iOS LocalAuthentication. La reconnaissance est effectuée <strong>par iOS</strong> : l'application et l'AFSR ne reçoivent que « accepté » ou « refusé », jamais d'image du visage, d'empreinte ni de gabarit biométrique. L'espace se verrouille après plus d'une minute en arrière-plan et à chaque lancement. Après 5 refus de déverrouillage, l'application détruit son jeton local et demande à afsr.fr de le révoquer.
+</p>
+<p>
+Ces données sont <strong>sans lien avec les données de suivi</strong> (journal, crises, médicaments, documents médicaux), qui ne sont jamais transmises à l'AFSR via l'espace adhérent. Droits d'accès, de rectification et d'effacement : contact@afsr.fr.
 </p>
 
 <h2>3. Pourquoi traitons-nous ces données ?</h2>
