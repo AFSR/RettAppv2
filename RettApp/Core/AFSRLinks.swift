@@ -8,19 +8,26 @@ import Foundation
 /// plus fait refuser une mise à jour. Trois littéraux éparpillés dans les
 /// réglages, c'étaient trois occasions d'en changer deux sur trois.
 ///
-/// Ces pages vivaient jusqu'ici sur un sous-domaine séparé, servi par six
-/// fichiers HTML écrits à la main que rien ne déployait et dont plus personne
-/// ne savait où ils étaient hébergés. Elles sont désormais servies par le site
-/// lui-même, depuis son dépôt, et déployées avec lui.
+/// Les pages propres à l'application vivent dans un dossier dédié du site,
+/// `/rettapp/`, servi par le site lui-même depuis son dépôt. Les anciennes
+/// adresses (`/politique-de-confidentialite`, `/mentions-legales`,
+/// `/confidentialite`…) y redirigent, pour les versions déjà publiées.
 enum AFSRLinks {
 
     static let site = URL(string: "https://afsr.fr")!
 
     static let don = URL(string: "https://afsr.fr/nous-soutenir/faire-un-don")!
 
-    /// Adresse canonique, celle à déclarer dans App Store Connect.
-    /// « /confidentialite » y redirige, pour les versions déjà publiées.
-    static let confidentialite = URL(string: "https://afsr.fr/politique-de-confidentialite")!
+    /// Dossier des pages de l'application.
+    static let rettapp = URL(string: "https://afsr.fr/rettapp")!
 
-    static let mentionsLegales = URL(string: "https://afsr.fr/mentions-legales")!
+    /// Présentation de l'app, aussi **Support URL** dans App Store Connect.
+    static let support = rettapp
+
+    static let faq = rettapp.appendingPathComponent("faq")
+
+    /// Adresse canonique, celle à déclarer dans App Store Connect (fiche française).
+    static let confidentialite = rettapp.appendingPathComponent("confidentialite")
+
+    static let mentionsLegales = rettapp.appendingPathComponent("mentions-legales")
 }

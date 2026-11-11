@@ -22,7 +22,7 @@ Complète `SITE_AFSR_TODO.md`. Code concerné : dépôt AFSR/website, branche
 
 7. **Politique de confidentialité du site afsr.fr** : ajouter l'application mobile.
    Les pages légales vivent désormais dans le dépôt du site (AFSR/website) et sont servies
-   sur `afsr.fr/politique-de-confidentialite` (FR/EN/PT) : y ajouter la section app. Points à
+   sur `afsr.fr/rettapp/confidentialite` (FR/EN/PT) : y ajouter la section app. Points à
    couvrir : données affichées à la demande et non copiées dans l'app ; jeton conservé 90 jours
    après le dernier usage, 365 au plus ; empreinte seule côté serveur ; nom d'appareil générique.
 8. **Pages de l'app** : plus de dossier `website/` dans ce dépôt. Vérifier que les pages

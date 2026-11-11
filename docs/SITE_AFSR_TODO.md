@@ -137,8 +137,8 @@ dédié `https://afsr.fr/rettapp/` (modèle de contrôleur et vues : dépôt AFS
 | URL cible | Rôle | Statut |
 |---|---|---|
 | `/rettapp` | Présentation + **Support URL** App Store Connect (voir §3) | à créer |
-| `/rettapp/confidentialite` (+ `/privacy-policy`, `/politica-de-privacidade`) | Politique de confidentialité **de l'app** : données de santé, CloudKit, HealthKit, espace adhérent (Face ID, jeton) | à déplacer (aujourd'hui `/politique-de-confidentialite` etc. à la racine) |
-| `/rettapp/mentions-legales` (+ `/legal-notice`, `/avisos-legais`) | Mentions légales | à déplacer |
+| `/rettapp/confidentialite`, `/rettapp/privacy-policy`, `/rettapp/politica-de-privacidade` | Politique de confidentialité **de l'app** : données de santé, CloudKit, HealthKit, espace adhérent (Face ID, jeton) | à déplacer (aujourd'hui `/politique-de-confidentialite` etc. à la racine) |
+| `/rettapp/mentions-legales`, `/rettapp/legal-notice`, `/rettapp/avisos-legais` | Mentions légales | à déplacer |
 | `/rettapp/faq` | Questions fréquentes (synchro, export, suppression des données) | à créer |
 
 À faire quand le dossier est en ligne :

@@ -159,10 +159,10 @@ dépôt du site, dans les trois langues de la fiche (cf. `docs/SITE_AFSR_TODO.md
 
 | Champ App Store Connect | URL à renseigner |
 |---|---|
-| **Privacy Policy URL** (fr) | `https://afsr.fr/politique-de-confidentialite` |
-| **Privacy Policy URL** (en) | `https://afsr.fr/privacy-policy` |
-| **Privacy Policy URL** (pt-BR) | `https://afsr.fr/politica-de-privacidade` |
-| **Support URL** | `https://afsr.fr/rettapp` (ou `https://afsr.fr/contact`) |
+| **Privacy Policy URL** (fr) | `https://afsr.fr/rettapp/confidentialite` |
+| **Privacy Policy URL** (en) | `https://afsr.fr/rettapp/privacy-policy` |
+| **Privacy Policy URL** (pt-BR) | `https://afsr.fr/rettapp/politica-de-privacidade` |
+| **Support URL** | `https://afsr.fr/rettapp` |
 | **Marketing URL** (optionnel) | `https://afsr.fr/rettapp` |
 
 ---
@@ -268,7 +268,7 @@ Conformément au déclaratif, RettApp n'est PAS un dispositif médical régulé 
 RettApp **lit** dans Apple Santé, et n'y écrit rien : l'API publique d'iOS 17 n'expose aucun type de catégorie pour les crises d'épilepsie, si bien que les observations saisies dans l'application y restent. L'autorisation de lecture est demandée par iOS lors de la première ouverture de l'écran « Santé », jamais au lancement, et aucun type n'est lu sans que l'utilisateur l'ait accordé : hydratation, alimentation (énergie, glucides, protéines, lipides), sommeil et siestes, rythme cardiaque au repos et moyen, nombre de pas, énergie dépensée. Ces données servent à l'affichage et au rapport destiné au médecin ; elles ne quittent pas l'appareil.
 
 6. CONSENTEMENT PARENTAL ET DONNÉES DE SANTÉ DE MINEURS
-L'écran d'onboarding inclut un avertissement explicite que ces données concernent des mineurs et qu'un consentement parental est requis. Politique de confidentialité accessible : https://afsr.fr/politique-de-confidentialite
+L'écran d'onboarding inclut un avertissement explicite que ces données concernent des mineurs et qu'un consentement parental est requis. Politique de confidentialité accessible : https://afsr.fr/rettapp/confidentialite
 
 7. AFSR
 L'AFSR est une association régie par la loi française du 1er juillet 1901, fondée en 1988. Site officiel : https://afsr.fr
