@@ -24,6 +24,12 @@ enum AFSRLinks {
     /// Présentation de l'app, aussi **Support URL** dans App Store Connect.
     static let support = rettapp
 
+    /// La page d'assistance : coordonnées de l'AFSR, questions fréquentes,
+    /// et comment faire effacer ses données. C'est elle qu'on ouvre depuis
+    /// l'app pour demander de l'aide ; `support` désigne l'adresse déclarée à
+    /// Apple.
+    static let assistance = URL(string: "https://afsr.fr/rettapp/support")!
+
     static let faq = rettapp.appendingPathComponent("faq")
 
     /// Adresse canonique, celle à déclarer dans App Store Connect (fiche française).
