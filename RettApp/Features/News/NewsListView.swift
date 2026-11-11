@@ -79,7 +79,7 @@ private struct NewsCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+        .shadow(color: .afsrShadow, radius: 14, x: 0, y: 6)
         .accessibilityElement(children: .combine)
     }
 
@@ -144,7 +144,7 @@ private struct NewsCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color.afsrSurface)
     }
 
     // MARK: Éléments

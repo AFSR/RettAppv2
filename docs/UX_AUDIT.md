@@ -162,3 +162,23 @@ Convention adoptée :
 **Verdict** : application conforme aux pratiques iOS modernes (SwiftUI, iOS 17,
 SF Symbols, Sign in with Apple, Charts natifs). Pas de blocant pour l'App Store
 côté UX, sous réserve des P1 ci-dessus.
+
+---
+
+## Passe visuelle (2026-11) — onglets moins austères
+
+- **Surfaces** : nouvelles couleurs `afsrSurface` (blanc en clair, surface
+  groupée en sombre) et `afsrShadow` (ombre teintée violet). Les cartes ne
+  sont plus en gris système fondu dans le fond lavande.
+- **Composants partagés** (`SectionCard.swift`) : `AFSRIconBadge` /
+  `AFSRSoftIconBadge` (pastilles d'icônes colorées), `AFSRRowLabel` (lignes de
+  liste façon Réglages iOS), `AFSRAvatar` (initiales sur dégradé),
+  `AFSRHeroHeader` (bandeau d'accueil dégradé).
+- **Boutons** : dégradé, ombre colorée et `AFSRPressableStyle` (léger
+  enfoncement au toucher). Bouton crise horizontal avec sous-titre explicite.
+- **Listes** : `afsrListBackground()` donne le fond lavande aux onglets
+  Réglages, AFSR et Adhérent.
+- **Journal** : compteurs avec anneau de progression, lignes avec pastilles,
+  titre « Fil de la journée ». **Bilan** : cartes de synthèse et bloc
+  d'analyse retravaillés. **Réglages** : carte profil avec avatar, appel au
+  don en bandeau. **Adhérent** : avatar aux initiales.

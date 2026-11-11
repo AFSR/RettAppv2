@@ -169,9 +169,14 @@ struct DashboardView: View {
             }
             .buttonStyle(.bordered).tint(.afsrPurpleAdaptive)
             Spacer()
-            Text(viewModel.windowLabel())
-                .font(AFSRFont.headline(16))
-                .lineLimit(1).minimumScaleFactor(0.8)
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                Text(viewModel.windowLabel())
+                    .font(AFSRFont.headline(16))
+                    .lineLimit(1).minimumScaleFactor(0.8)
+            }
             Spacer()
             Button { viewModel.shift(1) } label: {
                 Image(systemName: "chevron.right").font(.system(size: 18, weight: .semibold))
@@ -237,8 +242,11 @@ struct DashboardView: View {
         let found = insights
         if !found.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Ce que montrent vos données")
-                    .font(AFSRFont.headline(16))
+                HStack(spacing: 10) {
+                    AFSRIconBadge(systemImage: "sparkles", color: .afsrPurple, size: 28)
+                    Text("Ce que montrent vos données")
+                        .font(AFSRFont.headline(16))
+                }
 
                 ForEach(found) { insight in
                     HStack(alignment: .top, spacing: 10) {
@@ -259,8 +267,18 @@ struct DashboardView: View {
             }
             .padding(AFSRTokens.spacing)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemBackground),
-                        in: RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius))
+            .background(
+                LinearGradient(
+                    colors: [Color.afsrPurpleAdaptive.opacity(0.14), Color.afsrPurpleAdaptive.opacity(0.05)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius, style: .continuous)
+                    .stroke(Color.afsrPurpleAdaptive.opacity(0.18), lineWidth: 1)
+            )
         }
     }
 
@@ -280,7 +298,7 @@ struct DashboardView: View {
                 .foregroundStyle(.afsrPurpleAdaptive)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Color.afsrPurpleAdaptive.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.afsrPurpleAdaptive.opacity(0.12), in: Capsule())
     }
 
     // MARK: - Charts
@@ -761,10 +779,12 @@ struct DashboardView: View {
     // MARK: - Helpers
 
     private var emptyChartPlaceholder: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Image(systemName: "chart.line.flattrend.xyaxis")
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.afsrPurpleAdaptive)
+                .frame(width: 56, height: 56)
+                .background(Color.afsrPurpleAdaptive.opacity(0.1), in: Circle())
             Text("Aucune donnée pour cette période")
                 .font(AFSRFont.caption())
                 .foregroundStyle(.secondary)
@@ -796,14 +816,15 @@ private struct SummaryCard: View {
     var increaseIsGood: Bool = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .semibold))
-                Text(title).font(AFSRFont.caption())
-            }
-            .foregroundStyle(color)
-            Text(value).font(AFSRFont.title(22)).lineLimit(1).minimumScaleFactor(0.7)
+        VStack(alignment: .leading, spacing: 8) {
+            AFSRSoftIconBadge(systemImage: systemImage, color: color, size: 32)
+            Text(title)
+                .font(AFSRFont.caption(12))
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(value).font(AFSRFont.title(22)).lineLimit(1).minimumScaleFactor(0.6)
             HStack(spacing: 4) {
                 Text(subtitle).font(AFSRFont.caption()).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
@@ -814,8 +835,8 @@ private struct SummaryCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .afsrSurface()
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
