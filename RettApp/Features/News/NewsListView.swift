@@ -16,27 +16,27 @@ struct NewsListView: View {
                     actionTitle: "Actualiser"
                 ) { Task { await viewModel.refresh() } }
             } else {
-                List {
-                    if let error = viewModel.errorMessage {
-                        errorBanner(error)
-                            .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.clear)
-                    }
-                    ForEach(viewModel.articles) { article in
-                        NavigationLink(value: article) {
-                            NewsRow(article: article)
+                ScrollView {
+                    LazyVStack(spacing: 20) {
+                        if let error = viewModel.errorMessage {
+                            errorBanner(error)
                         }
-                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                        .listRowBackground(Color.clear)
+                        ForEach(Array(viewModel.articles.enumerated()), id: \.element.id) { index, article in
+                            NavigationLink(value: article) {
+                                NewsCard(article: article, isFeatured: index == 0)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
                 .background(Color.afsrBackground)
             }
         }
         .background(Color.afsrBackground)
         .navigationTitle("Actualités")
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: NewsArticle.self) { NewsDetailView(article: $0) }
         .refreshable { await viewModel.refresh() }
         .task { if viewModel.articles.isEmpty { await viewModel.refresh() } }
@@ -53,48 +53,126 @@ struct NewsListView: View {
         }
         .padding(12)
         .background(Color.afsrWarning.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal)
-        .padding(.vertical, 4)
     }
 }
 
-private struct NewsRow: View {
+/// Carte d'article. La première de la liste (`isFeatured`) est plus grande,
+/// avec le titre superposé à l'image ; les suivantes empilent image, texte
+/// et invitation à lire.
+private struct NewsCard: View {
     let article: NewsArticle
+    let isFeatured: Bool
+
+    private let corner: CGFloat = 22
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let url = article.featuredImageURL {
-                AsyncImage(url: url) { phase in
+        Group {
+            if isFeatured, article.featuredImageURL != nil {
+                featured
+            } else {
+                standard
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Variantes
+
+    private var featured: some View {
+        ZStack(alignment: .bottomLeading) {
+            image(height: 280)
+            LinearGradient(
+                colors: [.clear, .afsrPurpleDark.opacity(0.9)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+            VStack(alignment: .leading, spacing: 8) {
+                badge("À la une", filled: true)
+                Text(article.title)
+                    .font(AFSRFont.title(24))
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                if let date = article.date {
+                    Text(date, format: .dateTime.day().month(.wide).year())
+                        .font(AFSRFont.caption())
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            .padding(18)
+        }
+        .frame(height: 280)
+    }
+
+    private var standard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if article.featuredImageURL != nil {
+                image(height: 170)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                if let date = article.date {
+                    badge(date.formatted(.dateTime.day().month(.abbreviated).year()), filled: false)
+                }
+                Text(article.title)
+                    .font(AFSRFont.headline())
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+                if let excerpt = article.excerpt, !excerpt.isEmpty {
+                    Text(excerpt)
+                        .font(AFSRFont.body(15))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(3)
+                }
+                HStack(spacing: 4) {
+                    Text("Lire l'article")
+                    Image(systemName: "arrow.right")
+                }
+                .font(AFSRFont.caption())
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.afsrPurpleAdaptive)
+                .padding(.top, 2)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Color(.secondarySystemBackground))
+    }
+
+    // MARK: Éléments
+
+    private func image(height: CGFloat) -> some View {
+        Color.afsrAccent
+            .frame(height: height)
+            .overlay {
+                AsyncImage(url: article.featuredImageURL) { phase in
                     switch phase {
                     case .success(let img):
                         img.resizable().scaledToFill()
                     default:
-                        Color.afsrAccent
+                        Image(systemName: "newspaper")
+                            .font(.largeTitle)
+                            .foregroundStyle(Color.afsrPurple.opacity(0.4))
                     }
                 }
-                .frame(height: 180)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
             }
-            Text(article.title)
-                .font(AFSRFont.headline())
-                .foregroundStyle(.primary)
-            if let date = article.date {
-                Text(date, style: .date)
-                    .font(AFSRFont.caption())
-                    .foregroundStyle(.secondary)
-            }
-            if let excerpt = article.excerpt, !excerpt.isEmpty {
-                Text(excerpt)
-                    .font(AFSRFont.body(15))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-            }
-        }
-        .padding(AFSRTokens.spacing)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadius))
-        .shadow(color: .black.opacity(AFSRTokens.shadowOpacity), radius: AFSRTokens.shadowRadius, x: 0, y: 2)
+            .clipped()
+    }
+
+    private func badge(_ text: String, filled: Bool) -> some View {
+        Text(text)
+            .font(AFSRFont.caption())
+            .fontWeight(.semibold)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .foregroundStyle(filled ? Color.white : Color.afsrPurpleAdaptive)
+            .background(
+                filled ? Color.afsrPurple : Color.afsrPurple.opacity(0.12),
+                in: Capsule()
+            )
     }
 }
 

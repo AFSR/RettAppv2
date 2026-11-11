@@ -71,6 +71,7 @@ struct DiscoveryHomeView: View {
             }
         }
         .navigationTitle("AFSR")
+        .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
             "Créer un suivi ?",
             isPresented: $showStartSuiviConfirm,

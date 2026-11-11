@@ -58,7 +58,7 @@ struct JournalView: View {
             }
         }
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // Deux boutons, deux intentions, et c'est tout le sens de la
             // réorganisation. Avant, le « + » ne faisait qu'une chose — une

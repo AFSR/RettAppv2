@@ -130,6 +130,7 @@ struct SettingsView: View {
 
         }
         .navigationTitle("Réglages")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await refreshAuthorizations() }
         .confirmationDialog(
             "Créer un suivi ?",
