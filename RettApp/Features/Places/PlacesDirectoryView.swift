@@ -95,9 +95,9 @@ struct PlacesDirectoryView: View {
             PlaceDetailView(session: session, slug: lieu.slug, nom: lieu.name)
         }
         .sheet(isPresented: $proposer) {
-            NavigationStack {
-                PlaceReviewFormView(session: session, store: store, lieu: nil, existant: nil)
-            }
+            // Le parcours porte sa propre pile : il commence par une
+            // recherche, puis pousse soit l'avis, soit l'ajout d'un lieu.
+            PlaceShareFlowView(session: session, store: store)
         }
         .task { await store.chargerSiNecessaire() }
     }
