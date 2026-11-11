@@ -51,10 +51,19 @@ enum TrashStore {
 
         /// Une entrée venue de l'autre parent ne transporte pas le contenu
         /// supprimé, seulement la suppression : il n'y a rien à remettre en
-        /// place, et proposer « Restaurer » mentirait. Par défaut vrai, pour
-        /// que les entrées déjà enregistrées avant ce champ restent
-        /// restaurables.
-        var restorable: Bool = true
+        /// place, et proposer « Restaurer » mentirait.
+        ///
+        /// Optionnel, et lu via `restorable`, pour une raison précise : le
+        /// décodeur synthétisé de Swift échoue sur une clé absente, il ne
+        /// retombe pas sur la valeur par défaut d'une propriété. Un fichier
+        /// de corbeille écrit avant l'ajout de ce champ deviendrait donc
+        /// illisible d'un coup, et toutes les suppressions mémorisées
+        /// seraient perdues — y compris leur rôle de garde contre les
+        /// résurrections. Absent vaut « restaurable », le comportement
+        /// d'avant.
+        private var restorableFlag: Bool?
+
+        var restorable: Bool { restorableFlag ?? true }
 
         var expiresAt: Date { deletedAt.addingTimeInterval(TrashStore.retention) }
 
@@ -139,7 +148,7 @@ enum TrashStore {
             deletedAt: deletedAt,
             summary: summary,
             payload: payload,
-            restorable: restorable
+            restorableFlag: restorable
         )
         queue.sync {
             var all = loadUnsafe()

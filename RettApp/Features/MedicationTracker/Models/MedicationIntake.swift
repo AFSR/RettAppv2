@@ -40,12 +40,16 @@ enum MedicationRhythm {
                             HourMinute(hour: 16, minute: 0),
                             HourMinute(hour: 20, minute: 0)]
         default:
-            let premiere = 8, derniere = 20
+            // Répartition régulière entre 8 h et 20 h. On travaille en
+            // minutes depuis minuit plutôt qu'en heures décimales : arrondir
+            // les minutes séparément pouvait produire « 14 h 60 », une heure
+            // qui n'existe pas et que le sélecteur refuserait.
+            let premiere = 8 * 60, derniere = 20 * 60
             let pas = Double(derniere - premiere) / Double(count - 1)
             return (0..<count).map { i in
-                let h = Double(premiere) + pas * Double(i)
-                return HourMinute(hour: Int(h.rounded(.down)),
-                                  minute: Int((h - h.rounded(.down)) * 60).rounded(to: 5))
+                let brut = Double(premiere) + pas * Double(i)
+                let minutes = min(derniere, Int((brut / 5).rounded()) * 5)
+                return HourMinute(hour: minutes / 60, minute: minutes % 60)
             }
         }
     }
@@ -67,14 +71,6 @@ enum MedicationRhythm {
     /// Libellé du rythme, pour les boutons.
     static func label(forCountPerDay count: Int) -> String {
         count == 1 ? "1 fois par jour" : "\(count) fois par jour"
-    }
-}
-
-private extension Int {
-    /// Arrondi au multiple le plus proche, pour ne pas proposer « 13 h 43 ».
-    func rounded(to multiple: Int) -> Int {
-        guard multiple > 0 else { return self }
-        return (Int((Double(self) / Double(multiple)).rounded())) * multiple
     }
 }
 
