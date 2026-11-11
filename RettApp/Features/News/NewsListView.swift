@@ -42,6 +42,19 @@ struct NewsListView: View {
         .background(Color.afsrBackground)
         .navigationTitle("Actualités")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Logo de l'association en haut à gauche : la place d'une
+            // marque sur iOS, la droite étant réservée aux actions. Libre
+            // ici, l'onglet étant à la racine (pas de bouton retour).
+            ToolbarItem(placement: .topBarLeading) {
+                Image("RettLogo")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 28)
+                    .accessibilityLabel("Association Française du Syndrome de Rett")
+            }
+        }
         .refreshable { await viewModel.refresh() }
         .task { if viewModel.articles.isEmpty { await viewModel.refresh() } }
     }
