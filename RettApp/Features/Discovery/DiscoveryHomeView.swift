@@ -3,11 +3,10 @@ import SwiftUI
 /// Écran d'accueil de l'usage « découverte » : la porte d'entrée vers
 /// l'association pour qui ne suit pas d'enfant.
 ///
-/// Il ne rassemble pour l'instant que ce qui existe réellement dans l'app.
-/// Les deux briques annoncées dans la cible — espace adhérent en vue intégrée
-/// et information de fond sur la maladie et la recherche — n'y sont pas encore
-/// et ne sont donc pas affichées : un écran ne promet rien qu'il ne tienne.
-/// Elles viendront se loger ici.
+/// Il ne rassemble que ce qui existe réellement dans l'app : l'espace adhérent
+/// (écrans natifs, voir `MemberAreaView`), le don et les mentions légales.
+/// L'information de fond sur la maladie et la recherche n'y est pas encore et
+/// n'est donc pas affichée : un écran ne promet rien qu'il ne tienne.
 struct DiscoveryHomeView: View {
     @Environment(UsageModeStore.self) private var usageStore
     @State private var showStartSuiviConfirm = false
