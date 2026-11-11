@@ -138,6 +138,26 @@ final class PlacesStore {
         }
     }
 
+    /// Replie une chaîne pour la comparer : sans accents, sans casse, sans
+    /// espaces aux bords.
+    ///
+    /// Nécessaire parce que `localizedCaseInsensitiveContains` ignore la casse
+    /// mais **pas les diacritiques** : « creperie » ne trouvait pas
+    /// « Crêperie », et une famille qui tape sans accent cherche le même lieu.
+    /// Le défaut ne se voyait pas, puisqu'une recherche qui ne trouve rien
+    /// ressemble à un annuaire qui ne contient rien.
+    ///
+    /// Ne sert qu'au filtrage **local** : la recherche de l'annuaire est faite
+    /// par le serveur, sur des champs que l'application n'a pas tous.
+    static func fold(_ texte: String) -> String {
+        texte
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(
+                options: [.diacriticInsensitive, .caseInsensitive],
+                locale: Locale(identifier: "fr_FR")
+            )
+    }
+
     /// Les critères à poser pour un type de lieu, d'après le référentiel.
     func criteres(pourType type: String?) -> [PlaceCriterion] {
         guard let type, let meta else { return [] }

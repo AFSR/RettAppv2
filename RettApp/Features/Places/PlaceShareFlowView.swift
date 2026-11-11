@@ -103,12 +103,13 @@ struct PlaceShareFlowView: View {
     /// La recherche porte sur la liste déjà chargée : on ne relance pas
     /// l'annuaire pour trouver un lieu qu'on a sous les yeux.
     private var resultats: [Place] {
-        let terme = recherche.trimmingCharacters(in: .whitespaces)
+        let terme = PlacesStore.fold(recherche)
         guard !terme.isEmpty else { return store.places }
 
+        // Replié des deux côtés : « creperie » doit trouver « Crêperie ».
         return store.places.filter {
-            $0.name.localizedCaseInsensitiveContains(terme)
-                || ($0.city?.localizedCaseInsensitiveContains(terme) ?? false)
+            PlacesStore.fold($0.name).contains(terme)
+                || PlacesStore.fold($0.city ?? "").contains(terme)
         }
     }
 
