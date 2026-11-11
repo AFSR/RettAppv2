@@ -11,22 +11,20 @@ sur l'App Store.
 
 ## Sommaire
 
-1. [API Statamic — module Actualités](#1-api-statamic--module-actualités)
-2. [Pages légales obligatoires](#2-pages-légales-obligatoires)
-3. [Politique de confidentialité — contenu détaillé](#3-politique-de-confidentialité--contenu-détaillé)
-4. [Mentions légales — contenu détaillé](#4-mentions-légales--contenu-détaillé)
-5. [Page de présentation de l'app](#5-page-de-présentation-de-lapp)
-6. [Portail Apple Developer + App Store Connect](#6-portail-apple-developer--app-store-connect)
-7. [RGPD — registre, consentements, DPO](#7-rgpd--registre-consentements-dpo)
-8. [Checklist finale avant publication](#8-checklist-finale-avant-publication)
+1. API Statamic — module Actualités
+2. Pages dédiées à l'application (dossier `/rettapp/`)
+3. Page de présentation de l'app
+4. Portail Apple Developer + App Store Connect
+5. RGPD — registre, DPIA, consentement
+6. Checklist avant publication
 
 ---
 
 ## 1. API Statamic — module Actualités
 
-Le module Actualités de l'app est **désactivé** par feature flag tant que l'API n'est pas
-opérationnelle. Une fois ces étapes faites côté site, on rebascule
-`FeatureFlags.newsEnabled = true` côté code et on push une nouvelle version.
+Le module Actualités est **actif** dans l'app (`FeatureFlags.newsEnabled = true`). Tant que
+l'API n'est pas en ligne, l'onglet affiche un état vide : ces étapes sont à faire **avant** de
+publier la build.
 
 ### 1.1 Activer la Content API
 
@@ -51,7 +49,7 @@ return [
 
     'endpoints' => [
         'collections' => [
-            'actualites' => true,   // handle de la collection à exposer
+            'news' => true,   // handle de la collection à exposer (APIConfig.newsCollection)
         ],
     ],
 ];
@@ -70,8 +68,8 @@ php please stache:clear
 
 ### 1.2 Vérifier le handle de la collection
 
-Dans le CP : **Collections → Actualites** → URL = `/cp/collections/actualites/...`. Si le
-handle n'est pas `actualites` (ex. `news`, `posts`, `articles`), adapter `endpoints.collections`
+Dans le CP : **Collections** → URL = `/cp/collections/news/...`. L'app attend le handle `news`. Si le
+handle est différent (ex. `actualites`, `posts`, `articles`), adapter `endpoints.collections`
 ci-dessus **et** prévenir pour qu'on ajuste `APIConfig.newsCollection` dans l'app.
 
 ### 1.3 Blueprint des entries
@@ -94,7 +92,7 @@ le parser dans `NewsArticle.swift`. Sinon, renomme-les côté blueprint.
 ### 1.4 Tester depuis le navigateur
 
 ```
-https://afsr.fr/api/collections/actualites/entries?sort=-date&limit=20
+https://afsr.fr/api/collections/news/entries?sort=-date&limit=20
 ```
 
 Réponses attendues :
@@ -131,154 +129,39 @@ l'image. RettApp pourrait l'utiliser pour VoiceOver à l'avenir.
 
 ---
 
-## 2. Pages légales obligatoires
+## 2. Pages dédiées à l'application (dossier `/rettapp/`)
 
-Apple **refusera** la soumission App Store si ces deux pages n'existent pas. RGPD les
-exige aussi.
+L'app a ses propres pages, distinctes du reste du site, regroupées sous un dossier
+dédié `https://afsr.fr/rettapp/` (modèle de contrôleur et vues : dépôt AFSR/website).
 
-**C'est fait.** Les deux pages sont servies par le dépôt du site, dans les trois
-langues de l'application, et déployées avec lui. Voir
-`docs/pages-legales/README.md` côté site, et `App\Http\Controllers\LegalController`.
-
-| URL | Liée depuis | Statut |
+| URL cible | Rôle | Statut |
 |---|---|---|
-| `https://afsr.fr/politique-de-confidentialite` | App (Réglages → À propos), App Store Connect | ✅ servie par le dépôt |
-| `https://afsr.fr/privacy-policy` | App Store Connect (fiche anglaise) | ✅ servie par le dépôt |
-| `https://afsr.fr/politica-de-privacidade` | App Store Connect (fiche portugaise) | ✅ servie par le dépôt |
-| `https://afsr.fr/mentions-legales` | App (Réglages → À propos) | ✅ servie par le dépôt |
-| `https://afsr.fr/legal-notice` | — | ✅ servie par le dépôt |
-| `https://afsr.fr/avisos-legais` | — | ✅ servie par le dépôt |
+| `/rettapp` | Présentation + **Support URL** App Store Connect (voir §3) | à créer |
+| `/rettapp/confidentialite` (+ `/privacy-policy`, `/politica-de-privacidade`) | Politique de confidentialité **de l'app** : données de santé, CloudKit, HealthKit, espace adhérent (Face ID, jeton) | à déplacer (aujourd'hui `/politique-de-confidentialite` etc. à la racine) |
+| `/rettapp/mentions-legales` (+ `/legal-notice`, `/avisos-legais`) | Mentions légales | à déplacer |
+| `/rettapp/faq` | Questions fréquentes (synchro, export, suppression des données) | à créer |
 
-`https://afsr.fr/confidentialite` redirige vers la version française, de même
-que les six anciennes adresses en `.html` du sous-domaine `rettapp.afsr.fr`.
-
-Les URL sont rassemblées dans `RettApp/Core/AFSRLinks.swift` : trois littéraux
-éparpillés dans les réglages, c'étaient trois occasions d'en changer deux sur
-trois alors que la première est citée dans la fiche App Store.
-
-**Ce qui reste à faire côté association :** renseigner le RNA, le SIREN et le
-directeur de la publication (`AFSR_LEGAL_RNA`, `AFSR_LEGAL_SIREN`,
-`AFSR_LEGAL_PUBLICATION_DIRECTOR`). Tant qu'ils sont vides, les lignes
-correspondantes ne s'affichent pas — la page est publiable, mais l'identification
-de l'éditeur est une obligation pénalement sanctionnée.
-
----
-
-## 3. Politique de confidentialité — contenu détaillé
-
-### Structure recommandée
-
-```
-1. Identité du responsable de traitement
-   → Association Française du Syndrome de Rett, [adresse], [SIRET]
-   → DPO : [nom, email]
-
-2. Données collectées
-   - Identité enfant : prénom, date de naissance optionnelle
-   - Données de santé : crises d'épilepsie (date, durée, type, déclencheur, notes),
-     médicaments (nom, dose, horaires, prises), flag épilepsie
-   - Identifiant Apple (Apple User ID opaque, via Sign in with Apple)
-   - Aucune donnée de localisation, ni biométrie, ni contacts, ni photos
-
-3. Finalités
-   → Suivi quotidien par les parents et aidants, communication avec professionnels
-     de santé (export CSV)
-
-4. Base légale (RGPD art. 6 + 9)
-   → Consentement explicite du titulaire de l'autorité parentale (art. 9.2.a)
-
-5. Stockage
-   → Local uniquement sur l'appareil iOS de l'utilisateur (SwiftData chiffré au repos
-     par iOS Data Protection)
-   → Aucune transmission vers un serveur AFSR ou tiers
-   → Les sauvegardes iCloud peuvent contenir une copie chiffrée par Apple
-
-6. Durée de conservation
-   → L'utilisateur contrôle entièrement la durée de conservation
-   → Bouton "Effacer toutes les données" disponible dans les Réglages
-   → Aucune purge automatique
-
-7. Destinataires
-   → Aucun, sauf si l'utilisateur exporte volontairement (CSV) vers un tiers de son choix
-     (e.g. son neurologue par email)
-
-8. Transferts hors UE
-   → Apple Inc. (États-Unis) pour Sign in with Apple et iCloud, sous accord DPF
-     (Data Privacy Framework)
-
-9. Droits RGPD
-   - Accès : visible dans l'app
-   - Rectification : édition libre
-   - Effacement : "Effacer toutes les données" (Réglages)
-   - Portabilité : export CSV complet (Réglages)
-   - Opposition / limitation : désinstaller l'app
-   - Réclamation auprès de la CNIL : https://www.cnil.fr/fr/plaintes
-
-10. Cookies / traceurs
-    → Aucun cookie, aucun traceur, aucun analytics tiers
-
-11. Mineurs
-    → L'app est destinée à des données concernant des mineurs.
-    → L'usage requiert le consentement du titulaire de l'autorité parentale (art. 8 RGPD).
-
-12. AVERTISSEMENT MÉDICAL — copie EXACTE :
-    > « RettApp est un outil de suivi destiné aux parents et aidants. Elle ne constitue
-    > pas un dispositif médical au sens du règlement européen 2017/745 (MDR). Elle ne
-    > diagnostique pas, ne traite pas, et ne remplace en aucun cas l'avis d'un
-    > professionnel de santé. En cas d'urgence, appelez le 15 (Samu) ou le 112. »
-
-13. Modifications de la politique
-    → Comment l'utilisateur sera informé d'une mise à jour
-
-14. Contact
-    → Email du DPO + adresse postale AFSR
-```
-
-### Modèle de référence
-
-La CNIL fournit un modèle adaptable : <https://www.cnil.fr/fr/exemple-de-mentions-pour-un-formulaire-de-collecte-de-donnees>
-
-### À faire valider
-
-Le texte final **doit** être validé par :
-- Le **DPO** de l'AFSR
-- Idéalement un avocat spécialisé santé numérique (1-2 h de conseil)
+À faire quand le dossier est en ligne :
+1. Mettre des **redirections 301** depuis les adresses actuelles (`/politique-de-confidentialite`,
+   `/privacy-policy`, `/politica-de-privacidade`, `/mentions-legales`, `/legal-notice`,
+   `/avisos-legais`, `/confidentialite`) : elles sont déjà publiées dans la fiche App Store
+   et dans les versions de l'app déjà distribuées.
+2. Mettre à jour `RettApp/Core/AFSRLinks.swift`, `docs/APP_STORE_LISTING.md` et App Store Connect
+   (Privacy Policy URL, Support URL, Marketing URL).
+3. Le texte de la politique doit refléter l'état réel de l'app (**voir `SECURITY.md`**) :
+   stockage local SwiftData **et** synchronisation CloudKit entre parents, HealthKit, espace
+   adhérent (jeton 90 j / 365 j max, empreinte seule côté serveur, Face ID), pas de Sign in
+   with Apple, mineurs et consentement parental (art. 8 et 9.2.a RGPD), avertissement médical
+   (voir la fiche App Store), droits RGPD et CNIL.
+4. Renseigner `AFSR_LEGAL_RNA`, `AFSR_LEGAL_SIREN`, `AFSR_LEGAL_PUBLICATION_DIRECTOR` en production
+   (obligation pénalement sanctionnée ; sinon les lignes ne s'affichent pas).
+5. Faire valider le texte par le **DPO** et, idéalement, un avocat santé numérique (1-2 h).
 
 ---
 
-## 4. Mentions légales — contenu détaillé
+## 3. Page de présentation de l'app
 
-```
-1. Éditeur du site et de l'app
-   → Association Française du Syndrome de Rett
-   → Statut juridique : association loi 1901
-   → Adresse du siège social
-   → SIRET, RNA
-   → Représentant légal (Président)
-   → Téléphone, email de contact
-
-2. Directeur de la publication
-   → Nom + qualité
-
-3. Hébergeur du site web
-   → Nom, adresse, téléphone de l'hébergeur de afsr.fr
-
-4. Crédits
-   → Mention de l'app iOS (RettApp)
-   → Crédits éventuels (designer, développeur)
-
-5. Propriété intellectuelle
-   → Logo AFSR, nom RettApp, contenus → propriété AFSR
-
-6. Liens hypertexte
-   → Politique de l'AFSR sur les liens entrants/sortants
-```
-
----
-
-## 5. Page de présentation de l'app
-
-URL suggérée : `https://afsr.fr/rettapp`
+URL : `https://afsr.fr/rettapp` (page d'accueil du dossier §2)
 
 Contenu :
 - Capture d'écran (icône + 3-5 screenshots — à fournir au moment de la soumission App Store)
@@ -295,27 +178,26 @@ Cette page sert :
 
 ---
 
-## 6. Portail Apple Developer + App Store Connect
+## 4. Portail Apple Developer + App Store Connect
 
 Hors site web, mais à coordonner depuis le compte Apple Developer de l'AFSR.
 
-### 6.1 Compte Apple Developer
+### 4.1 Compte Apple Developer
 
 - Compte payant (99 $/an pour individuel ou organisation)
 - L'AFSR doit ouvrir un **compte Organisation** (D-U-N-S Number requis, 1-2 semaines
   d'attente pour l'enregistrement)
 
-### 6.2 Bundle ID
+### 4.2 Bundle ID
 
 - `fr.afsr.RettApp` à enregistrer sur https://developer.apple.com/account/resources/identifiers/list
 - Capabilities à activer sur le Bundle ID :
-  - Sign in with Apple
   - HealthKit
   - Push Notifications
-  - iCloud (CloudKit) → pour la future synchronisation entre parents
+  - iCloud (CloudKit) → synchronisation entre parents
 - Container CloudKit : `iCloud.fr.afsr.RettApp` (à créer dans CloudKit Dashboard)
 
-### 6.3 App Store Connect — fiche app
+### 4.3 App Store Connect — fiche app
 
 Page à créer : https://appstoreconnect.apple.com → My Apps → +
 
@@ -326,83 +208,66 @@ Champs à remplir :
 - Catégorie secondaire : Health & Fitness
 - Age rating : à préciser (probablement 4+)
 - **Privacy Policy URL** : `https://afsr.fr/politique-de-confidentialite`
-  (fiche anglaise : `/privacy-policy` ; fiche portugaise : `/politica-de-privacidade`)
+  (cf. §2 pour les adresses finales et les versions EN/PT)
 - **Support URL** : `https://afsr.fr/rettapp`
 - **Marketing URL** (optionnel) : `https://afsr.fr/rettapp`
-- Description (4 000 car. max) — voir §5
+- Description (4 000 car. max) — voir §3
 - Mots-clés (100 car.) : « épilepsie, syndrome de rett, médicaments, suivi, santé »
 - Screenshots (iPhone 6.7", 6.5", iPad 12.9", 11") — à produire
 
-### 6.4 Privacy Manifest (déjà côté code à créer)
+### 4.4 Privacy Manifest (déjà côté code à créer)
 
-`PrivacyInfo.xcprivacy` dans `RettApp/Resources/` — voir `SECURITY.md` §7. Pas
-d'action côté site web, mais à inclure dans la build avant soumission.
+**Toujours absent** de `RettApp/Resources/` : à créer côté code (voir `SECURITY.md` §7)
+et à inclure dans la build avant soumission.
 
-### 6.5 Déclaratif "Regulated medical device"
+### 4.5 Déclaratif "Regulated medical device"
 
 → Sélectionner **No** (justifié par l'absence de certification CE/FDA/UKCA, voir
 `SECURITY.md` §10).
 
 ---
 
-## 7. RGPD — registre, consentements, DPO
+## 5. RGPD — registre, DPIA, consentement
 
-### 7.1 Registre des traitements (art. 30)
+### 5.1 Registre des traitements (art. 30)
 
-L'AFSR doit ajouter dans son registre des traitements une **fiche RettApp** :
+Ajouter une **fiche RettApp** au registre de l'AFSR : suivi quotidien par parents et aidants ;
+personnes concernées : enfants (mineurs) et leurs parents/aidants ; données : identité,
+santé (crises, médicaments, humeur, symptômes), identifiants CloudKit/adhérent ; sous-traitant :
+Apple (CloudKit, HealthKit, iCloud — DPA Apple, DPF) ; conservation : contrôlée par
+l'utilisateur ; sécurité : `SECURITY.md`.
 
-```
-- Nom du traitement     : RettApp — suivi familial du syndrome de Rett
-- Finalité              : suivi quotidien par parents et aidants
-- Catégories de personnes : enfants atteints du syndrome de Rett
-                            (mineurs) + leurs parents/aidants
-- Catégories de données : identité (prénom, date de naissance), santé (épilepsie,
-                          médicaments, crises), identifiant Apple
-- Destinataires         : aucun (stockage local uniquement)
-- Sous-traitants        : Apple Inc. (Sign in with Apple, iCloud) — DPA Apple
-- Transferts hors UE    : USA via DPF (Apple)
-- Durée de conservation : contrôlée par l'utilisateur (pas de purge automatique)
-- Mesures de sécurité   : voir SECURITY.md
-```
+### 5.2 DPIA (analyse d'impact)
 
-### 7.2 DPIA (Analyse d'impact)
+**Obligatoire** (données de santé de mineurs). À conduire par le DPO avec le développeur avant la
+mise en ligne. Modèle : <https://www.cnil.fr/fr/RGPD-analyse-impact-protection-des-donnees-aipd>
 
-**Obligatoire** dès lors qu'on traite des données de santé de mineurs (CNIL liste les
-traitements DPIA obligatoires). À conduire par le DPO de l'AFSR avec le développeur
-avant la mise en ligne publique.
+### 5.3 Consentement parental
 
-Modèle CNIL : <https://www.cnil.fr/fr/RGPD-analyse-impact-protection-des-donnees-aipd>
-
-### 7.3 Consentement parental
-
-Géré côté app (onboarding). Le DPO doit valider le wording de l'écran d'avertissement
-médical et le toggle de consentement.
+Géré dans l'app (onboarding). Le DPO valide le wording de l'avertissement médical et du consentement.
 
 ---
 
-## 8. Checklist finale avant publication
-
-À cocher avant soumission App Store :
+## 6. Checklist avant publication
 
 - [ ] API Statamic activée et testée (`/api/collections/news/entries` répond `200`)
-- [x] Page **politique de confidentialité** servie à `https://afsr.fr/politique-de-confidentialite`
-- [x] Page **mentions légales** servie à `https://afsr.fr/mentions-legales`
-- [ ] `AFSR_LEGAL_RNA`, `AFSR_LEGAL_SIREN` et `AFSR_LEGAL_PUBLICATION_DIRECTOR` renseignés en production
-- [ ] Page **présentation app** publiée à `https://afsr.fr/rettapp`
+- [ ] Dossier `/rettapp/` en ligne (présentation, confidentialité, mentions, FAQ) + redirections des anciennes URL
+- [ ] `AFSRLinks.swift`, fiche App Store et App Store Connect alignés sur les nouvelles URL
+- [ ] `AFSR_LEGAL_RNA`, `AFSR_LEGAL_SIREN`, `AFSR_LEGAL_PUBLICATION_DIRECTOR` renseignés en production
 - [ ] Compte **Apple Developer Organisation** ouvert et validé (D-U-N-S)
 - [ ] Bundle ID `fr.afsr.RettApp` enregistré, capabilities activées
 - [ ] Container CloudKit `iCloud.fr.afsr.RettApp` créé
 - [ ] Fiche App Store Connect créée et remplie
-- [ ] **Screenshots** produits (iPhone + iPad, 5-10 par taille)
+- [ ] **Screenshots** produits (iPhone + iPad)
 - [ ] **Icône** 1024×1024 finalisée
-- [ ] Privacy Manifest (`PrivacyInfo.xcprivacy`) ajouté dans la build
+- [ ] Privacy Manifest (`PrivacyInfo.xcprivacy`) créé et ajouté à la build
 - [ ] Déclaratif "Regulated medical device" → **No** validé
-- [ ] **Fiche RGPD registre des traitements** rédigée par le DPO
-- [ ] **DPIA** conduite et signée
-- [ ] Texte des **mentions médicales** validé par avocat santé numérique (1-2 h)
-- [ ] **Build TestFlight** validée par les premiers testeurs (familles AFSR pilotes)
+- [ ] Registre des traitements et **DPIA** par le DPO
+- [ ] Textes validés par avocat santé numérique
+- [ ] **Build TestFlight** validée par des familles pilotes
 - [ ] Soumission App Store
 
 ---
 
-*Ce document est vivant. Mettre à jour au fur et à mesure que les actions sont réalisées.*
+*Document vivant : retirer les tâches au fur et à mesure qu'elles sont faites. Déjà fait : pages légales
+servies par le dépôt du site (`LegalController`).*
