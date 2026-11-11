@@ -50,6 +50,10 @@ struct ContentView: View {
                     .tabItem { Label("AFSR", systemImage: "heart.circle.fill") }
             }
 
+            // Les lieux Rett friendly : un annuaire public, utile à tous.
+            NavigationStack { PlacesView() }
+                .tabItem { Label("Lieux", systemImage: "map.fill") }
+
             // Onglet réservé aux personnes connectées à leur compte AFSR.
             if MemberSession.shared.isSignedIn {
                 NavigationStack { MemberAreaView() }

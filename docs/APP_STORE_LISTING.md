@@ -162,7 +162,7 @@ dépôt du site, dans les trois langues de la fiche (cf. `docs/SITE_AFSR_TODO.md
 | **Privacy Policy URL** (fr) | `https://afsr.fr/politique-de-confidentialite` |
 | **Privacy Policy URL** (en) | `https://afsr.fr/privacy-policy` |
 | **Privacy Policy URL** (pt-BR) | `https://afsr.fr/politica-de-privacidade` |
-| **Support URL** | `https://afsr.fr/rettapp` (ou `https://afsr.fr/contact`) |
+| **Support URL** | `https://afsr.fr/rettapp/support` |
 | **Marketing URL** (optionnel) | `https://afsr.fr/rettapp` |
 
 ---

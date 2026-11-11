@@ -54,7 +54,6 @@ struct MemberHomeView: View {
             accountSection
             contentSection
             if !sections.isEmpty { sectionsSection }
-            moreSection
             privacySection
         }
         .afsrListBackground()
@@ -181,6 +180,11 @@ struct MemberHomeView: View {
                 AFSRRowLabel(title: "Dons et attestations fiscales", systemImage: "gift.fill", color: .afsrEmergency)
             }
             NavigationLink {
+                MyPlaceReviewsView()
+            } label: {
+                lockableLabel("Mes avis sur les lieux", systemImage: "star.bubble.fill", locked: !isActiveMember)
+            }
+            NavigationLink {
                 MemberPreferencesView(session: session)
             } label: {
                 AFSRRowLabel(title: "Réception des envois", systemImage: "envelope.fill", color: Color(hex: "#1E88E5"))
@@ -222,18 +226,6 @@ struct MemberHomeView: View {
                     )
                 }
             }
-        }
-    }
-
-    private var moreSection: some View {
-        Section {
-            // L'annuaire est public. Le dépôt d'avis, lui, demande de se
-            // connecter sur le site : il n'est pas encore dans l'app.
-            Link(destination: URL(string: "https://afsr.fr/rett-friendly")!) {
-                AFSRRowLabel(title: "Annuaire des lieux Rett friendly", systemImage: "mappin.and.ellipse", color: Color(hex: "#00897B"))
-            }
-        } footer: {
-            Text("S'ouvre sur afsr.fr. Pour déposer un avis sur un lieu, connectez-vous au site.")
         }
     }
 

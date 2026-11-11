@@ -18,9 +18,18 @@ enum AFSRLinks {
 
     static let don = URL(string: "https://afsr.fr/nous-soutenir/faire-un-don")!
 
-    /// Adresse canonique, celle à déclarer dans App Store Connect.
-    /// « /confidentialite » y redirige, pour les versions déjà publiées.
-    static let confidentialite = URL(string: "https://afsr.fr/politique-de-confidentialite")!
+    /// Le dossier que l'App Store cite : présentation, assistance, politique de
+    /// confidentialité et mentions légales à des adresses stables, sous un même
+    /// préfixe. Le site les sert directement (sans redirection) ; les adresses
+    /// historiques `/politique-de-confidentialite` et `/mentions-legales`
+    /// répondent toujours, pour les versions déjà publiées de l'app.
+    static let rettapp = URL(string: "https://afsr.fr/rettapp")!
 
-    static let mentionsLegales = URL(string: "https://afsr.fr/mentions-legales")!
+    /// À déclarer comme « Support URL » dans App Store Connect.
+    static let support = URL(string: "https://afsr.fr/rettapp/support")!
+
+    /// À déclarer comme « Privacy Policy URL » dans App Store Connect.
+    static let confidentialite = URL(string: "https://afsr.fr/rettapp/confidentialite")!
+
+    static let mentionsLegales = URL(string: "https://afsr.fr/rettapp/mentions-legales")!
 }

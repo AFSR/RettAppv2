@@ -55,11 +55,25 @@ déconnexion.
 - L'onglet **Adhérent** remplace l'entrée « Espace adhérent » de Réglages et de l'accueil
   découverte dès qu'on est connecté.
 
-## Pas encore dans l'app
+## Lieux Rett friendly (onglet « Lieux »)
 
-L'annuaire « Rett friendly » est un lien vers afsr.fr (public). **Déposer ou
-modifier un avis** reste sur le site : c'est un formulaire avec carte et
-géocodage, à porter dans un second temps.
+Intégrés à l'app, publics pour la lecture, réservés aux adhérents à jour pour l'écriture.
+
+- **Carte et liste** (`PlacesView`) : recherche instantanée (sans accents ni casse, filtrée en
+  mémoire — tout l'annuaire tient en une réponse), filtres par type et département,
+  « Autour de moi » (position **uniquement sur l'appareil**, jamais envoyée ; autorisation
+  demandée au premier appui, pas à l'ouverture de l'onglet).
+- **Fiche** (`PlaceDetailView`) : itinéraire dans Plans, appel, site, ce que les adhérents ont
+  constaté (« constaté par 3 adhérents sur 4 »), avis. Le **texte** des avis n'est lisible
+  que d'un adhérent à jour déverrouillé ; la note et les constats restent publics.
+- **Donner un avis** (`PlaceChooserView` → `PlaceReviewForm`) : on cherche le lieu dans
+  l'annuaire, puis sur **Plans** (MapKit) s'il n'y figure pas — nom, adresse, ville et
+  position viennent avec le résultat, le type est déduit de la catégorie et se corrige. Tout
+  arrive **en relecture**, un lieu proposé arrive en **brouillon**, comme sur le site.
+- **Mes avis** (Adhérent › Mes avis sur les lieux) : état en relecture / publié / refusé,
+  modification (repasse en relecture) et retrait.
+- Règles identiques au site, vérifiées par `PlacesApiTest` côté site : un avis par lieu, cinq
+  dépôts par jour, engagement de visite obligatoire.
 
 ## Prérequis de mise en ligne
 

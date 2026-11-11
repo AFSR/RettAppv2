@@ -3,6 +3,7 @@ import LocalAuthentication
 import Observation
 import Security
 import SwiftUI
+import UIKit
 
 // MARK: - Trousseau
 
@@ -252,7 +253,7 @@ final class MemberSession {
         let result: LoginResult = try await client.post("/connexion/verification", body: [
             "challenge": challenge,
             "code": code,
-            "device_name": "RettApp iOS"
+            "device_name": "RettApp · \(UIDevice.current.model)"
         ])
         return try finish(result)
     }

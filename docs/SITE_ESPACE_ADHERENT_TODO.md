@@ -40,11 +40,10 @@ Complète `SITE_AFSR_TODO.md`. Code concerné : dépôt AFSR/website, branche
 
 ## C. Sécurité (recommandé)
 
-12. **« Mes appareils connectés »** dans `/mon-compte` : liste des jetons (`member_api_tokens` :
-    nom, dernier usage) avec bouton « Déconnecter » et « Tout déconnecter ». Aujourd'hui, un
-    adhérent qui perd son téléphone n'a aucun moyen de couper la session depuis le site.
-13. **E-mail de prévenance** à chaque nouvelle connexion depuis l'app (« Connexion à votre
-    espace depuis RettApp — ce n'était pas vous ? »). Détecte une prise de contrôle.
+12. ~~« Mes appareils connectés »~~ **Fait** : `/mon-compte/appareils` (liste, « Déconnecter »,
+    « Tout déconnecter »), dans le menu du compte.
+13. ~~E-mail de prévenance~~ **Fait** : chaque nouvelle connexion depuis l'app envoie un courriel
+    (`NewAppLogin`). À vérifier : que l'envoi d'e-mails fonctionne en production.
 14. **Alerte sur les codes demandés en masse** (logs `Envoi du code de connexion impossible`,
     limites 10/min/IP et 5/h/identifiant déjà en place) : surveiller le coût SMS.
 15. Passer en revue le **pare-feu OVH** : l'API n'utilise que GET et POST, rien à ouvrir. Vérifier
@@ -56,8 +55,8 @@ Complète `SITE_AFSR_TODO.md`. Code concerné : dépôt AFSR/website, branche
 16. `App\Classes\AppShell`, `afsr.app_shell_token`, et les `@unless($appShell)` des gabarits ne
     servent plus à l'app (elle n'affiche plus de pages du site). Ils sont inoffensifs ; à retirer
     quand on voudra alléger.
-17. La page « Lieux Rett friendly » (dépôt d'avis) n'est pas dans l'app : elle ne s'ouvre plus
-    dans l'application, seulement dans Safari, où l'adhérent doit se reconnecter.
+17. ~~Lieux Rett friendly~~ **Fait** : intégrés à l'app (onglet « Lieux »), via
+    `/api/membre/lieux`. Aucune action côté base.
 
 ## E. Côté Apple (hors site)
 
@@ -66,3 +65,25 @@ Complète `SITE_AFSR_TODO.md`. Code concerné : dépôt AFSR/website, branche
     l'utilisateur, pour la fonctionnalité de l'app, sans suivi. Face ID n'est pas une collecte :
     rien de biométrique ne quitte l'appareil.
 19. Notes de version : mentionner l'espace adhérent et le verrouillage Face ID.
+
+## F. Pages App Store sous `/rettapp` (fait dans le code, à vérifier en ligne)
+
+| Champ App Store Connect | URL |
+|---|---|
+| Support URL | `https://afsr.fr/rettapp/support` (alias `/rettapp/faq`) |
+| Privacy Policy URL | `https://afsr.fr/rettapp/confidentialite` (EN `/privacy-policy`, PT `/politica-de-privacidade`) |
+| Marketing URL | `https://afsr.fr/rettapp` |
+| Mentions légales | `https://afsr.fr/rettapp/mentions-legales` (EN `/legal-notice`, PT `/avisos-legais`) |
+
+Ouvrir chacune dans un navigateur **après le déploiement** : Apple refuse une mise à jour dont
+l'adresse ne répond pas. Les adresses historiques répondent toujours.
+
+## G. Lieux Rett friendly dans l'app
+
+20. **App Store Connect → Confidentialité** : la position (précise ou approximative) est lue sur
+    l'appareil et **n'est pas collectée** (jamais envoyée) : ne pas la déclarer comme collectée.
+    La recherche d'adresse passe par Plans d'Apple (MapKit) : rien à déclarer pour l'AFSR.
+21. **Modération** : les avis et les lieux proposés depuis l'app arrivent dans la même file que
+    ceux du site (Runway). Prévoir de relire plus souvent : l'app les rend plus faciles à
+    déposer. Un lieu proposé arrive **en brouillon** avec ses coordonnées Plans : à publier
+    d'abord, sinon l'avis publié ne paraît nulle part.

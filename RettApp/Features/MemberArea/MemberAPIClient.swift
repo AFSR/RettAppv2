@@ -83,7 +83,17 @@ final class MemberAPIClient {
     }
 
     func post<T: Decodable>(_ path: String, body: [String: String] = [:]) async throws -> T {
-        try await send(method: "POST", path: Self.apiPrefix + path, body: body)
+        try await send(method: "POST", path: Self.apiPrefix + path, body: try JSONEncoder().encode(body))
+    }
+
+    /// Corps JSON libre : valeurs imbriquées, nombres, booléens. Pour les envois
+    /// qui ne tiennent pas dans un dictionnaire de chaînes (avis sur un lieu).
+    func postJSON<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+        guard JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(withJSONObject: body) else {
+            throw MemberAPIError.unreadable
+        }
+        return try await send(method: "POST", path: Self.apiPrefix + path, body: data)
     }
 
     /// Télécharge un document dans un dossier temporaire et renvoie son
@@ -139,7 +149,7 @@ final class MemberAPIClient {
 
     // MARK: - Internes
 
-    private func send<T: Decodable>(method: String, path: String, body: [String: String]?) async throws -> T {
+    private func send<T: Decodable>(method: String, path: String, body: Data?) async throws -> T {
         let request = try makeRequest(method: method, path: path, body: body, accept: "application/json")
 
         let (data, response): (Data, URLResponse)
@@ -162,7 +172,7 @@ final class MemberAPIClient {
         }
     }
 
-    private func makeRequest(method: String, path: String, body: [String: String]?, accept: String) throws -> URLRequest {
+    private func makeRequest(method: String, path: String, body: Data?, accept: String) throws -> URLRequest {
         var components = URLComponents()
         components.scheme = "https"
         components.host = Self.host
@@ -178,7 +188,7 @@ final class MemberAPIClient {
         }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(body)
+            request.httpBody = body
         }
         return request
     }
