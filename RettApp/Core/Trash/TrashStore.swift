@@ -65,6 +65,24 @@ enum TrashStore {
 
         var restorable: Bool { restorableFlag ?? true }
 
+        init(
+            id: UUID,
+            recordName: String,
+            recordType: String,
+            deletedAt: Date,
+            summary: String,
+            payload: CombinedBackup,
+            restorableFlag: Bool? = nil
+        ) {
+            self.id = id
+            self.recordName = recordName
+            self.recordType = recordType
+            self.deletedAt = deletedAt
+            self.summary = summary
+            self.payload = payload
+            self.restorableFlag = restorableFlag
+        }
+
         var expiresAt: Date { deletedAt.addingTimeInterval(TrashStore.retention) }
 
         static func == (lhs: Item, rhs: Item) -> Bool { lhs.id == rhs.id }

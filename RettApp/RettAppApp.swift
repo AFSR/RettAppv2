@@ -170,6 +170,9 @@ struct RettAppApp: App {
                     }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
+                    // Verrou de l'espace adhérent : il se referme après un
+                    // moment en arrière-plan.
+                    MemberSession.shared.scenePhaseChanged(newPhase)
                     // Pull silencieux à chaque retour au foreground pour que
                     // les changements de l'autre parent apparaissent sans
                     // intervention manuelle.

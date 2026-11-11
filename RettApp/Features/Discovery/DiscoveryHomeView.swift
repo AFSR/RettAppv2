@@ -3,11 +3,10 @@ import SwiftUI
 /// Écran d'accueil de l'usage « découverte » : la porte d'entrée vers
 /// l'association pour qui ne suit pas d'enfant.
 ///
-/// Il ne rassemble pour l'instant que ce qui existe réellement dans l'app.
-/// Les deux briques annoncées dans la cible — espace adhérent en vue intégrée
-/// et information de fond sur la maladie et la recherche — n'y sont pas encore
-/// et ne sont donc pas affichées : un écran ne promet rien qu'il ne tienne.
-/// Elles viendront se loger ici.
+/// Il ne rassemble que ce qui existe réellement dans l'app : l'espace adhérent
+/// (écrans natifs, voir `MemberAreaView`), le don et les mentions légales.
+/// L'information de fond sur la maladie et la recherche n'y est pas encore et
+/// n'est donc pas affichée : un écran ne promet rien qu'il ne tienne.
 struct DiscoveryHomeView: View {
     @Environment(UsageModeStore.self) private var usageStore
     @State private var showStartSuiviConfirm = false
@@ -26,16 +25,19 @@ struct DiscoveryHomeView: View {
                 .padding(.vertical, 4)
             }
 
-            Section {
-                NavigationLink {
-                    MemberAreaView()
-                } label: {
-                    Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+            // Connecté, l'espace adhérent a son propre onglet.
+            if !MemberSession.shared.isSignedIn {
+                Section {
+                    NavigationLink {
+                        MemberAreaView()
+                    } label: {
+                        Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+                    }
+                } header: {
+                    Text("Adhésion")
+                } footer: {
+                    Text("Votre adhésion, vos dons et attestations fiscales, les publications et communications réservées aux adhérents. Connexion par code reçu en SMS ou par e-mail, sans mot de passe.")
                 }
-            } header: {
-                Text("Adhésion")
-            } footer: {
-                Text("Votre adhésion, vos dons et attestations fiscales, les publications et communications réservées aux adhérents. Connexion par code reçu en SMS ou par e-mail, sans mot de passe.")
             }
 
             Section {
@@ -71,6 +73,7 @@ struct DiscoveryHomeView: View {
             }
         }
         .navigationTitle("AFSR")
+        .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
             "Créer un suivi ?",
             isPresented: $showStartSuiviConfirm,

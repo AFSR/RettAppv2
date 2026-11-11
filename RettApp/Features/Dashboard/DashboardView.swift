@@ -137,7 +137,7 @@ struct DashboardView: View {
         }
         .background(Color.afsrBackground.ignoresSafeArea())
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .onChange(of: viewModel.scale) { _, _ in crosshairDate = nil }
         .onChange(of: viewModel.referenceDate) { _, _ in crosshairDate = nil }
     }

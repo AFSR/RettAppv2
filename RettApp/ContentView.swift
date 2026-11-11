@@ -50,6 +50,12 @@ struct ContentView: View {
                     .tabItem { Label("AFSR", systemImage: "heart.circle.fill") }
             }
 
+            // Onglet réservé aux personnes connectées à leur compte AFSR.
+            if MemberSession.shared.isSignedIn {
+                NavigationStack { MemberAreaView() }
+                    .tabItem { Label("Adhérent", systemImage: "person.crop.circle.fill") }
+            }
+
             NavigationStack { SettingsView(usage: usage) }
                 .tabItem { Label("Réglages", systemImage: "gear") }
         }

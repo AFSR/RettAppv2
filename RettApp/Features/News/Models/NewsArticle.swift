@@ -198,11 +198,13 @@ struct NewsArticle: Identifiable, Hashable, Codable {
             self.id = s
         } else if let n = try? c.decode(Int.self, forKey: .id) {
             self.id = String(n)
+        } else if let slug = try? c.decode(String.self, forKey: .slug) {
+            self.id = slug
         } else {
             self.id = UUID().uuidString
         }
 
-        self.title = (try? c.decode(String.self, forKey: .title)) ?? "Sans titre"
+        self.title = NewsArticle.decodeHTMLEntities((try? c.decode(String.self, forKey: .title)) ?? "Sans titre")
         self.slug = try? c.decodeIfPresent(String.self, forKey: .slug)
 
         if let dateString = try? c.decodeIfPresent(String.self, forKey: .date) {
@@ -216,7 +218,7 @@ struct NewsArticle: Identifiable, Hashable, Codable {
         self.content = fragments.joined(separator: "\n")
 
         if let given = try? c.decodeIfPresent(String.self, forKey: .excerpt), !given.isEmpty {
-            self.excerpt = given
+            self.excerpt = NewsArticle.decodeHTMLEntities(given)
         } else {
             self.excerpt = NewsArticle.plainTextExcerpt(fromHTML: self.content)
         }
@@ -255,12 +257,7 @@ struct NewsArticle: Identifiable, Hashable, Codable {
         var text = html.replacingOccurrences(
             of: "<[^>]+>", with: " ", options: .regularExpression
         )
-        text = text.replacingOccurrences(of: "&nbsp;", with: " ")
-        text = text.replacingOccurrences(of: "&amp;", with: "&")
-        text = text.replacingOccurrences(of: "&lt;", with: "<")
-        text = text.replacingOccurrences(of: "&gt;", with: ">")
-        text = text.replacingOccurrences(of: "&#39;", with: "'")
-        text = text.replacingOccurrences(of: "&quot;", with: "\"")
+        text = decodeHTMLEntities(text)
         text = text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
@@ -271,6 +268,47 @@ struct NewsArticle: Identifiable, Hashable, Codable {
             return String(cut[..<lastSpace]) + "…"
         }
         return String(cut) + "…"
+    }
+
+    private static let entityRegex = try! NSRegularExpression(
+        pattern: "&(#[0-9]+|#[xX][0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]*);"
+    )
+
+    private static let namedEntities: [String: String] = [
+        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'",
+        "nbsp": " ", "hellip": "…", "lsquo": "‘", "rsquo": "’",
+        "ldquo": "“", "rdquo": "”", "laquo": "«", "raquo": "»",
+        "ndash": "–", "mdash": "—", "euro": "€", "oelig": "œ", "OElig": "Œ",
+        "eacute": "é", "egrave": "è", "ecirc": "ê", "euml": "ë",
+        "agrave": "à", "acirc": "â", "icirc": "î", "iuml": "ï",
+        "ocirc": "ô", "ugrave": "ù", "ucirc": "û", "ccedil": "ç",
+        "Eacute": "É", "Egrave": "È", "Agrave": "À", "Ccedil": "Ç"
+    ]
+
+    /// Décode les entités HTML — numériques (`&#039;`, `&#x27;`) et nommées
+    /// courantes. Le site les émet dans les titres et le texte brut ; sans
+    /// ce décodage, l'app affiche « j&#039;ai » tel quel. Une entité
+    /// inconnue est laissée intacte.
+    static func decodeHTMLEntities(_ input: String) -> String {
+        guard input.contains("&") else { return input }
+        let ns = input as NSString
+        let result = NSMutableString(string: input)
+        let matches = entityRegex.matches(in: input, range: NSRange(location: 0, length: ns.length))
+        for m in matches.reversed() {
+            let name = ns.substring(with: m.range(at: 1))
+            var replacement: String?
+            if name.hasPrefix("#") {
+                let digits = name.dropFirst()
+                let code = digits.first == "x" || digits.first == "X"
+                    ? UInt32(digits.dropFirst(), radix: 16)
+                    : UInt32(digits, radix: 10)
+                replacement = code.flatMap(Unicode.Scalar.init).map { String(Character($0)) }
+            } else {
+                replacement = namedEntities[name]
+            }
+            if let replacement { result.replaceCharacters(in: m.range, with: replacement) }
+        }
+        return result as String
     }
 
     private static let isoFormatter: ISO8601DateFormatter = {

@@ -52,7 +52,11 @@ struct SettingsView: View {
             //    déjà présenté dans la page de don elle-même)
             supportSection
 
-            memberAreaSection
+            // Une fois connecté, l'espace adhérent a son propre onglet : le
+            // garder ici en ferait deux portes vers le même écran.
+            if !MemberSession.shared.isSignedIn {
+                memberAreaSection
+            }
 
             if isSuivi {
                 // ── 1. PROFIL
@@ -130,6 +134,7 @@ struct SettingsView: View {
 
         }
         .navigationTitle("Réglages")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await refreshAuthorizations() }
         .confirmationDialog(
             "Créer un suivi ?",
