@@ -9,9 +9,19 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: systemImage)
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(.afsrPurpleLight)
+            ZStack {
+                Circle()
+                    .fill(Color.afsrPurpleAdaptive.opacity(0.08))
+                    .frame(width: 128, height: 128)
+                Circle()
+                    .fill(Color.afsrPurpleAdaptive.opacity(0.14))
+                    .frame(width: 92, height: 92)
+                Image(systemName: systemImage)
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(.afsrPurpleAdaptive)
+            }
+            .accessibilityHidden(true)
+            .padding(.bottom, 4)
             Text(title)
                 .font(AFSRFont.headline())
             Text(message)

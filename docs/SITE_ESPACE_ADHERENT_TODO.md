@@ -21,13 +21,14 @@ Complète `SITE_AFSR_TODO.md`. Code concerné : dépôt AFSR/website, branche
 ## B. Pages légales et RGPD (à faire avant la publication)
 
 7. **Politique de confidentialité du site afsr.fr** : ajouter l'application mobile.
-   Texte prêt dans `website/confidentialite.html` §2.5 (FR/EN/PT), à reprendre. Points à
+   Les pages légales vivent désormais dans le dépôt du site (AFSR/website) et sont servies
+   sur `afsr.fr/rettapp/confidentialite` (FR/EN/PT) : y ajouter la section app. Points à
    couvrir : données affichées à la demande et non copiées dans l'app ; jeton conservé 90 jours
    après le dernier usage, 365 au plus ; empreinte seule côté serveur ; nom d'appareil générique.
-8. **Pages de l'app** (`rettapp.afsr.fr/confidentialite.html`, `privacy-policy.html`,
-   `politica-de-privacidade.html`) : republier les fichiers du dossier `website/` de ce dépôt.
-   L'ancienne version affirmait que l'app « ne demande pas de permission Face ID » : c'est
-   désormais faux, et la page est liée depuis l'App Store.
+8. **Pages de l'app** : plus de dossier `website/` dans ce dépôt. Vérifier que les pages
+   du site (`politique-de-confidentialite`, `privacy-policy`, `politica-de-privacidade`)
+   mentionnent bien Face ID : l'ancienne version affirmait que l'app « ne demande pas de
+   permission Face ID », ce qui est faux, et la page est liée depuis l'App Store.
 9. **Registre des traitements** : ajouter « authentification et sessions de l'application
    mobile » (finalité : accès sécurisé à l'espace adhérent ; données : identifiant de contact,
    empreinte de jeton, date d'usage ; durée 90 j glissants / 365 j max ; base légale :

@@ -42,6 +42,19 @@ struct NewsListView: View {
         .background(Color.afsrBackground)
         .navigationTitle("Actualités")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Logo de l'association en haut à gauche : la place d'une
+            // marque sur iOS, la droite étant réservée aux actions. Libre
+            // ici, l'onglet étant à la racine (pas de bouton retour).
+            ToolbarItem(placement: .topBarLeading) {
+                Image("RettLogo")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 28)
+                    .accessibilityLabel("Association Française du Syndrome de Rett")
+            }
+        }
         .refreshable { await viewModel.refresh() }
         .task { if viewModel.articles.isEmpty { await viewModel.refresh() } }
     }
@@ -79,7 +92,7 @@ private struct NewsCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+        .shadow(color: .afsrShadow, radius: 14, x: 0, y: 6)
         .accessibilityElement(children: .combine)
     }
 
@@ -144,7 +157,7 @@ private struct NewsCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color.afsrSurface)
     }
 
     // MARK: Éléments

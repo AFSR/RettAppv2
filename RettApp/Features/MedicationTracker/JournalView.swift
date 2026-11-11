@@ -401,7 +401,17 @@ private struct JournalContent: View {
                 if logs.isEmpty && seizures.isEmpty && moods.isEmpty {
                     emptyState
                 } else {
-                    LazyVStack(spacing: 8) {
+                    HStack {
+                        Text("Fil de la journée")
+                            .font(AFSRFont.headline(17))
+                        Spacer()
+                        Text(combinedFeed.count == 1 ? "1 entrée" : "\(combinedFeed.count) entrées")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 4)
+                    LazyVStack(spacing: 10) {
                         ForEach(combinedFeed) { item in
                             JournalFeedRow(
                                 item: item,
@@ -447,10 +457,14 @@ private struct JournalContent: View {
         let s = stats
         let lateLogs = logs.filter { $0.isLate }.count
         return HStack(spacing: 10) {
-            StatPill(value: "\(s.taken)/\(s.planned)", label: "Pris", color: .afsrSuccess)
-            StatPill(value: "\(s.adHoc)", label: "Ponctuels", color: .afsrPurpleAdaptive)
+            StatPill(value: "\(s.taken)/\(s.planned)", label: "Pris", color: .afsrSuccess,
+                     systemImage: "checkmark",
+                     progress: s.planned > 0 ? Double(s.taken) / Double(s.planned) : 0)
+            StatPill(value: "\(s.adHoc)", label: "Ponctuels", color: .afsrPurpleAdaptive,
+                     systemImage: "pin.fill")
             if lateLogs > 0 {
-                StatPill(value: "\(lateLogs)", label: "En retard", color: .afsrWarning)
+                StatPill(value: "\(lateLogs)", label: "En retard", color: .afsrWarning,
+                         systemImage: "clock.fill")
             }
         }
         .padding(.horizontal)
@@ -460,16 +474,15 @@ private struct JournalContent: View {
     private var moodObservationCard: some View {
         let dayObs = observations.first
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "face.smiling")
-                    .foregroundStyle(.afsrPurpleAdaptive)
+            HStack(spacing: 10) {
+                AFSRIconBadge(systemImage: "face.smiling", color: .afsrSuccess, size: 28)
                 Text("Humeur & observations")
-                    .font(AFSRFont.headline(15))
+                    .font(AFSRFont.headline(16))
                 Spacer()
             }
 
             if moods.isEmpty && (dayObs == nil || dayObs?.isPopulated == false) {
-                Text("Aucune saisie aujourd'hui")
+                Text("Rien de noté pour ce jour. Ajoutez une humeur, les repas ou le sommeil.")
                     .font(AFSRFont.caption())
                     .foregroundStyle(.secondary)
             } else {
@@ -511,28 +524,29 @@ private struct JournalContent: View {
                 } label: {
                     Label("Humeur", systemImage: "plus")
                         .font(AFSRFont.caption())
-                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
                         .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
                         .foregroundStyle(.afsrPurpleAdaptive)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AFSRPressableStyle())
                 Button {
                     showObservation = true
                 } label: {
                     Label(dayObs?.isPopulated == true ? "Modifier obs." : "Repas / sommeil",
                           systemImage: "square.and.pencil")
                         .font(AFSRFont.caption())
-                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
                         .background(Color.afsrPurpleAdaptive.opacity(0.15), in: Capsule())
                         .foregroundStyle(.afsrPurpleAdaptive)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(AFSRPressableStyle())
                 Spacer()
             }
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .padding(14)
+        .afsrSurface()
         .padding(.horizontal)
         .sheet(isPresented: $showMood) { MoodSheet() }
         .sheet(isPresented: $showObservation) {
@@ -542,18 +556,27 @@ private struct JournalContent: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "pills")
-                .font(.system(size: 40, weight: .light))
-                .foregroundStyle(.secondary)
+            ZStack {
+                Circle()
+                    .fill(Color.afsrPurpleAdaptive.opacity(0.08))
+                    .frame(width: 104, height: 104)
+                Circle()
+                    .fill(Color.afsrPurpleAdaptive.opacity(0.14))
+                    .frame(width: 76, height: 76)
+                Image(systemName: "pills.fill")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(.afsrPurpleAdaptive)
+            }
+            .accessibilityHidden(true)
             Text("Aucune prise pour cette journée")
-                .font(AFSRFont.headline(15))
+                .font(AFSRFont.headline(16))
             Text("Touchez ➕ pour noter une prise, une humeur ou un symptôme. Le plan médicamenteux se règle depuis le menu ···.")
                 .font(AFSRFont.caption())
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
         }
-        .padding(.top, 40)
+        .padding(.top, 28)
     }
 
     private func toggle(_ log: MedicationLog) {
@@ -620,10 +643,7 @@ private struct SymptomRowCompact: View {
     let event: SymptomEvent
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: event.symptomType.icon)
-                .font(.system(size: 22))
-                .foregroundStyle(.afsrPurpleAdaptive)
-                .frame(width: 32)
+            AFSRSoftIconBadge(systemImage: event.symptomType.icon, color: .afsrPurpleAdaptive)
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.symptomType.label)
                     .font(AFSRFont.headline(15))
@@ -652,8 +672,7 @@ private struct SymptomRowCompact: View {
             Spacer()
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .afsrSurface()
     }
 }
 
@@ -663,10 +682,7 @@ private struct SeizureRowCompact: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                Image(systemName: "waveform.path.ecg")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.afsrEmergency)
-                    .frame(width: 32)
+                AFSRSoftIconBadge(systemImage: "waveform.path.ecg", color: .afsrEmergency)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text("Crise — \(event.seizureType.label)")
@@ -693,8 +709,7 @@ private struct SeizureRowCompact: View {
                     .foregroundStyle(.secondary)
             }
             .padding(12)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+            .afsrSurface()
         }
         .buttonStyle(.plain)
     }
@@ -705,8 +720,9 @@ private struct MoodRowCompact: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(entry.level.emoji)
-                .font(.system(size: 26))
-                .frame(width: 32)
+                .font(.system(size: 24))
+                .frame(width: 40, height: 40)
+                .background(Color.afsrSuccess.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.level.label)
                     .font(AFSRFont.headline(15))
@@ -726,8 +742,7 @@ private struct MoodRowCompact: View {
             Spacer()
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .afsrSurface()
     }
 }
 
@@ -753,16 +768,14 @@ private struct JournalEntryRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: statusIcon)
-                .font(.system(size: 24))
-                .foregroundStyle(statusColor)
-                .frame(width: 32)
+            AFSRSoftIconBadge(systemImage: statusIcon, color: statusColor)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(log.medicationName)
                         .font(AFSRFont.headline(16))
                         .lineLimit(1)
+                        .foregroundStyle(!log.isAdHoc && log.taken ? Color.secondary : Color.primary)
                     if log.isAdHoc {
                         Text("Ponctuel")
                             .font(AFSRFont.caption())
@@ -812,8 +825,8 @@ private struct JournalEntryRow: View {
             }
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .afsrSurface()
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall + 4, style: .continuous))
         .contextMenu {
             if !log.isAdHoc {
                 Button {
@@ -831,19 +844,47 @@ private struct StatPill: View {
     let value: String
     let label: String
     let color: Color
+    var systemImage: String = "circle.fill"
+    /// Progression 0…1 affichée en anneau autour de l'icône (nil = pas d'anneau).
+    var progress: Double? = nil
+
     var body: some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(AFSRFont.headline(18))
-                .foregroundStyle(color)
-            Text(label)
-                .font(AFSRFont.caption())
-                .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .stroke(color.opacity(0.15), lineWidth: 4)
+                if let progress {
+                    Circle()
+                        .trim(from: 0, to: max(0, min(1, progress)))
+                        .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeOut(duration: 0.4), value: progress)
+                }
+                Image(systemName: systemImage)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(color)
+            }
+            .frame(width: 36, height: 36)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(value)
+                    .font(AFSRFont.headline(18))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                Text(label)
+                    .font(AFSRFont.caption(12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: AFSRTokens.cornerRadiusSmall))
+        .frame(maxWidth: .infinity)
+        .afsrSurface()
+        .accessibilityElement(children: .combine)
     }
 }
 

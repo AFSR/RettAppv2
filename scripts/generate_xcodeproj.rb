@@ -115,15 +115,19 @@ common_app_settings = {
   'TARGETED_DEVICE_FAMILY'               => '1,2',
   # ⚠️ Ces deux valeurs sont la source de vérité : le projet est régénéré, et
   # une version corrigée à la main dans Xcode est perdue à la prochaine
-  # exécution de ce script. Elles étaient restées à 1.5.0 / 11 alors que
-  # l'App Store en est à 1.9 (build 2) : régénérer aurait fait régresser la
-  # version annoncée, et App Store Connect refuse un numéro inférieur au
-  # dernier publié.
+  # exécution de ce script. C'est exactement ce qui est arrivé : le projet
+  # portait 1.9 / 11, corrigé directement dans project.pbxproj, pendant que ce
+  # script annonçait encore 1.5.0 / 11 — la prochaine régénération aurait fait
+  # régresser la version annoncée, et App Store Connect refuse un numéro
+  # inférieur au dernier publié.
+  #
+  # Build 12 et non 3 : il doit passer au-dessus du 11 que portait déjà le
+  # projet, pas seulement au-dessus de ce qui est en ligne.
   #
   # À avancer ICI avant chaque archivage. Le build doit augmenter à chaque
   # envoi, même pour renvoyer le même code après un rejet.
   'MARKETING_VERSION'                    => '1.9.1',
-  'CURRENT_PROJECT_VERSION'              => '3',
+  'CURRENT_PROJECT_VERSION'              => '12',
   'ENABLE_USER_SCRIPT_SANDBOXING'        => 'YES',
   'SWIFT_EMIT_LOC_STRINGS'               => 'YES',
   'SUPPORTS_MACCATALYST'                 => 'NO',

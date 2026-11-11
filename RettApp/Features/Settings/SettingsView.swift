@@ -67,7 +67,7 @@ struct SettingsView: View {
                     NavigationLink {
                         ConfigurationSubView()
                     } label: {
-                        Label("Suivi & rappels", systemImage: "slider.horizontal.3")
+                        AFSRRowLabel(title: "Suivi & rappels", systemImage: "slider.horizontal.3", color: .afsrPurple)
                     }
                 } header: {
                     Text("Suivi médical")
@@ -83,12 +83,12 @@ struct SettingsView: View {
                     NavigationLink {
                         MedicalReportView()
                     } label: {
-                        Label("Rapport pour le médecin (PDF)", systemImage: "doc.text.fill")
+                        AFSRRowLabel(title: "Rapport pour le médecin (PDF)", systemImage: "doc.text.fill", color: Color(hex: "#1E88E5"))
                     }
                     NavigationLink {
                         FollowUpBookletView()
                     } label: {
-                        Label("Cahier de suivi (école / centre)", systemImage: "book.closed.fill")
+                        AFSRRowLabel(title: "Cahier de suivi (école / centre)", systemImage: "book.closed.fill", color: Color(hex: "#00897B"))
                     }
                 } header: {
                     Text("Documents à imprimer")
@@ -101,7 +101,7 @@ struct SettingsView: View {
                     NavigationLink {
                         DataSubView()
                     } label: {
-                        Label("Mes données", systemImage: "internaldrive")
+                        AFSRRowLabel(title: "Mes données", systemImage: "internaldrive.fill", color: Color(hex: "#546E7A"))
                     }
                 } header: {
                     Text("Données")
@@ -116,23 +116,35 @@ struct SettingsView: View {
                 startSuiviSection
             }
 
+            // ── APPARENCE (dans les deux usages)
+            Section {
+                NavigationLink {
+                    AppIconPickerView()
+                } label: {
+                    Label("Icône de l'app", systemImage: "app.badge")
+                }
+            } header: {
+                Text("Apparence")
+            }
+
             // ── 7. AIDE & LÉGAL
             Section {
                 NavigationLink {
                     MedicalDisclaimerSubView()
                 } label: {
-                    Label("Avertissement médical", systemImage: "exclamationmark.shield.fill")
+                    AFSRRowLabel(title: "Avertissement médical", systemImage: "exclamationmark.shield.fill", color: .afsrWarning)
                 }
                 NavigationLink {
                     AboutSubView()
                 } label: {
-                    Label("À propos et mentions légales", systemImage: "info.circle.fill")
+                    AFSRRowLabel(title: "À propos et mentions légales", systemImage: "info.circle.fill", color: Color(hex: "#8E8E93"))
                 }
             } header: {
                 Text("Aide et informations")
             }
 
         }
+        .afsrListBackground()
         .navigationTitle("Réglages")
         .navigationBarTitleDisplayMode(.inline)
         .task { await refreshAuthorizations() }
@@ -208,7 +220,7 @@ struct SettingsView: View {
     private var deviceRoleSection: some View {
         Section {
             HStack {
-                Label("Cet iPhone est utilisé par", systemImage: "iphone")
+                AFSRRowLabel(title: "Cet iPhone est utilisé par", systemImage: "iphone", color: Color(hex: "#546E7A"))
                 Spacer()
                 Text(DeviceRoleStore.shared.role.label)
                     .foregroundStyle(.secondary)
@@ -217,11 +229,12 @@ struct SettingsView: View {
                 pendingRole = (DeviceRoleStore.shared.role == .parent) ? .child : .parent
                 showRoleChangeConfirm = true
             } label: {
-                Label(
-                    DeviceRoleStore.shared.role == .parent
+                AFSRRowLabel(
+                    title: DeviceRoleStore.shared.role == .parent
                         ? "Basculer en mode enfant pour activer Apple Santé…"
                         : "Basculer en mode parent…",
-                    systemImage: "arrow.triangle.2.circlepath"
+                    systemImage: "arrow.triangle.2.circlepath",
+                    color: .afsrPurpleAdaptive
                 )
             }
         } header: {
@@ -244,21 +257,42 @@ struct SettingsView: View {
         Section("Profil") {
             if let profile = profiles.first {
                 Button { showChildEditor = true } label: {
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .foregroundStyle(.afsrPurpleAdaptive)
-                        VStack(alignment: .leading) {
-                            Text(profile.firstName).font(AFSRFont.headline(17)).foregroundStyle(.primary)
-                            if let age = profile.ageYears {
-                                Text("\(age) ans").font(AFSRFont.caption()).foregroundStyle(.secondary)
+                    HStack(spacing: 14) {
+                        AFSRAvatar(name: profile.firstName, size: 54)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(profile.firstName.isEmpty ? "Votre enfant" : profile.firstName)
+                                .font(AFSRFont.headline(19))
+                                .foregroundStyle(.primary)
+                            HStack(spacing: 6) {
+                                if let age = profile.ageYears {
+                                    profileChip("\(age) ans", systemImage: "birthday.cake.fill")
+                                }
+                                if profile.hasEpilepsy {
+                                    profileChip("Épilepsie", systemImage: "waveform.path.ecg")
+                                }
                             }
                         }
                         Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.tertiary)
                     }
+                    .padding(.vertical, 6)
                 }
+                .accessibilityHint("Modifier le profil de l'enfant")
             }
         }
+    }
+
+    private func profileChip(_ text: String, systemImage: String) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(AFSRFont.caption(12))
+            .fontWeight(.semibold)
+            .labelStyle(.titleAndIcon)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .foregroundStyle(.afsrPurpleAdaptive)
+            .background(Color.afsrPurpleAdaptive.opacity(0.12), in: Capsule())
     }
 
     private var sharingSection: some View {
@@ -266,7 +300,7 @@ struct SettingsView: View {
             NavigationLink {
                 ParentSharingView()
             } label: {
-                Label("Partage entre parents", systemImage: "person.2.badge.plus.fill")
+                AFSRRowLabel(title: "Partage entre parents", systemImage: "person.2.fill", color: Color(hex: "#3949AB"))
             }
         } header: {
             Text("Partage")
@@ -282,7 +316,7 @@ struct SettingsView: View {
             Button {
                 showStartSuiviConfirm = true
             } label: {
-                Label("Créer un suivi pour un enfant", systemImage: "plus.circle.fill")
+                AFSRRowLabel(title: "Créer un suivi pour un enfant", systemImage: "plus", color: .afsrSuccess)
             }
         } header: {
             Text("Suivi médical")
@@ -296,9 +330,30 @@ struct SettingsView: View {
             NavigationLink {
                 DonationView()
             } label: {
-                Label("Soutenir l'AFSR", systemImage: "heart.circle.fill")
-                    .foregroundStyle(.afsrEmergency)
+                HStack(spacing: 14) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 46, height: 46)
+                        .background(.white.opacity(0.2), in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Soutenir l'AFSR")
+                            .font(AFSRFont.headline(17))
+                        Text("Chaque don aide les familles et la recherche")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.white.opacity(0.88))
+                    }
+                    .foregroundStyle(.white)
+                }
+                .padding(.vertical, 6)
             }
+            .listRowBackground(
+                LinearGradient(
+                    colors: [Color.afsrEmergency, Color(hex: "#FF6F61")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
         }
     }
 
@@ -313,7 +368,7 @@ struct SettingsView: View {
             NavigationLink {
                 MemberAreaView()
             } label: {
-                Label("Espace adhérent", systemImage: "person.text.rectangle.fill")
+                AFSRRowLabel(title: "Espace adhérent", systemImage: "person.text.rectangle.fill", color: .afsrPurpleLight)
             }
         } footer: {
             Text("Votre adhésion, vos dons et attestations fiscales, les publications réservées aux adhérents. Sans rapport avec vos données de suivi, qui restent sur cet appareil.")
