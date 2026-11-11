@@ -23,6 +23,7 @@ struct PlaceDetailView: View {
     struct FormulaireDemande: Identifiable {
         let lieuID: String
         let nom: String
+        let sousTitre: String
         let criteres: [PlaceCriterion]
         let existant: MyPlaceReview?
 
@@ -50,11 +51,16 @@ struct PlaceDetailView: View {
                 .background(Color.afsrBackground)
                 .sheet(item: $formulaire) { demande in
                     NavigationStack {
-                        PlaceReviewFormView(
+                        PlaceReviewSheet(
                             session: session,
-                            store: nil,
-                            lieu: (id: demande.lieuID, nom: demande.nom, criteres: demande.criteres),
-                            existant: demande.existant
+                            place: .init(
+                                establishmentID: demande.lieuID,
+                                name: demande.nom,
+                                subtitle: demande.sousTitre,
+                                criteria: demande.criteres,
+                                proposal: nil
+                            ),
+                            existing: demande.existant
                         ) {
                             await recharger()
                         }
@@ -207,6 +213,7 @@ struct PlaceDetailView: View {
                             formulaire = FormulaireDemande(
                                 lieuID: reponse.establishment.id,
                                 nom: reponse.establishment.name,
+                                sousTitre: Self.sousTitre(reponse.establishment),
                                 criteres: mien.criteria.isEmpty ? reponse.establishment.criteria : mien.criteria,
                                 existant: mien
                             )
@@ -234,6 +241,7 @@ struct PlaceDetailView: View {
                 formulaire = FormulaireDemande(
                     lieuID: reponse.establishment.id,
                     nom: reponse.establishment.name,
+                    sousTitre: Self.sousTitre(reponse.establishment),
                     criteres: reponse.establishment.criteria,
                     existant: nil
                 )
@@ -294,6 +302,10 @@ struct PlaceDetailView: View {
         else { return }
 
         UIApplication.shared.open(url)
+    }
+
+    private static func sousTitre(_ lieu: PlaceDetail) -> String {
+        [lieu.typeLabel, lieu.city].compactMap(\.self).filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     private func retirer(_ avis: MyPlaceReview, recharger: @escaping () async -> Void) async {
