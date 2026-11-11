@@ -116,6 +116,17 @@ struct SettingsView: View {
                 startSuiviSection
             }
 
+            // ── APPARENCE (dans les deux usages)
+            Section {
+                NavigationLink {
+                    AppIconPickerView()
+                } label: {
+                    Label("Icône de l'app", systemImage: "app.badge")
+                }
+            } header: {
+                Text("Apparence")
+            }
+
             // ── 7. AIDE & LÉGAL
             Section {
                 NavigationLink {
