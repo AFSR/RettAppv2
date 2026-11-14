@@ -60,7 +60,7 @@ qui est la requête exacte des familles qui viennent de recevoir le diagnostic.
 
 | Champ | Français | Anglais | Portugais (BR) |
 |---|---|---|---|
-| **Nom** (30) | `RettApp · Syndrome de Rett` | `RettApp · Rett Syndrome` | `RettApp · Síndrome de Rett` |
+| **Nom** (30) | `RettApp - Syndrome de Rett` | `RettApp - Rett Syndrome` | `RettApp - Síndrome de Rett` |
 | | *26 car.* | *23 car.* | *26 car.* |
 | **Sous-titre** (30) | `Crises, médicaments, bilan` | `Seizures, medication, trends` | `Crises, medicamentos, resumo` |
 | | *26 car.* | *28 car.* | *28 car.* |
@@ -72,8 +72,8 @@ Le sous-titre ne répète aucun mot du nom : les deux champs couvrent ensemble *
 
 | Proposition | Long. | Ce qu'elle vise |
 |---|---|---|
-| `RettApp · Syndrome de Rett` | 26 | La requête exacte après un diagnostic. **Proposé.** |
-| `RettApp · Suivi épilepsie` | 25 | Le terme le plus cherché, mais positionne l'app en outil d'épilepsie plutôt qu'en app de l'association. |
+| `RettApp - Syndrome de Rett` | 26 | La requête exacte après un diagnostic. **Proposé.** |
+| `RettApp - Suivi épilepsie` | 25 | Le terme le plus cherché, mais positionne l'app en outil d'épilepsie plutôt qu'en app de l'association. |
 | `RettApp` | 7 | L'actuel. Rien à redire, sinon qu'il ne cherche rien. |
 
 ### Alternatives pour le sous-titre
@@ -310,18 +310,35 @@ paraissent dans les résultats de recherche.
 
 ### L'ordre
 
-| # | Écran | Pourquoi là |
-|---|---|---|
-| 1 | **Journal**, une journée remplie | Montre ce qu'est l'app en une image : une journée d'enfant, notée. Se comprend sans légende. |
-| 2 | **Chronomètre de crise en cours** | Le moment qui décide du téléchargement, pour un parent qui vient de vivre une crise. |
-| 3 | **Bilan**, vue mois, graphiques remplis | Répond à « et après ? » : ce que les notes deviennent. |
-| 4 | **Plan médicamenteux du jour**, groupé par moment | La seconde raison d'ouvrir l'app tous les jours. |
-| 5 | **Rapport PDF**, aperçu | L'argument pour le rendez-vous médical. |
-| 6 | **Annuaire des lieux**, carte avec épingles | La nouveauté, et la seule fonction visible par la communauté entière. |
-| 7 | **Espace adhérent**, accueil connecté | Pour les adhérents, qui viennent par la newsletter. |
-| 8 | **Actualités** | Montre que l'app vit, même sans suivi médical. |
+| # | Écran | Comment y arriver | Pourquoi là |
+|---|---|---|---|
+| 1 | **Journal**, une journée remplie | Onglet *Journal* | Montre ce qu'est l'app en une image : une journée d'enfant, notée. Se comprend sans légende. |
+| 2 | **Qualifier une crise**, liste des types avec leurs descriptions | Journal → bouton **+** (« Noter quelque chose ») → *Crise antérieure* | L'écran qui montre le soin apporté à l'app : chaque type expliqué en mots simples. |
+| 3 | **Bilan**, vue mois, graphiques remplis | Onglet *Bilan* | Répond à « et après ? » : ce que les notes deviennent. |
+| 4 | **Plan médicamenteux du jour**, groupé par moment | Journal → bouton **…** (« Ouvrir ») → *Plan médicamenteux* | La seconde raison d'ouvrir l'app tous les jours. |
+| 5 | **Rapport pour le médecin**, aperçu du PDF | Réglages → *Documents à imprimer* → *Rapport pour le médecin (PDF)* | L'argument pour le rendez-vous médical. |
+| 6 | **Annuaire des lieux**, carte avec épingles | Onglet *Adhérent* → connecté → *Lieux Rett friendly* | La nouveauté, et la seule fonction tournée vers la communauté entière. |
+| 7 | **Espace adhérent**, accueil connecté | Onglet *Adhérent*, session ouverte | Pour les adhérents, qui viennent par la newsletter. |
+| 8 | **Actualités** | Onglet *Actualités* | Montre que l'app vit, même sans suivi médical. |
 
 Huit suffisent. Les deux dernières places restent libres si un écran manque à l'appel.
+
+### Deux conditions à remplir avant de capturer
+
+- **L'onglet *Bilan* n'apparaît que si le profil déclare l'épilepsie** (`hasEpilepsy`).
+  Sans cela, la capture 3 est inatteignable.
+- **Les captures 6 et 7 demandent une session adhérent ouverte.** L'annuaire vit dans
+  l'espace adhérent, qui demande un compte à jour.
+
+### Le chronomètre n'est pas un écran
+
+C'est un **bandeau dans le Journal**, affiché pendant l'enregistrement — il n'y a pas de
+vue plein écran. Une capture « chronomètre en cours » montrerait donc le Journal une
+seconde fois, ce qui est la raison pour laquelle elle a été remplacée par la
+qualification.
+
+> `SeizureTracker/SeizureTrackerView.swift` n'est référencé que par son propre `#Preview` :
+> c'est du code mort, vestige de la version où le chronomètre était plein écran.
 
 ### Avant de capturer
 
