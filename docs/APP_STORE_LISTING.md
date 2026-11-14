@@ -52,6 +52,25 @@ C'est ce qu'un parent voit **avant** d'ouvrir la fiche : icône, nom, sous-titre
 trois premières captures. Apple indexe fortement le nom et le sous-titre — davantage que
 les mots-clés.
 
+### Ne pas confondre avec l'onglet « En-tête et résultats de recherche » d'App Store Connect
+
+Cet onglet (dans *Aperçus d'app et captures d'écran*) ne contient **ni nom ni sous-titre** :
+c'est un emplacement de **visuel** — une image ou une vidéo, une seule ressource par
+emplacement. Le nom et le sous-titre se saisissent ailleurs (*Informations sur l'app*).
+Les visuels prêts à déposer sont dans `docs/app-store-assets/` :
+
+| Emplacement | Fichier | Taille | Zone de sécurité d'Apple |
+|---|---|---|---|
+| En-tête de la page produit | `en-tete_3840x1646.png` | 3840 × 1646 (21:9) | 1646 × 661, centrée |
+| Résultats de recherche | `resultats-recherche_3840x2560.png` | 3840 × 2560 (3:2) | 2168 × 1030, centrée |
+| Ressource universelle | `universel_5244x2950.png` | 5244 × 2950 (16:9) | 1402 × 962 |
+
+Dégradé et papillon de l'icône, nom, « Association Française du Syndrome de Rett ».
+Aucune capture, aucun prénom, aucun prix, aucune URL. PNG en RVB, sans canal alpha,
+comme l'exige Apple. Les chiffres de zone de sécurité viennent d'un résumé de la page
+de spécifications d'Apple : **vérifiez-les avec le bouton « Aperçu » d'App Store
+Connect** avant de valider. Ces visuels n'ont pas été vus dans l'interface d'Apple.
+
 ### Ce qui change
 
 Le nom était `RettApp` seul : 7 caractères sur 30, soit 23 caractères de poids de
