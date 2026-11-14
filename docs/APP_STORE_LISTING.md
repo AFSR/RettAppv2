@@ -113,9 +113,9 @@ et en recherche (5 à 30 s, 30 ou 60 images par seconde, muette par défaut, en 
 
 | Fichier | Contenu |
 |---|---|
-| `en-tete_v6_dynamique_3840x1646.mp4` | **Vidéo de 10 s**, 30 i/s, H.264, sans son, 4,8 Mo, en boucle sans saut. Logo fixe au centre ; quatre cartes de l'app qui flottent en biais ; ailes du site qui respirent ; papillons qui traversent derrière les cartes. |
+| `en-tete_v6_dynamique_3840x1646.mp4` | **Vidéo de 10 s**, 30 i/s, H.264, sans son, 4,8 Mo, en boucle sans saut. Logo fixe au centre ; quatre cartes de l'app qui flottent en biais ; ailes du site qui respirent. **Sans papillons volants** (retirés le 14 novembre : jugés peu réussis). |
 | `en-tete_v6_dynamique_3840x1646.png` | Première image de la vidéo : sert d'**image d'en-tête** si l'on préfère une image, et de poster. |
-| `resultats-recherche_v6_dynamique_3840x2560.png` | Pile de trois cartes inclinées (adhérent, actualité, Humeur), en 3:2. |
+| `resultats-recherche_v6_dynamique_3840x2560.png` | Pile de trois cartes inclinées (adhérent, actualité, Humeur), en 3:2, **sous une plaque blanche portant le logo de l'AFSR** (`logo.svg` du site, texte `#68257C`), pour que l'association passe avant l'app. Plaque et cartes tiennent dans la zone de sécurité d'Apple (2168 × 1030). |
 
 Les cartes sont des captures réelles de l'app (actualité « Bilan Octobre Rett », « Mon compte »,
 « Humeur & observations », graphique du Bilan **recadré sans son titre**). Aucun écran de
