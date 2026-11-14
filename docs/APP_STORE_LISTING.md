@@ -107,6 +107,26 @@ site, Drive, Canva ; Gmail refuse l'accès) : aucune des pistes ci-dessous ne s'
 | `resultats-recherche_v5_actualite_*` | Zoom sur l'actualité « Bilan Octobre Rett » et son visuel « MERCI ! » : couleurs et ton de l'association, par le contenu plutôt que par le décor. |
 | `resultats-recherche_v5_humeur_*` | Zoom sur la carte « Humeur & observations » du Journal. Calme, mais l'état vide (« Rien de noté pour ce jour ») est peu parlant. |
 
+**Version dynamique (v6)** — d'après la page d'Apple : sujet principal au centre dans la zone
+de sécurité, décor qui s'étend sur tout le cadre sans distraire, vidéo autorisée en en-tête
+et en recherche (5 à 30 s, 30 ou 60 images par seconde, muette par défaut, en boucle).
+
+| Fichier | Contenu |
+|---|---|
+| `en-tete_v6_dynamique_3840x1646.mp4` | **Vidéo de 10 s**, 30 i/s, H.264, sans son, 4,8 Mo, en boucle sans saut. Logo fixe au centre ; quatre cartes de l'app qui flottent en biais ; ailes du site qui respirent ; papillons qui traversent derrière les cartes. |
+| `en-tete_v6_dynamique_3840x1646.png` | Première image de la vidéo : sert d'**image d'en-tête** si l'on préfère une image, et de poster. |
+| `resultats-recherche_v6_dynamique_3840x2560.png` | Pile de trois cartes inclinées (adhérent, actualité, Humeur), en 3:2. |
+
+Les cartes sont des captures réelles de l'app (actualité « Bilan Octobre Rett », « Mon compte »,
+« Humeur & observations », graphique du Bilan **recadré sans son titre**). Aucun écran de
+crise, aucun nom d'enfant, aucune donnée de démonstration. Le logo ne bouge pas : l'image
+fixe doit se lire seule.
+
+À contrôler avant de déposer : la **taille et le codec exigés pour une vidéo d'en-tête** ne
+figurent pas dans le résumé de la page d'Apple que j'ai lu (durée et cadence, si) ; le
+bouton « Aperçu » d'App Store Connect le dira. Et les cartes sont tirées de captures de
+920 px : à refaire en natif. La vidéo n'a pas été lue dans l'interface d'Apple.
+
 Première proposition (v1) : dégradé et papillon de l'icône, nom, « Association Française du Syndrome de Rett ».
 Aucune capture, aucun prénom, aucun prix, aucune URL. PNG en RVB, sans canal alpha,
 comme l'exige Apple. Les chiffres de zone de sécurité viennent d'un résumé de la page
