@@ -83,18 +83,29 @@ final class AppIconOptionTests: XCTestCase {
 
     // MARK: - L'écran d'ouverture
 
-    /// L'illustration du splash est agrandie depuis l'aperçu du catalogue.
-    /// En dessous de la taille affichée en @3x, elle devient floue — et c'est
-    /// le premier écran que voit la famille.
-    func test_lesApercusCouvrentLEcranDOuvertureEnTroisX() {
-        let requis = LaunchSplashMetrics.artworkSide * 3
+    /// Les aperçus sont agrandis depuis le catalogue, et deviennent flous en
+    /// dessous de la taille affichée en @3x. Le plus exigeant des deux
+    /// usages est le sélecteur, à 56 pt — la barre des Actualités n'en
+    /// demande que 28.
+    func test_lesApercusCouvrentLePlusGrandUsageEnTroisX() {
+        let requis: CGFloat = 56 * 3
         for option in AppIconOption.allCases {
             let image = UIImage(named: option.previewName)
             XCTAssertGreaterThanOrEqual(
                 image?.size.width ?? 0, requis,
-                "aperçu trop petit pour l'écran d'ouverture : \(option.previewName)"
+                "aperçu trop petit : \(option.previewName)"
             )
         }
+    }
+
+    /// L'écran d'ouverture porte le logo complet de l'association, le même
+    /// pour toutes les familles. Sans ce fichier, il s'ouvrirait sur un
+    /// rectangle blanc vide — et rien ne le signalerait à la compilation.
+    func test_leLogoDeLAssociationEstDansLeCatalogue() throws {
+        let logo = try XCTUnwrap(UIImage(named: "AFSRLogo"), "AFSRLogo absent du catalogue")
+        // Le logo est agrandi jusqu'à `logoWidth` : en dessous de trois fois
+        // cette largeur, il est flou sur un écran @3x.
+        XCTAssertGreaterThanOrEqual(logo.size.width, LaunchSplashMetrics.logoWidth * 3)
     }
 
     /// L'écran de lancement du système et celui de l'app doivent partager le

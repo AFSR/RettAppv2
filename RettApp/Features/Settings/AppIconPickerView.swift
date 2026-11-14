@@ -81,9 +81,10 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 /// quand l'icône change. D'où ce relais, qui part de ce qu'iOS dit au
 /// lancement et n'est modifié qu'après un changement **accepté** par iOS.
 ///
-/// Il existe parce que l'icône ne vit plus seulement dans les Réglages :
-/// l'écran d'ouverture et le haut des Actualités la montrent aussi, et
-/// doivent suivre sans qu'on ait à relancer l'application.
+/// Il existe parce que l'icône ne vit plus seulement dans les Réglages : le
+/// haut des Actualités la montre aussi, et doit suivre sans qu'on ait à
+/// relancer l'application. (L'écran d'ouverture, lui, porte le logo de
+/// l'association et ne dépend pas de ce choix.)
 @Observable
 @MainActor
 final class AppIconStore {
@@ -109,9 +110,9 @@ final class AppIconStore {
 
 /// L'icône de l'app, à la taille demandée, avec le coin des icônes iOS.
 ///
-/// Partagée entre le sélecteur, l'écran d'ouverture et la barre des
-/// Actualités : trois endroits qui doivent montrer la même chose, et qui
-/// l'ont montrée différemment tant que chacun dessinait la sienne.
+/// Partagée entre le sélecteur et la barre des Actualités : deux endroits
+/// qui doivent montrer la même chose, et qui l'ont montrée différemment tant
+/// que chacun dessinait la sienne.
 struct AppIconThumbnail: View {
     let option: AppIconOption
     let side: CGFloat
@@ -165,7 +166,7 @@ struct AppIconPickerView: View {
                     .accessibilityAddTraits(option == store.current ? .isSelected : [])
                 }
             } footer: {
-                Text("L'icône change sur l'écran d'accueil, sur l'écran d'ouverture et en haut des Actualités. iOS affiche une confirmation à chaque changement.")
+                Text("L'icône change sur l'écran d'accueil et en haut des Actualités. L'écran d'ouverture, lui, porte le logo de l'association. iOS affiche une confirmation à chaque changement.")
             }
         }
         .navigationTitle("Icône de l'app")
