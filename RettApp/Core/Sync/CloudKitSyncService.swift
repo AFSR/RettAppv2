@@ -27,7 +27,11 @@ final class CloudKitSyncService {
     static let containerID = "iCloud.fr.afsr.RettApp"
     static let zoneName = "FamilyData"
 
-    private static let log = Logger(subsystem: "fr.afsr.RettApp", category: "Sync")
+    /// `nonisolated` : la classe est `@MainActor`, donc ses propriétés
+    /// statiques le sont aussi, et les méthodes `nonisolated` d'ici ne
+    /// pourraient pas journaliser. `Logger` est `Sendable`, la sortie de
+    /// l'acteur est donc sûre. Sans ce mot, c'est une erreur en Swift 6.
+    private nonisolated static let log = Logger(subsystem: "fr.afsr.RettApp", category: "Sync")
 
     enum AccountStatus: Equatable {
         case unknown
@@ -1505,7 +1509,9 @@ final class CloudKitSyncService {
 
     // MARK: - Mémoire anti-boucle des résurrections de prises cochées
 
-    private static let resurrectedKey = "afsr.medlog.resurrectedOnce.v1"
+    /// `nonisolated` pour la même raison que `log` : les deux accesseurs qui
+    /// la lisent le sont, puisqu'ils tournent hors du MainActor.
+    private nonisolated static let resurrectedKey = "afsr.medlog.resurrectedOnce.v1"
 
     /// IDs de prises cochées dont on a déjà refusé UNE suppression distante.
     /// Persistée pour survivre au relaunch — sinon chaque redémarrage
@@ -1556,12 +1562,18 @@ final class CloudKitSyncService {
     func acceptShare(_ metadata: CKShare.Metadata) async throws {
         syncState = .syncing
         defer { syncState = .idle }
-        try await container.accept(metadata)
+        // Le `CKShare` renvoyé n'apprend rien de plus que `metadata` : on
+        // l'écarte explicitement, sinon le compilateur signale un résultat
+        // inutilisé et l'avertissement masque les vrais.
+        _ = try await container.accept(metadata)
         role = .participant
         // Un cache résiduel de zone privée pourrait faire pousser dans la
         // mauvaise zone après acceptation → on invalide.
         ownedZone = nil
-        Self.log.info("Share accepté (rootRecordID=\(metadata.rootRecordID.recordName))")
+        // `hierarchicalRootRecordID` remplace `rootRecordID`, déprécié depuis
+        // iOS 16. Optionnel : un partage de zone entière n'a pas de racine.
+        let racine = metadata.hierarchicalRootRecordID?.recordName ?? "zone entière"
+        Self.log.info("Share accepté (racine=\(racine))")
     }
 
     // MARK: - Helpers

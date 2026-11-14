@@ -1,6 +1,11 @@
 import SwiftUI
 import VisionKit
-import Vision
+// `@preconcurrency` : Vision est un module antérieur à la concurrence stricte,
+// et ses types (`VNImageRequestHandler`, `VNRecognizeTextRequest`) ne sont pas
+// déclarés `Sendable` alors qu'ils traversent une closure `@Sendable`. C'est la
+// suppression que recommande le compilateur lui-même ; elle ne change rien à
+// l'exécution, la reconnaissance restant confinée à une seule tâche.
+@preconcurrency import Vision
 import UIKit
 
 /// Wrapper SwiftUI autour de `VNDocumentCameraViewController`. Permet à l'utilisateur

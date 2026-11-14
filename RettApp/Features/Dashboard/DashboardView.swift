@@ -769,7 +769,10 @@ struct DashboardView: View {
     }
 
     private func updateCrosshair(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) {
-        let plotFrame = geo[proxy.plotAreaFrame]
+        // `plotAreaFrame` est renommé `plotFrame` depuis iOS 17, et devient
+        // optionnel : il n'existe pas tant que le graphique n'a pas de place.
+        guard let aire = proxy.plotFrame else { return }
+        let plotFrame = geo[aire]
         let xInPlot = location.x - plotFrame.origin.x
         if let date: Date = proxy.value(atX: xInPlot) {
             crosshairDate = date
