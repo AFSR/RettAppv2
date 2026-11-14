@@ -49,26 +49,19 @@ struct LaunchSplashView: View {
 
     var body: some View {
         // Lu dans `body`, donc sur le MainActor, et non dans un initialiseur
-        // de propriété : `UIApplication` y est isolée.
+        // de propriété : `AppIconStore` y est isolée.
         //
-        // La source de vérité est `alternateIconName`, pas une copie rangée
-        // dans les réglages : une copie qui dériverait afficherait ici une
-        // illustration que l'écran d'accueil ne porte pas.
-        let option = AppIconOption(alternateIconName: UIApplication.shared.alternateIconName)
+        // Le relais remonte à `UIApplication.alternateIconName`, qui reste la
+        // source de vérité : afficher ici une illustration que l'écran
+        // d'accueil ne porte pas serait pire que de n'en afficher aucune.
+        let option = AppIconStore.shared.current
 
         return ZStack {
             Color.launchBackground
                 .ignoresSafeArea()
 
             VStack(spacing: 22) {
-                Image(option.previewName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: LaunchSplashMetrics.artworkSide,
-                           height: LaunchSplashMetrics.artworkSide)
-                    // 22 % du côté : la proportion d'un coin d'icône iOS.
-                    .clipShape(RoundedRectangle(cornerRadius: LaunchSplashMetrics.artworkSide * 0.22,
-                                                style: .continuous))
+                AppIconThumbnail(option: option, side: LaunchSplashMetrics.artworkSide)
 
                 Text("Association Française du Syndrome de Rett")
                     .font(.subheadline)

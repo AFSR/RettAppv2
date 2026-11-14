@@ -43,15 +43,17 @@ struct NewsListView: View {
         .navigationTitle("Actualités")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Logo de l'association en haut à gauche : la place d'une
-            // marque sur iOS, la droite étant réservée aux actions. Libre
-            // ici, l'onglet étant à la racine (pas de bouton retour).
+            // L'icône de l'app en haut à gauche : la place d'une marque sur
+            // iOS, la droite étant réservée aux actions. Libre ici, l'onglet
+            // étant à la racine (pas de bouton retour).
+            //
+            // C'est bien l'icône **choisie** par la famille, et non un logo
+            // fixe : l'app qu'elle ouvre et l'écran qu'elle regarde portent
+            // alors le même visuel. Le relais `AppIconStore` existe pour
+            // cela — `UIApplication.alternateIconName` n'est pas observable,
+            // et ce coin ne se redessinerait qu'au prochain lancement.
             ToolbarItem(placement: .topBarLeading) {
-                Image("RettLogo")
-                    .renderingMode(.original)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 28)
+                AppIconThumbnail(option: AppIconStore.shared.current, side: 28)
                     .accessibilityLabel("Association Française du Syndrome de Rett")
             }
         }
