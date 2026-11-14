@@ -95,6 +95,18 @@ recadrant sur les quatre autres lignes.
 Si la charte du site évolue, ces visuels sont à refaire : ils recopient ses valeurs, ils
 ne les lisent pas.
 
+**Alternatives (v5)** — la v4 n'a pas convenu non plus. Les collections « Over the Rett'bow »
+et « Rett dingue de toi » sont **introuvables** depuis les sources accessibles (dépôt du
+site, Drive, Canva ; Gmail refuse l'accès) : aucune des pistes ci-dessous ne s'en inspire.
+
+| Fichier | Idée |
+|---|---|
+| `en-tete_v5A_envol_*` | Fond clair du site, un envol de petits papillons aux couleurs de la charte (violet, magenta, rose, vert, lime) qui montent d'un coin à l'autre. Coloré, irrégulier, sans arc-en-ciel. |
+| `en-tete_v5B_deux-ailes_*` | Deux ailes du site : violet et rose à gauche, **vert** à droite — les deux couleurs du logo de l'AFSR. |
+| `en-tete_v5C_typo_*` | Dégradé du site, « RettApp » immense et rognée en filigrane en Unbounded 900. |
+| `resultats-recherche_v5_actualite_*` | Zoom sur l'actualité « Bilan Octobre Rett » et son visuel « MERCI ! » : couleurs et ton de l'association, par le contenu plutôt que par le décor. |
+| `resultats-recherche_v5_humeur_*` | Zoom sur la carte « Humeur & observations » du Journal. Calme, mais l'état vide (« Rien de noté pour ce jour ») est peu parlant. |
+
 Première proposition (v1) : dégradé et papillon de l'icône, nom, « Association Française du Syndrome de Rett ».
 Aucune capture, aucun prénom, aucun prix, aucune URL. PNG en RVB, sans canal alpha,
 comme l'exige Apple. Les chiffres de zone de sécurité viennent d'un résumé de la page
