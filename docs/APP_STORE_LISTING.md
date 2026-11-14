@@ -65,13 +65,15 @@ Les visuels prêts à déposer sont dans `docs/app-store-assets/` :
 | Résultats de recherche | `resultats-recherche_3840x2560.png` | 3840 × 2560 (3:2) | 2168 × 1030, centrée |
 | Ressource universelle | `universel_5244x2950.png` | 5244 × 2950 (16:9) | 1402 × 962 |
 
-**Seconde proposition (v2), plus colorée** — fichiers `*_v2_*` : pétales multicolores et
-arc-en-ciel (clin d'œil à « Over the Rett'bow »), sur le violet de la charte
+**Seconde proposition (v2), plus colorée** — fichiers `*_v2_*` : fleurs de pétales
+multicolores et irrégulières (dans l'esprit des collections de l'association), sur le
+violet de la charte
 (`en-tete_v2_violet`) ou sur fond crème (`en-tete_v2_creme`). Le visuel de recherche
 `resultats-recherche_v2_zoom` est un **zoom sur l'écran réel** du Journal, comme Apple le
-suggère pour les résultats de recherche. Les deux collections n'ont pas pu être
-consultées : la palette vient du visuel « MERCI ! » des Actualités, pas des collections
-elles-mêmes. Le zoom est tiré d'une capture de 920 px de large, donc légèrement flou :
+suggère pour les résultats de recherche. **Pas d'arc-en-ciel, ni de spectre complet** : une première version en avait un, écartée
+le 14 novembre parce qu'elle se lisait comme un symbole étranger à l'association ; la
+palette n'a ni bleu ni jaune. Les deux collections n'ont pas pu être consultées : la
+palette vient du visuel « MERCI ! » des Actualités, pas des collections elles-mêmes. Le zoom est tiré d'une capture de 920 px de large, donc légèrement flou :
 à refaire depuis une capture native de l'iPhone, avec un profil sans prénom.
 
 Première proposition (v1) : dégradé et papillon de l'icône, nom, « Association Française du Syndrome de Rett ».
