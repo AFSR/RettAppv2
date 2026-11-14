@@ -71,10 +71,10 @@ app_target.add_resources([assets_ref])
 strings_ref = resources_group.new_reference('Localizable.strings')
 strings_ref.last_known_file_type = 'text.plist.strings'
 app_target.add_resources([strings_ref])
-# LaunchScreen.storyboard
-launch_ref = resources_group.new_reference('LaunchScreen.storyboard')
-launch_ref.last_known_file_type = 'file.storyboard'
-app_target.add_resources([launch_ref])
+# Pas de LaunchScreen.storyboard : l'écran de lancement est décrit par la clé
+# `UILaunchScreen` de l'Info.plist (un fond uni), et l'illustration est posée
+# par `LaunchSplashView` côté app — un storyboard ne peut pas lire l'icône
+# choisie par la famille, puisqu'il s'affiche avant que l'app ne tourne.
 # BDPM (base de médicaments) — généré par scripts/build_bdpm_db.rb
 bdpm_path = File.join(ROOT, APP_DIR, 'Resources', 'bdpm.sqlite')
 if File.exist?(bdpm_path)
@@ -103,6 +103,26 @@ ent_ref.last_known_file_type = 'text.plist.entitlements'
 tests_group = add_group_for_path(project, TESTS_NAME, TESTS_DIR)
 add_sources_recursively(tests_group, File.join(ROOT, TESTS_DIR), test_target, ROOT)
 
+# --- Icônes de rechange -----------------------------------------------------
+#
+# iOS n'accepte `setAlternateIconName` que pour les icônes déclarées dans
+# `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES`. Déposer un
+# `AppIcon-*.appiconset` dans le catalogue ne suffit pas : l'image est
+# compilée, mais pas déclarée comme icône de rechange, et l'appel échoue sur
+# l'appareil sans que la compilation n'ait rien à signaler.
+#
+# Ce réglage était absent, et c'est ce qui empêchait le choix d'icône de
+# fonctionner — les sept visuels étaient bien dans le catalogue depuis le
+# début.
+#
+# La liste est LUE sur le disque plutôt qu'écrite ici : une liste tenue à la
+# main aurait dérivé du catalogue dès la première icône ajoutée, et la panne
+# serait revenue à l'identique sans que rien ne la signale.
+alternate_appicons = Dir
+  .glob(File.join(ROOT, APP_DIR, 'Resources/Assets.xcassets/AppIcon-*.appiconset'))
+  .map { |path| File.basename(path, '.appiconset') }
+  .sort
+
 # --- Build settings ---------------------------------------------------------
 
 common_app_settings = {
@@ -115,15 +135,17 @@ common_app_settings = {
   'TARGETED_DEVICE_FAMILY'               => '1,2',
   # ⚠️ Ces deux valeurs sont la source de vérité : le projet est régénéré, et
   # une version corrigée à la main dans Xcode est perdue à la prochaine
-  # exécution de ce script. C'est arrivé DEUX fois : le projet a porté 1.9 / 11
-  # puis 1.9 / 14, corrigés directement dans project.pbxproj, pendant que ce
-  # script annonçait 1.5.0 / 11 puis 1.9.1 / 12.
+  # exécution de ce script. C'est arrivé TROIS fois : le projet a porté
+  # 1.9 / 11, puis 1.9 / 14, puis 1.9 / 150 (commit « v19 Build 150 »),
+  # corrigés directement dans project.pbxproj, pendant que ce script annonçait
+  # 1.5.0 / 11, puis 1.9.1 / 12, puis 1.9 / 15.
   #
-  # Build 15, et c'est un plancher, pas un choix : les builds 12 et 14 de la
-  # 1.9 sont DÉJÀ partis chez Apple (voir le journal des commits). Un numéro
-  # déjà consommé est refusé par App Store Connect, et un numéro inférieur au
-  # dernier publié aussi. Avant d'archiver, vérifiez le dernier build reçu
-  # dans App Store Connect et placez-vous au-dessus.
+  # 150 est repris du projet, et c'est un plancher, pas un choix : les builds
+  # 12, 14 et 150 de la 1.9 ont déjà été produits, et App Store Connect refuse
+  # un numéro déjà consommé autant qu'un numéro inférieur au dernier publié.
+  # Avant d'archiver, lisez le dernier build REÇU dans App Store Connect et
+  # placez-vous au-dessus : ne déduisez pas le prochain numéro de ce fichier,
+  # il peut avoir été dépassé par une publication faite depuis Xcode.
   #
   # La version reste 1.9 : c'est le train sur lequel les builds partent.
   # Passer à 1.9.1 ou 1.10.0 est une décision de publication, à prendre
@@ -132,13 +154,14 @@ common_app_settings = {
   # À avancer ICI avant chaque archivage. Le build doit augmenter à chaque
   # envoi, même pour renvoyer le même code après un rejet.
   'MARKETING_VERSION'                    => '1.9',
-  'CURRENT_PROJECT_VERSION'              => '15',
+  'CURRENT_PROJECT_VERSION'              => '150',
   'ENABLE_USER_SCRIPT_SANDBOXING'        => 'YES',
   'SWIFT_EMIT_LOC_STRINGS'               => 'YES',
   'SUPPORTS_MACCATALYST'                 => 'NO',
   'GENERATE_INFOPLIST_FILE'              => 'NO',
   'DEVELOPMENT_ASSET_PATHS'              => '',
   'ASSETCATALOG_COMPILER_APPICON_NAME'   => 'AppIcon',
+  'ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES' => alternate_appicons,
   'ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME' => 'AccentColor',
   'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad' =>
     'UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight',
@@ -153,6 +176,10 @@ app_target.build_configurations.each do |config|
     config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
   else
     config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+    # Repris de ce qu'Xcode avait inscrit à la main (sous sa forme ancienne,
+    # « -Owholemodule ») et que la régénération aurait perdu : le module est
+    # optimisé d'un bloc, pas fichier par fichier.
+    config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
   end
 end
 

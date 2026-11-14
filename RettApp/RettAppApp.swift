@@ -98,7 +98,10 @@ struct RettAppApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            // L'écran d'ouverture est posé ici, au-dessus de RootView : il
+            // couvre indifféremment l'onboarding, l'attente iCloud et l'écran
+            // principal, dont le choix n'est pas encore fait à ce moment.
+            LaunchSplash { RootView() }
                 .environment(syncService)
                 .environment(updateService)
                 // Accédé ici, dans le ViewBuilder (donc sur le main actor),
