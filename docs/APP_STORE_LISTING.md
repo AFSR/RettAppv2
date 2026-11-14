@@ -285,11 +285,26 @@ la 1.9 ne rouvre pas le champ. Les textes des trois langues sont dans
 
 ## 6. Captures d'écran
 
-**Parti pris retenu le 14 novembre 2026 : captures brutes.** Pas de cadre d'iPhone, pas
-de légende incrustée, pas de fond coloré. L'écran tel qu'il est.
+**Parti pris révisé le 14 novembre 2026, d'après les bonnes pratiques d'Apple**
+(<https://developer.apple.com/app-store/asset-best-practices/>) : l'écran réel, avec une
+**courte légende** au-dessus. Le matin même, le choix était des captures brutes ; Apple
+autorise le texte et recommande une phrase qui *complète* l'image au lieu de la décrire.
 
-Conséquence à assumer : la **première** capture doit se comprendre seule, puisque rien
-ne l'explique. C'est pour cela que le Journal vient avant le chronomètre.
+Ce que la page d'Apple demande, et comment le jeu y répond :
+
+| Recommandation d'Apple | Application ici |
+|---|---|
+| Au plus 10 captures ; **jusqu'à trois** paraissent dans les résultats de recherche (selon l'orientation) | Les trois premières sont choisies pour se suffire : Journal, qualification d'une crise, Bilan. |
+| Commencer par les fonctions les plus fortes, dans un récit cohérent | Récit : *ma journée* → *chaque crise comprise* → *ce que ça devient* → *les médicaments* → *le rapport* → *la communauté*. |
+| Montrer l'app en usage ; ne pas gaspiller l'image en appel à l'action | Écrans réels, aucune capture de « bienvenue » ou de configuration. |
+| Texte : une phrase courte qui complète le visuel, **localisée** dans chaque langue | Légendes ci-dessous, en FR / EN / PT, une par capture. |
+| Éléments clés lisibles, au centre, dans la zone de sécurité ; vérifier avec l'aperçu d'App Store Connect | Légende en haut, écran centré ; à contrôler dans l'aperçu avant l'envoi. |
+| Pas de prix, d'URL, de symbole ©, de récompense non obtenue, de mention d'autres plateformes | Aucune légende n'en contient. **Pas d'« afsr.fr » dans l'image.** |
+| Les visuels doivent respecter un classement **4+**, même si l'app est classée plus haut | Aucune image de crise, aucun visage : l'écran de qualification montre des textes, pas des scènes. |
+| Respecter la section 2.3 des règles de la revue (métadonnées exactes) | L'écran montré doit exister dans la version soumise : pas de don, pas de jeu du regard. |
+
+Conséquence à assumer : la **première** capture doit se comprendre seule. C'est pour
+cela que le Journal vient avant le chronomètre.
 
 ### Tailles à fournir
 
@@ -322,6 +337,35 @@ paraissent dans les résultats de recherche.
 | 8 | **Actualités** | Onglet *Actualités* | Montre que l'app vit, même sans suivi médical. |
 
 Huit suffisent. Les deux dernières places restent libres si un écran manque à l'appel.
+
+### Les légendes
+
+Courtes, sans verbe d'action, sans promesse médicale, et sans rien qui ne soit vérifiable
+à l'écran. Elles se traduisent, elles ne se transposent pas : une capture française
+sous une légende anglaise reste française, mais la légende suit la langue de la fiche.
+
+| # | Français | Anglais | Portugais (BR) |
+|---|---|---|---|
+| 1 | Toute la journée, au même endroit | The whole day, in one place | O dia todo, em um só lugar |
+| 2 | Chaque type de crise, expliqué | Every seizure type, explained | Cada tipo de crise, explicado |
+| 3 | Ce que deviennent vos notes | What your notes add up to | O que suas anotações revelam |
+| 4 | Les prises du jour, en un coup d'œil | Today's doses at a glance | As doses do dia num relance |
+| 5 | Un rapport pour le médecin | A report for the doctor | Um relatório para o médico |
+| 6 | Des lieux qui accueillent bien | Places that welcome well | Locais que acolhem bem |
+| 7 | L'espace adhérent, dans l'app | The member area, in the app | A área do associado, no app |
+| 8 | Les nouvelles de l'association | News from the association | Novidades da associação |
+
+Écartées exprès : « Ne ratez plus aucune prise » (promesse de résultat sur un traitement),
+« Gratuit » (le prix est interdit dans les visuels), « Vos données restent chez vous »
+(vraie du suivi seulement, et la place manque pour la nuance, voir §8).
+
+### Aperçus vidéo
+
+Apple en autorise trois, qui paraissent aussi dans les résultats de recherche, muets par
+défaut et en boucle. **Aucun n'est prévu** : il faudrait un enregistrement d'écran propre
+sur un Mac ou un iPhone, avec les mêmes données que les captures. Si on en fait un, un
+seul suffit : une journée du Journal, de la saisie d'une crise à sa lecture dans le
+Bilan, sans coupes rapides, sans son nécessaire, sans donnée réelle.
 
 ### Deux conditions à remplir avant de capturer
 
