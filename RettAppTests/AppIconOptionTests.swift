@@ -5,9 +5,12 @@ import XCTest
 /// compilation, elle fait échouer `setAlternateIconName` chez l'utilisateur.
 final class AppIconOptionTests: XCTestCase {
 
-    func test_sixIconesAlternativesPlusLActuelle() {
+    func test_sixIconesAlternativesPlusCelleParDefaut() {
         XCTAssertEqual(AppIconOption.allCases.count, 7)
-        XCTAssertEqual(AppIconOption.allCases.filter { $0.assetName == nil }, [.actuelle])
+        XCTAssertEqual(AppIconOption.allCases.filter { $0.assetName == nil }, [.defaut])
+        // L'icône par défaut vient en tête : c'est celle que porte l'app tant
+        // qu'on n'a rien choisi, et la liste se lit à partir de là.
+        XCTAssertEqual(AppIconOption.allCases.first, .defaut)
     }
 
     func test_nomsUniques() {
@@ -19,7 +22,24 @@ final class AppIconOptionTests: XCTestCase {
         for option in AppIconOption.allCases {
             XCTAssertEqual(AppIconOption(alternateIconName: option.assetName), option)
         }
-        XCTAssertEqual(AppIconOption(alternateIconName: "inconnu"), .actuelle)
+        XCTAssertEqual(AppIconOption(alternateIconName: "inconnu"), .defaut)
+    }
+
+    /// Le dégradé était une alternative ; il est devenu l'icône principale en
+    /// novembre 2026, et `AppIcon-Degrade` a disparu du catalogue. Une famille
+    /// qui l'avait choisi garde ce nom enregistré par iOS : il doit retomber
+    /// sur l'icône par défaut — qui porte exactement le même visuel — et non
+    /// laisser la liste sans aucune coche.
+    func test_lAncienNomDuDegradeRetombeSurLIconeParDefaut() {
+        XCTAssertEqual(AppIconOption(alternateIconName: "AppIcon-Degrade"), .defaut)
+    }
+
+    /// Le ruban était l'icône publiée jusqu'à la 1.9. Il n'a pas été supprimé
+    /// mais déplacé dans les alternatives : une famille qui le reconnaît sur
+    /// son écran d'accueil doit pouvoir le remettre.
+    func test_leRubanResteDisponibleCommeAlternative() {
+        XCTAssertEqual(AppIconOption.ruban.assetName, "AppIcon-Ruban")
+        XCTAssertEqual(AppIconOption(alternateIconName: "AppIcon-Ruban"), .ruban)
     }
 
     func test_chaqueIconeADesImagesDansLeCatalogue() {
@@ -63,18 +83,29 @@ final class AppIconOptionTests: XCTestCase {
 
     // MARK: - L'écran d'ouverture
 
-    /// L'illustration du splash est agrandie depuis l'aperçu du catalogue.
-    /// En dessous de la taille affichée en @3x, elle devient floue — et c'est
-    /// le premier écran que voit la famille.
-    func test_lesApercusCouvrentLEcranDOuvertureEnTroisX() {
-        let requis = LaunchSplashMetrics.artworkSide * 3
+    /// Les aperçus sont agrandis depuis le catalogue, et deviennent flous en
+    /// dessous de la taille affichée en @3x. Le plus exigeant des deux
+    /// usages est le sélecteur, à 56 pt — la barre des Actualités n'en
+    /// demande que 28.
+    func test_lesApercusCouvrentLePlusGrandUsageEnTroisX() {
+        let requis: CGFloat = 56 * 3
         for option in AppIconOption.allCases {
             let image = UIImage(named: option.previewName)
             XCTAssertGreaterThanOrEqual(
                 image?.size.width ?? 0, requis,
-                "aperçu trop petit pour l'écran d'ouverture : \(option.previewName)"
+                "aperçu trop petit : \(option.previewName)"
             )
         }
+    }
+
+    /// L'écran d'ouverture porte le logo complet de l'association, le même
+    /// pour toutes les familles. Sans ce fichier, il s'ouvrirait sur un
+    /// rectangle blanc vide — et rien ne le signalerait à la compilation.
+    func test_leLogoDeLAssociationEstDansLeCatalogue() throws {
+        let logo = try XCTUnwrap(UIImage(named: "AFSRLogo"), "AFSRLogo absent du catalogue")
+        // Le logo est agrandi jusqu'à `logoWidth` : en dessous de trois fois
+        // cette largeur, il est flou sur un écran @3x.
+        XCTAssertGreaterThanOrEqual(logo.size.width, LaunchSplashMetrics.logoWidth * 3)
     }
 
     /// L'écran de lancement du système et celui de l'app doivent partager le
