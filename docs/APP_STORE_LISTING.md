@@ -65,16 +65,26 @@ Les visuels prêts à déposer sont dans `docs/app-store-assets/` :
 | Résultats de recherche | `resultats-recherche_3840x2560.png` | 3840 × 2560 (3:2) | 2168 × 1030, centrée |
 | Ressource universelle | `universel_5244x2950.png` | 5244 × 2950 (16:9) | 1402 × 962 |
 
-**Seconde proposition (v2), plus colorée** — fichiers `*_v2_*` : fleurs de pétales
-multicolores et irrégulières (dans l'esprit des collections de l'association), sur le
-violet de la charte
-(`en-tete_v2_violet`) ou sur fond crème (`en-tete_v2_creme`). Le visuel de recherche
-`resultats-recherche_v2_zoom` est un **zoom sur l'écran réel** du Journal, comme Apple le
-suggère pour les résultats de recherche. **Pas d'arc-en-ciel, ni de spectre complet** : une première version en avait un, écartée
-le 14 novembre parce qu'elle se lisait comme un symbole étranger à l'association ; la
-palette n'a ni bleu ni jaune. Les deux collections n'ont pas pu être consultées : la
-palette vient du visuel « MERCI ! » des Actualités, pas des collections elles-mêmes. Le zoom est tiré d'une capture de 920 px de large, donc légèrement flou :
-à refaire depuis une capture native de l'iPhone, avec un profil sans prénom.
+**Troisième proposition (v3), sobre** — fichiers `*_v3_*`. Deux séries précédentes ont été
+écartées le 14 novembre : l'une jugée trop uniforme (v1), l'autre trop colorée, avec un
+arc-en-ciel qui se lisait comme un symbole étranger à l'association (v2, supprimée). La v3
+garde le violet de la charte et des fleurs de pétales **ton sur ton**, discrètes, dans deux
+coins opposés pour que la composition ne soit pas symétrique.
+
+| Fichier | Contenu |
+|---|---|
+| `en-tete_v3_violet_3840x1646.png` | Papillon blanc et nom sur violet. |
+| `en-tete_v3_clair_3840x1646.png` | Même chose, papillon violet sur fond clair. |
+| `resultats-recherche_v3_adherent_3840x2560.png` | Zoom sur la liste « Mon compte » de l'espace adhérent. **Recommandé.** |
+| `resultats-recherche_v3_bilan_3840x2560.png` | Zoom sur le graphique du Bilan. Plus proche du suivi, mais le titre dit « crises ». |
+
+**Aucun zoom n'est tiré d'un écran de crise.** Le Journal et sa carte rouge « Démarrer une
+crise » ont été écartés pour les résultats de recherche : c'est le premier visuel qu'un
+parent voit, souvent peu après un diagnostic. Les zooms viennent de captures de 920 px de
+large, donc un peu doux : à refaire depuis une capture native, sur un profil sans prénom.
+La ligne « Dons et attestations fiscales » du zoom adhérent est une **lecture** des reçus,
+pas un don depuis l'app ; si cette ligne prête à confusion pour la revue, la masquer en
+recadrant sur les trois premières lignes.
 
 Première proposition (v1) : dégradé et papillon de l'icône, nom, « Association Française du Syndrome de Rett ».
 Aucune capture, aucun prénom, aucun prix, aucune URL. PNG en RVB, sans canal alpha,
