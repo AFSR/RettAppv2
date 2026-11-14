@@ -17,6 +17,16 @@ struct ParentSharingView: View {
     @State private var isResetting = false
     @State private var isPreparingShare = false
 
+    /// Le prénom sous lequel l'autre parent nous verra. Demandé avant la
+    /// première invitation, puis modifiable à tout moment : un partage déjà
+    /// créé est mis à jour, sinon le parent qui le renseigne après coup
+    /// resterait anonyme chez l'autre.
+    @State private var demandePrenom = false
+    @State private var prenomSaisi = ""
+    /// Posé quand la question précède l'envoi de l'invitation, pour enchaîner
+    /// sur AirDrop une fois le prénom connu.
+    @State private var inviterApres = false
+
     var body: some View {
         Form {
             accountSection
@@ -35,10 +45,19 @@ struct ParentSharingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await sync.refreshAccountStatus()
-            // Demande la permission de découvrir les autres participants par
-            // e-mail / nom Apple ID (best effort — l'iOS gère la feuille système).
-            await sync.requestParticipantsDiscoverability()
+            // La demande de découvrabilité vivait ici. iOS 17 ne la sert plus,
+            // et elle n'affichait donc plus aucune feuille système : le nom
+            // vient maintenant du prénom saisi dans `ownerFirstNameAlert`.
             await sync.refreshShareStatus()
+        }
+        .alert("Comment l'autre parent vous verra", isPresented: $demandePrenom) {
+            TextField("Votre prénom", text: $prenomSaisi)
+                .textInputAutocapitalization(.words)
+                .textContentType(.givenName)
+            Button("Annuler", role: .cancel) { prenomSaisi = sync.ownerFirstName }
+            Button("Continuer") { validerPrenom() }
+        } message: {
+            Text("Ce prénom apparaîtra sur l'appareil de l'autre parent, à côté de ce que vous notez. Il reste dans l'iCloud de votre famille : l'AFSR ne le reçoit pas.")
         }
         .confirmationDialog(
             sync.role == .participant ? "Quitter le partage ?" : "Arrêter le partage ?",
@@ -232,7 +251,7 @@ struct ParentSharingView: View {
             switch sync.role {
             case .none:
                 Button {
-                    presentShareSheet()
+                    inviterUnParent()
                 } label: {
                     HStack {
                         if isPreparingShare { ProgressView().controlSize(.small) }
@@ -243,7 +262,7 @@ struct ParentSharingView: View {
                 .disabled(sync.accountStatus != .available || sync.syncState == .syncing || isPreparingShare)
             case .owner:
                 Button {
-                    presentShareSheet()
+                    inviterUnParent()
                 } label: {
                     HStack {
                         if isPreparingShare { ProgressView().controlSize(.small) }
@@ -252,6 +271,18 @@ struct ParentSharingView: View {
                     }
                 }
                 .disabled(isPreparingShare)
+                Button {
+                    prenomSaisi = sync.ownerFirstName
+                    inviterApres = false
+                    demandePrenom = true
+                } label: {
+                    Label(
+                        sync.ownerFirstName.isEmpty
+                            ? "Dire comment l'autre parent vous voit"
+                            : "L'autre parent vous voit comme « \(sync.ownerFirstName) »",
+                        systemImage: "person.text.rectangle"
+                    )
+                }
                 Button(role: .destructive) {
                     presentStopConfirm = true
                 } label: {
@@ -396,6 +427,33 @@ struct ParentSharingView: View {
     /// l'invitation doit se faire en présentiel pour garantir l'intégrité du
     /// destinataire (Messages/Mail seraient acceptables techniquement mais
     /// ouvriraient une porte d'attaque sociale qu'on préfère fermer côté UX).
+    /// Demande le prénom s'il manque, puis invite. Sans lui, l'autre parent
+    /// verrait « Vous avez accepté l'invitation d'un autre parent » et
+    /// « L'autre parent a ajouté 2 crises » — exact, et parfaitement inutile
+    /// quand on cherche qui a noté quoi.
+    private func inviterUnParent() {
+        if sync.ownerFirstName.trimmingCharacters(in: .whitespaces).isEmpty {
+            prenomSaisi = ""
+            inviterApres = true
+            demandePrenom = true
+        } else {
+            presentShareSheet()
+        }
+    }
+
+    private func validerPrenom() {
+        sync.ownerFirstName = prenomSaisi.trimmingCharacters(in: .whitespacesAndNewlines)
+        let enchainer = inviterApres
+        inviterApres = false
+
+        Task {
+            // Un partage déjà créé porte l'ancien nom, ou aucun : on le
+            // corrige côté serveur avant d'inviter.
+            await sync.updateOwnerDisplayName()
+            if enchainer { presentShareSheet() }
+        }
+    }
+
     private func presentShareSheet() {
         Task {
             isPreparingShare = true
