@@ -65,18 +65,24 @@ Les visuels prêts à déposer sont dans `docs/app-store-assets/` :
 | Résultats de recherche | `resultats-recherche_3840x2560.png` | 3840 × 2560 (3:2) | 2168 × 1030, centrée |
 | Ressource universelle | `universel_5244x2950.png` | 5244 × 2950 (16:9) | 1402 × 962 |
 
-**Troisième proposition (v3), sobre** — fichiers `*_v3_*`. Deux séries précédentes ont été
-écartées le 14 novembre : l'une jugée trop uniforme (v1), l'autre trop colorée, avec un
-arc-en-ciel qui se lisait comme un symbole étranger à l'association (v2, supprimée). La v3
-garde le violet de la charte et des fleurs de pétales **ton sur ton**, discrètes, dans deux
-coins opposés pour que la composition ne soit pas symétrique.
+**Quatrième proposition (v4), calquée sur le site** — fichiers `*_v4_*`. Trois séries ont
+été écartées le 14 novembre : trop uniforme (v1), trop colorée avec un arc-en-ciel qui se
+lisait comme un symbole étranger à l'association (v2), ton sur ton sans lien avec le site
+(v3). La v4 reprend la charte de afsr.fr, lue dans le dépôt `AFSR/website` :
+
+| Élément | Source dans le site |
+|---|---|
+| Dégradé `#AE3F96` → `#9E1981` → `#68257C` | `resources/svg` du bandeau `wings-hero` |
+| Grandes ailes de papillon, à gauche et en miroir à droite | `resources/svg/wings.svg` |
+| Titre en **Unbounded** 800, texte en **Montserrat** 600 | `resources/css/public.scss` (`$font-heading`, `$font-default`) |
+| Variante claire sur `#FBF6FA` → `#F5E8F2`, titre `#68257C` | `$brand-purple-light-10/30`, `$brand-purple-100` |
 
 | Fichier | Contenu |
 |---|---|
-| `en-tete_v3_violet_3840x1646.png` | Papillon blanc et nom sur violet. |
-| `en-tete_v3_clair_3840x1646.png` | Même chose, papillon violet sur fond clair. |
-| `resultats-recherche_v3_adherent_3840x2560.png` | Zoom sur la liste « Mon compte » de l'espace adhérent. **Recommandé.** |
-| `resultats-recherche_v3_bilan_3840x2560.png` | Zoom sur le graphique du Bilan. Plus proche du suivi, mais le titre dit « crises ». |
+| `en-tete_v4_violet_3840x1646.png` | Papillon blanc et nom sur le dégradé du site. |
+| `en-tete_v4_clair_3840x1646.png` | Même chose sur fond clair, papillon et texte violets. |
+| `resultats-recherche_v4_adherent_3840x2560.png` | Zoom sur la liste « Mon compte » de l'espace adhérent. **Recommandé.** |
+| `resultats-recherche_v4_bilan_3840x2560.png` | Zoom sur le graphique du Bilan. Plus proche du suivi, mais le titre dit « crises ». |
 
 **Aucun zoom n'est tiré d'un écran de crise.** Le Journal et sa carte rouge « Démarrer une
 crise » ont été écartés pour les résultats de recherche : c'est le premier visuel qu'un
@@ -84,7 +90,10 @@ parent voit, souvent peu après un diagnostic. Les zooms viennent de captures de
 large, donc un peu doux : à refaire depuis une capture native, sur un profil sans prénom.
 La ligne « Dons et attestations fiscales » du zoom adhérent est une **lecture** des reçus,
 pas un don depuis l'app ; si cette ligne prête à confusion pour la revue, la masquer en
-recadrant sur les trois premières lignes.
+recadrant sur les quatre autres lignes.
+
+Si la charte du site évolue, ces visuels sont à refaire : ils recopient ses valeurs, ils
+ne les lisent pas.
 
 Première proposition (v1) : dégradé et papillon de l'icône, nom, « Association Française du Syndrome de Rett ».
 Aucune capture, aucun prénom, aucun prix, aucune URL. PNG en RVB, sans canal alpha,
