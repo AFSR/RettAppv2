@@ -60,7 +60,7 @@ qui est la requête exacte des familles qui viennent de recevoir le diagnostic.
 
 | Champ | Français | Anglais | Portugais (BR) |
 |---|---|---|---|
-| **Nom** (30) | `RettApp · Syndrome de Rett` | `RettApp · Rett Syndrome` | `RettApp · Síndrome de Rett` |
+| **Nom** (30) | `RettApp - Syndrome de Rett` | `RettApp - Rett Syndrome` | `RettApp - Síndrome de Rett` |
 | | *26 car.* | *23 car.* | *26 car.* |
 | **Sous-titre** (30) | `Crises, médicaments, bilan` | `Seizures, medication, trends` | `Crises, medicamentos, resumo` |
 | | *26 car.* | *28 car.* | *28 car.* |
@@ -72,8 +72,8 @@ Le sous-titre ne répète aucun mot du nom : les deux champs couvrent ensemble *
 
 | Proposition | Long. | Ce qu'elle vise |
 |---|---|---|
-| `RettApp · Syndrome de Rett` | 26 | La requête exacte après un diagnostic. **Proposé.** |
-| `RettApp · Suivi épilepsie` | 25 | Le terme le plus cherché, mais positionne l'app en outil d'épilepsie plutôt qu'en app de l'association. |
+| `RettApp - Syndrome de Rett` | 26 | La requête exacte après un diagnostic. **Proposé.** |
+| `RettApp - Suivi épilepsie` | 25 | Le terme le plus cherché, mais positionne l'app en outil d'épilepsie plutôt qu'en app de l'association. |
 | `RettApp` | 7 | L'actuel. Rien à redire, sinon qu'il ne cherche rien. |
 
 ### Alternatives pour le sous-titre
