@@ -88,6 +88,33 @@ final class CloudKitSyncService {
     /// par `refreshShareStatus` à partir du champ custom du `CKShare`.
     var ownerDisplayNameFromShare: String?
 
+    /// Le prénom sous lequel l'autre parent vous voit : « Partagé par Marie »,
+    /// « Marie a ajouté 2 crises ».
+    ///
+    /// Il est **demandé**, et non deviné. Jusqu'en novembre 2026 il venait de
+    /// `discoverUserIdentity`, qu'iOS 17 ne prend plus en charge : l'appel
+    /// renvoyait toujours rien, le champ n'était jamais écrit, et les deux
+    /// parents se voyaient mutuellement anonymes sans que rien ne le signale.
+    ///
+    /// Rangé dans les réglages de l'appareil et non en base : c'est une
+    /// préférence locale, et la corbeille a déjà montré ce que coûte un
+    /// changement de schéma SwiftData.
+    ///
+    /// Il ne quitte l'appareil qu'avec le partage lui-même, c'est-à-dire vers
+    /// l'iCloud personnel de la famille — jamais vers un serveur de l'AFSR.
+    var ownerFirstName: String = UserDefaults.standard
+        .string(forKey: CloudKitSyncService.ownerFirstNameKey) ?? "" {
+        didSet {
+            UserDefaults.standard.set(ownerFirstName, forKey: Self.ownerFirstNameKey)
+        }
+    }
+
+    /// Le prénom nettoyé, ou `nil` s'il n'y en a pas.
+    private var ownerFirstNameOrNil: String? {
+        let nettoye = ownerFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return nettoye.isEmpty ? nil : nettoye
+    }
+
     /// Journal court des dernières activités distantes (récup à chaque pull
     /// `.shared`). Affiché dans Réglages → Partage pour donner de la
     /// visibilité sur ce que fait l'autre parent. Plafonné à 30 entrées.
@@ -252,8 +279,11 @@ final class CloudKitSyncService {
         // présentiel via AirDrop, ou destinataire de confiance).
         share.publicPermission = .readWrite
         // Champ custom : nom affichable du propriétaire, lu côté participant
-        // pour afficher « Partagé par X » sans dépendre de discoverUserIdentity.
-        if let ownerName = await currentUserDisplayName() {
+        // pour afficher « Partagé par X ». Il vient du prénom saisi par le
+        // parent, et non plus de `discoverUserIdentity`, qu'iOS 17 ne prend
+        // plus en charge — cet appel renvoyait toujours rien, et le champ
+        // n'était donc jamais écrit.
+        if let ownerName = ownerFirstNameOrNil {
             share["ownerDisplayName"] = ownerName as CKRecordValue
         }
 
@@ -389,30 +419,48 @@ final class CloudKitSyncService {
         }
     }
 
-    /// Récupère le nom complet de l'utilisateur iCloud courant via
-    /// `discoverUserIdentity`. Nécessite `requestApplicationPermission(.userDiscoverability)`
-    /// accordée + l'utilisateur a activé « Trouvable par e-mail » dans ses
-    /// Réglages iCloud. Retourne nil sinon — l'appelant prévoit un fallback.
-    private func currentUserDisplayName() async -> String? {
+    /// Reporte le prénom sur un partage **déjà créé**.
+    ///
+    /// Sans cela, un parent qui renseigne son prénom après coup resterait
+    /// anonyme chez l'autre : le champ n'est écrit qu'à la création du
+    /// partage, et la plupart des partages existants ont été créés à l'époque
+    /// où `discoverUserIdentity` ne renvoyait déjà plus rien.
+    func updateOwnerDisplayName() async {
+        guard role == .owner else { return }
+        guard let zone = await existingOwnedZone() else { return }
+
         do {
-            let userRecordID = try await container.userRecordID()
-            let identity = try await discoverIdentity(userRecordID: userRecordID)
-            if let comps = identity?.nameComponents {
-                let formatter = PersonNameComponentsFormatter()
-                let s = formatter.string(from: comps)
-                return s.isEmpty ? nil : s
+            guard let share = try await fetchZoneShare(
+                database: container.privateCloudDatabase, zoneID: zone.zoneID
+            ) else { return }
+
+            share["ownerDisplayName"] = ownerFirstNameOrNil as CKRecordValue?
+
+            let resultat = try await container.privateCloudDatabase.modifyRecords(
+                saving: [share], deleting: [],
+                savePolicy: .ifServerRecordUnchanged
+            )
+            // `modifyRecords` ne lève pas quand un enregistrement échoue :
+            // il faut lire les résultats, comme à la création du partage.
+            for (_, issue) in resultat.saveResults {
+                if case .failure(let erreur) = issue {
+                    Self.log.error("updateOwnerDisplayName: \(erreur.localizedDescription)")
+                    return
+                }
             }
+            currentShare = share
+            ownerDisplayNameFromShare = ownerFirstNameOrNil
         } catch {
-            Self.log.error("currentUserDisplayName: \(error.localizedDescription)")
+            Self.log.error("updateOwnerDisplayName: \(error.localizedDescription)")
         }
-        return nil
     }
 
-    /// Récupère le statut de partage actuel (si on est propriétaire ou participant)
-    /// **et** la liste des participants associés au share. Les identités
-    /// viennent en priorité du champ custom `ownerDisplayName` stocké dans le
-    /// CKShare ; à défaut, `discoverUserIdentity` (qui nécessite que l'autre
-    /// utilisateur ait activé la découvrabilité — souvent désactivée).
+    /// Récupère le statut de partage actuel (si on est propriétaire ou
+    /// participant) **et** la liste des participants associés au share.
+    ///
+    /// Le nom affiché vient du champ custom `ownerDisplayName` du CKShare, et
+    /// de lui seul. Il n'y a plus de repli : celui qui existait passait par
+    /// `discoverUserIdentity`, qu'iOS 17 ne sert plus.
     func refreshShareStatus() async {
         do {
             // ORDRE IMPORTANT — on vérifie le rôle PARTICIPANT en premier.
@@ -530,8 +578,6 @@ final class CloudKitSyncService {
         participants = infos
         participantCount = max(0, infos.filter { !$0.isOwner && $0.acceptanceStatus != .removed }.count)
         ownerDisplayNameFromShare = share["ownerDisplayName"] as? String
-        let enriched = await enrichParticipants(from: share, currentList: infos)
-        participants = enriched
     }
 
     private func applyParticipantShare(_ share: CKShare) async {
@@ -546,70 +592,20 @@ final class CloudKitSyncService {
         participants = infos
         participantCount = max(0, infos.filter { !$0.isOwner && $0.acceptanceStatus != .removed }.count)
         ownerDisplayNameFromShare = share["ownerDisplayName"] as? String
-        let enriched = await enrichParticipants(from: share, currentList: infos)
-        participants = enriched
     }
 
-    /// Demande à l'utilisateur l'autorisation de découvrir l'identité des autres
-    /// participants (Apple ID, e-mail). Sans cette permission, CloudKit nous
-    /// renvoie des participants anonymes même quand les autres parents ont
-    /// activé la découvrabilité de leur côté.
-    func requestParticipantsDiscoverability() async {
-        do {
-            let status = try await container.requestApplicationPermission(.userDiscoverability)
-            Self.log.info("Discoverability permission: \(String(describing: status))")
-        } catch {
-            Self.log.error("Discoverability request failed: \(error.localizedDescription)")
-        }
-    }
-
-    /// Enrichit la liste des participants avec leur identité visible (e-mail,
-    /// nom complet) en interrogeant CloudKit. Nécessite que :
-    ///   - chaque parent ait activé la découvrabilité côté Réglages iOS,
-    ///   - cette app ait obtenu la permission `.userDiscoverability` (cf.
-    ///     `requestParticipantsDiscoverability()`).
-    private func enrichParticipants(from share: CKShare, currentList: [ParticipantInfo]) async -> [ParticipantInfo] {
-        var enriched: [ParticipantInfo] = []
-        for (i, p) in share.participants.enumerated() {
-            let base = currentList.indices.contains(i)
-                ? currentList[i]
-                : ParticipantInfo(from: p, isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID)
-            // Si on a déjà email/nom, on garde — sinon on tente la découverte.
-            if base.email != nil || base.displayName != nil {
-                enriched.append(base)
-                continue
-            }
-            guard let userRecordID = p.userIdentity.userRecordID else {
-                enriched.append(base)
-                continue
-            }
-            do {
-                let identity = try await discoverIdentity(userRecordID: userRecordID)
-                enriched.append(ParticipantInfo(
-                    from: p,
-                    isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID,
-                    overrideIdentity: identity
-                ))
-            } catch {
-                Self.log.error("discoverUserIdentity failed: \(error.localizedDescription)")
-                enriched.append(base)
-            }
-        }
-        return enriched
-    }
-
-    /// Wrapper de `discoverUserIdentity(withUserRecordID:completionHandler:)` en
-    /// async/await. L'API ObjC originale n'a pas de variante async auto-bridgée
-    /// dans le SDK iOS 17 — il faut explicitement wrapper avec
-    /// `withCheckedThrowingContinuation` pour utiliser `try await`.
-    private func discoverIdentity(userRecordID: CKRecord.ID) async throws -> CKUserIdentity? {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<CKUserIdentity?, Error>) in
-            container.discoverUserIdentity(withUserRecordID: userRecordID) { identity, error in
-                if let error { cont.resume(throwing: error) }
-                else { cont.resume(returning: identity) }
-            }
-        }
-    }
+    // `requestParticipantsDiscoverability()`, `enrichParticipants()` et
+    // `discoverIdentity()` vivaient ici. Elles reposaient sur
+    // `requestApplicationPermission(.userDiscoverability)` et
+    // `discoverUserIdentity`, qu'iOS 17 ne prend plus en charge — « No longer
+    // supported », pas « déprécié mais fonctionnel ». Les appels ne faisaient
+    // plus rien, et les participants restaient anonymes chez toutes les
+    // familles sans qu'aucune erreur n'apparaisse.
+    //
+    // Le nom affiché vient désormais de `ownerFirstName`, demandé au parent.
+    // Les voir sous leur nom Apple ID n'est plus possible : Apple a fermé
+    // cette porte, et la rouvrir demanderait une invitation nominative par
+    // e-mail — ce que le partage par AirDrop refuse délibérément.
 
     /// Retire un participant spécifique du share (action propriétaire). Le
     /// participant perd l'accès immédiatement, mais le partage reste en place
@@ -1513,6 +1509,8 @@ final class CloudKitSyncService {
     /// la lisent le sont, puisqu'ils tournent hors du MainActor.
     private nonisolated static let resurrectedKey = "afsr.medlog.resurrectedOnce.v1"
 
+    private nonisolated static let ownerFirstNameKey = "afsr.sharing.ownerFirstName"
+
     /// IDs de prises cochées dont on a déjà refusé UNE suppression distante.
     /// Persistée pour survivre au relaunch — sinon chaque redémarrage
     /// relancerait un cycle de ping-pong suppression/résurrection.
@@ -1959,12 +1957,16 @@ struct ParticipantInfo: Identifiable, Hashable {
     let acceptanceLabel: String
     let permissionLabel: String
 
-    init(from p: CKShare.Participant, isOwnerSlot: Bool, overrideIdentity: CKUserIdentity? = nil) {
+    init(from p: CKShare.Participant, isOwnerSlot: Bool) {
         self.acceptanceStatus = p.acceptanceStatus
         self.id = p.userIdentity.userRecordID?.recordName ?? UUID().uuidString
-        // Priorité : overrideIdentity (récupéré via discoverUserIdentity) > userIdentity
-        //            de p (souvent vide pour les shares à publicPermission ouvert).
-        let identity = overrideIdentity ?? p.userIdentity
+        // L'identité est presque toujours vide sur un partage à
+        // `publicPermission` ouvert, qui est le nôtre : l'invitation par
+        // AirDrop ne nomme personne. Un paramètre `overrideIdentity` comblait
+        // ce vide avec `discoverUserIdentity`, qu'iOS 17 ne sert plus ; il a
+        // été retiré avec elle. Le nom du propriétaire vient maintenant du
+        // champ `ownerDisplayName` du partage.
+        let identity = p.userIdentity
         if let comps = identity.nameComponents {
             let f = PersonNameComponentsFormatter()
             f.style = .default
