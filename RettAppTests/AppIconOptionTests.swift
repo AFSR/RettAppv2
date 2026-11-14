@@ -27,4 +27,69 @@ final class AppIconOptionTests: XCTestCase {
             XCTAssertNotNil(UIImage(named: option.previewName), "aperçu manquant : \(option.previewName)")
         }
     }
+
+    // MARK: - Ce que le catalogue seul ne garantit pas
+
+    /// Le test qui manquait.
+    ///
+    /// Les sept visuels étaient dans `Assets.xcassets` depuis le début, et le
+    /// changement d'icône ne fonctionnait pas pour autant : il manquait
+    /// `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` dans le projet. Sans ce
+    /// réglage, le compilateur de catalogue n'écrit pas les entrées ci-dessous
+    /// et iOS refuse `setAlternateIconName` — sans que rien n'échoue à la
+    /// compilation, ni qu'aucun test d'alors ne s'en aperçoive.
+    ///
+    /// On interroge donc le bundle construit, pas le catalogue source : c'est
+    /// la seule chose que l'appareil regarde.
+    func test_chaqueIconeAlternativeEstDeclareeDansLeBundle() throws {
+        let icons = try XCTUnwrap(
+            Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
+            "CFBundleIcons absent : aucune icône n'est déclarée dans le bundle"
+        )
+        let alternates = icons["CFBundleAlternateIcons"] as? [String: Any] ?? [:]
+
+        for option in AppIconOption.allCases {
+            guard let name = option.assetName else { continue }
+            XCTAssertNotNil(
+                alternates[name],
+                """
+                Icône de rechange non déclarée dans le bundle : \(name).
+                Vérifiez ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES, puis
+                relancez `ruby scripts/generate_xcodeproj.rb`.
+                """
+            )
+        }
+    }
+
+    // MARK: - L'écran d'ouverture
+
+    /// L'illustration du splash est agrandie depuis l'aperçu du catalogue.
+    /// En dessous de la taille affichée en @3x, elle devient floue — et c'est
+    /// le premier écran que voit la famille.
+    func test_lesApercusCouvrentLEcranDOuvertureEnTroisX() {
+        let requis = LaunchSplashMetrics.artworkSide * 3
+        for option in AppIconOption.allCases {
+            let image = UIImage(named: option.previewName)
+            XCTAssertGreaterThanOrEqual(
+                image?.size.width ?? 0, requis,
+                "aperçu trop petit pour l'écran d'ouverture : \(option.previewName)"
+            )
+        }
+    }
+
+    /// L'écran de lancement du système et celui de l'app doivent partager le
+    /// même fond, sinon le raccord se voit au démarrage. Le fond vient du
+    /// catalogue justement pour que les deux lisent le même objet.
+    func test_lEcranDeLancementEtLAppPartagentLeMemeFond() throws {
+        let infos = try XCTUnwrap(Bundle.main.infoDictionary)
+
+        // Un storyboard l'emporterait sur `UILaunchScreen` : sa présence
+        // ramènerait le logo fixe, qui ne peut pas suivre l'icône choisie.
+        XCTAssertNil(infos["UILaunchStoryboardName"])
+
+        let launch = infos["UILaunchScreen"] as? [String: Any]
+        XCTAssertEqual(launch?["UIColorName"] as? String, "LaunchBackground")
+        XCTAssertNotNil(UIColor(named: "LaunchBackground"),
+                        "fond de lancement absent du catalogue : iOS ouvrirait sur du blanc")
+    }
 }

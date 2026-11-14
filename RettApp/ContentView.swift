@@ -50,11 +50,17 @@ struct ContentView: View {
                     .tabItem { Label("AFSR", systemImage: "heart.circle.fill") }
             }
 
-            // Onglet réservé aux personnes connectées à leur compte AFSR.
-            if MemberSession.shared.isSignedIn {
-                NavigationStack { MemberAreaView() }
-                    .tabItem { Label("Adhérent", systemImage: "person.crop.circle.fill") }
-            }
+            // Toujours présent, connecté ou non. L'onglet n'apparaissait
+            // autrefois qu'une fois connecté, ce qui demandait de deviner que
+            // l'espace adhérent existait et de le chercher dans les Réglages :
+            // personne ne cherche ce dont rien n'annonce l'existence.
+            //
+            // Non connecté, l'onglet ouvre l'écran de connexion — `MemberAreaView`
+            // le fait déjà. Il ne montre donc ni page vide ni ligne grisée, ce
+            // qui est la raison pour laquelle les autres onglets, eux, restent
+            // conditionnels.
+            NavigationStack { MemberAreaView() }
+                .tabItem { Label("Adhérent", systemImage: "person.crop.circle.fill") }
 
             NavigationStack { SettingsView(usage: usage) }
                 .tabItem { Label("Réglages", systemImage: "gear") }

@@ -29,8 +29,21 @@
     </dict>
     <key>CKSharingSupported</key>
     <true/>
-    <key>UILaunchStoryboardName</key>
-    <string>LaunchScreen</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.medical</string>
+    <!-- Écran de lancement sans storyboard (iOS 14+), en remplacement de
+         `UILaunchStoryboardName` / LaunchScreen.storyboard.
+
+         Le système lit cette clé AVANT que le code de l'app ne tourne : cet
+         écran ne peut donc pas suivre l'icône choisie par la famille, et un
+         storyboard ne le pouvait pas davantage. Il ne porte plus que le fond
+         noir ; c'est `LaunchSplashView` qui pose par-dessus l'illustration de
+         l'icône du moment et le nom de l'association. -->
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string>LaunchBackground</string>
+    </dict>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>armv7</string>

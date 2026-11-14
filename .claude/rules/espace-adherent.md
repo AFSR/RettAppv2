@@ -66,6 +66,12 @@ Le partage n'est **pas symétrique**, et l'app doit le respecter à la lettre :
   Avoir un compte ne suffit pas. Le serveur le décide (`reviews_readable`) ;
   l'app affiche l'explication, elle ne recalcule pas la règle.
 
+Ce qui précède décrit l'**API**. Dans l'**application**, l'annuaire reste
+derrière la connexion : il vit dans l'espace adhérent et n'est pas atteignable
+sans compte. Ce n'est pas un oubli, c'est une décision de l'association, prise
+le 14 novembre 2026 sur question explicite. Ne l'ouvrez pas au public au motif
+que le serveur, lui, le permettrait.
+
 ## Ne codez pas en dur les types et les critères
 
 Ils viennent de `/lieux/meta`. Ajouter un critère côté site doit suffire à le
