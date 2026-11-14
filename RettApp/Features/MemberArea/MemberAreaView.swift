@@ -48,6 +48,25 @@ struct MemberHomeView: View {
 
     private var isActiveMember: Bool { session.profile?.membership.active ?? false }
 
+    /// Les destinations de l'espace adhérent, poussées **par valeur**.
+    ///
+    /// Ce n'était pas le cas, et c'est ce qui cassait l'ouverture des lieux.
+    /// Avec `NavigationLink { Destination() }`, l'identité de la destination
+    /// tient à la place du lien dans la liste. Or cette liste se réorganise
+    /// toute seule : `reload()` arrive après l'affichage et insère la section
+    /// « Rubriques » **au-dessus** de « Lieux Rett friendly ». Un écran poussé
+    /// juste avant était alors dépilé — on touchait la ligne, et on revenait
+    /// aussitôt d'où l'on venait.
+    ///
+    /// Poussée par valeur, la destination ne dépend plus de la forme de la
+    /// liste. Elle survit au rechargement des rubriques.
+    private enum Destination: Hashable {
+        case adhesion, informations, famille, dons, preferences
+        case publications, communications
+        case rubrique(MemberSection)
+        case lieux, mesAvis
+    }
+
     var body: some View {
         List {
             headerSection
@@ -58,6 +77,20 @@ struct MemberHomeView: View {
             privacySection
         }
         .afsrListBackground()
+        .navigationDestination(for: Destination.self) { destination in
+            switch destination {
+            case .adhesion:       MemberMembershipView(session: session)
+            case .informations:   MemberProfileView(session: session)
+            case .famille:        MemberFamilyView(session: session)
+            case .dons:           MemberDonationsView(session: session)
+            case .preferences:    MemberPreferencesView(session: session)
+            case .publications:   MemberPublicationsView(session: session)
+            case .communications: MemberCommunicationsView(session: session)
+            case .rubrique(let section): MemberSectionView(session: session, section: section)
+            case .lieux:          PlacesDirectoryView(session: session)
+            case .mesAvis:        MyPlaceReviewsView(session: session)
+            }
+        }
         .navigationTitle("Espace adhérent")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await reload() }
@@ -160,29 +193,19 @@ struct MemberHomeView: View {
 
     private var accountSection: some View {
         Section("Mon compte") {
-            NavigationLink {
-                MemberMembershipView(session: session)
-            } label: {
+            NavigationLink(value: Destination.adhesion) {
                 AFSRRowLabel(title: "Mon adhésion", systemImage: "checkmark.seal.fill", color: .afsrSuccess)
             }
-            NavigationLink {
-                MemberProfileView(session: session)
-            } label: {
+            NavigationLink(value: Destination.informations) {
                 AFSRRowLabel(title: "Mes informations", systemImage: "person.text.rectangle.fill", color: .afsrPurple)
             }
-            NavigationLink {
-                MemberFamilyView(session: session)
-            } label: {
+            NavigationLink(value: Destination.famille) {
                 AFSRRowLabel(title: "Ma famille", systemImage: "person.2.fill", color: Color(hex: "#3949AB"))
             }
-            NavigationLink {
-                MemberDonationsView(session: session)
-            } label: {
+            NavigationLink(value: Destination.dons) {
                 AFSRRowLabel(title: "Dons et attestations fiscales", systemImage: "gift.fill", color: .afsrEmergency)
             }
-            NavigationLink {
-                MemberPreferencesView(session: session)
-            } label: {
+            NavigationLink(value: Destination.preferences) {
                 AFSRRowLabel(title: "Réception des envois", systemImage: "envelope.fill", color: Color(hex: "#1E88E5"))
             }
         }
@@ -190,14 +213,10 @@ struct MemberHomeView: View {
 
     private var contentSection: some View {
         Section {
-            NavigationLink {
-                MemberPublicationsView(session: session)
-            } label: {
+            NavigationLink(value: Destination.publications) {
                 lockableLabel("Publications AFSR", systemImage: "books.vertical", locked: !isActiveMember)
             }
-            NavigationLink {
-                MemberCommunicationsView(session: session)
-            } label: {
+            NavigationLink(value: Destination.communications) {
                 lockableLabel("Communications", systemImage: "bubble.left.and.bubble.right", locked: !isActiveMember)
             }
         } header: {
@@ -212,9 +231,7 @@ struct MemberHomeView: View {
     private var sectionsSection: some View {
         Section("Rubriques") {
             ForEach(sections) { section in
-                NavigationLink {
-                    MemberSectionView(session: session, section: section)
-                } label: {
+                NavigationLink(value: Destination.rubrique(section)) {
                     lockableLabel(
                         section.title,
                         systemImage: MemberFormat.symbol(forSiteIcon: section.icon),
@@ -229,18 +246,14 @@ struct MemberHomeView: View {
         Section {
             // L'annuaire et le dépôt d'avis sont désormais dans l'app : plus
             // de détour par Safari, où il fallait se reconnecter au site.
-            NavigationLink {
-                PlacesDirectoryView(session: session)
-            } label: {
+            NavigationLink(value: Destination.lieux) {
                 AFSRRowLabel(title: "Lieux Rett friendly",
                              systemImage: "mappin.and.ellipse",
                              color: Color(hex: "#00897B"),
                              subtitle: "Chercher un lieu qui accueille bien, sur une carte ou dans la liste")
             }
 
-            NavigationLink {
-                MyPlaceReviewsView(session: session)
-            } label: {
+            NavigationLink(value: Destination.mesAvis) {
                 AFSRRowLabel(title: "Mes avis sur les lieux",
                              systemImage: "text.bubble",
                              color: Color(hex: "#00897B"),

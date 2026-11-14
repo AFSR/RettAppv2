@@ -170,7 +170,9 @@ struct SectionsResponse: Decodable {
     let sections: [MemberSection]
 }
 
-struct MemberSection: Decodable, Identifiable, Equatable {
+/// `Hashable` et non seulement `Equatable` : une rubrique voyage dans le
+/// chemin de navigation de l'espace adhérent, ce qui l'exige.
+struct MemberSection: Decodable, Identifiable, Hashable {
     let slug: String
     let title: String
     let icon: String
