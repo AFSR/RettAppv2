@@ -142,6 +142,7 @@ struct DashboardView: View {
         case .mood:      moodChart
         case .adherence: adherenceChart
         case .symptoms:  symptomsSection
+        case .factors:   factorsSection
         }
     }
 
@@ -522,6 +523,57 @@ struct DashboardView: View {
                     }
                 }
                 .chartOverlay(content: crosshairCapture)
+            }
+        }
+    }
+
+    // MARK: - Facteurs associés
+
+    /// Regarde les 90 derniers jours jusqu'à la fin de la fenêtre, quelle que
+    /// soit l'échelle choisie : voir `JournalFactors.lookbackDays`.
+    private var factorDays: [JournalFactors.Day] {
+        let end = min(viewModel.windowBounds().end, Date().addingTimeInterval(86_400))
+        return JournalFactors.days(
+            seizures: seizures, symptoms: symptoms, observations: observations,
+            moods: moods, logs: logs, endingBefore: end
+        )
+    }
+
+    private var factorsSection: some View {
+        let days = factorDays
+        let findings = JournalFactors.findings(in: days)
+        let journalDays = JournalFactors.daysWithJournal(in: days)
+        return SectionCard(title: "Facteurs associés", systemImage: "link", accent: .afsrPurpleAdaptive) {
+            VStack(alignment: .leading, spacing: 12) {
+                if findings.isEmpty {
+                    Text(journalDays < JournalFactors.minimumDays
+                         ? "Pas encore assez de données : \(journalDays) jour\(journalDays > 1 ? "s" : "") de journal sur les \(JournalFactors.lookbackDays) derniers. Il en faut au moins \(JournalFactors.minimumDays)."
+                         : "Aucun lien net entre le journal et les crises ou les symptômes sur les \(JournalFactors.lookbackDays) derniers jours.")
+                        .font(AFSRFont.body(15))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(findings) { f in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: f.factor.systemImage)
+                                .foregroundStyle(.afsrPurpleAdaptive)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(f.sentence)
+                                    .font(AFSRFont.body(15))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(f.caveat)
+                                    .font(AFSRFont.caption())
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                Text("Calculé sur cet iPhone, sur les \(JournalFactors.lookbackDays) derniers jours. Un lien n'est pas une cause : à voir avec l'équipe soignante.")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
