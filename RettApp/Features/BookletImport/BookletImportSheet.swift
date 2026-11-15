@@ -30,7 +30,40 @@ struct BookletImportSheet: View {
         case unsupportedScan
     }
 
+    /// Pourquoi le scan n'a pas abouti.
+    ///
+    /// Les trois cas appellent des gestes différents — refaire la photo,
+    /// changer de page, ou cadrer la page entière — et l'app les présentait
+    /// tous comme « QR code introuvable », y compris lorsque le QR avait été
+    /// parfaitement lu. On envoyait donc la famille refaire une photo qui ne
+    /// pouvait pas mieux marcher.
+    enum EchecScan {
+        case introuvable
+        case contenuEtranger
+        case pageIncomplete
+
+        var titre: String {
+            switch self {
+            case .introuvable:     return "QR code introuvable"
+            case .contenuEtranger: return "Page non reconnue"
+            case .pageIncomplete:  return "Page incomplète"
+            }
+        }
+
+        var explication: String {
+            switch self {
+            case .introuvable:
+                return "Le QR code en haut à droite de la page n'a pas pu être lu. Cela peut arriver si la photo est floue, trop sombre, ou si la page provient d'une ancienne version du cahier (générée avant l'ajout du QR)."
+            case .contenuEtranger:
+                return "Un QR code a bien été lu, mais son contenu n'est pas celui d'un cahier de suivi RettApp. Vérifiez que la page vient bien du cahier imprimé depuis l'application."
+            case .pageIncomplete:
+                return "Le QR code a été lu, mais la page n'a pas pu être analysée. Photographiez-la entière, bien à plat et sans coin coupé."
+            }
+        }
+    }
+
     @State private var phase: Phase = .intro
+    @State private var echecScan: EchecScan = .introuvable
     @State private var showScanner = false
     @State private var progress: String = ""
     @State private var scanError: String?
@@ -163,9 +196,9 @@ struct BookletImportSheet: View {
                 .font(.system(size: 56, weight: .light))
                 .foregroundStyle(.afsrEmergency)
                 .padding(.top, 24)
-            Text("QR code introuvable")
+            Text(echecScan.titre)
                 .font(AFSRFont.title(18))
-            Text("Le QR code en haut à droite de la page n'a pas pu être lu. Cela peut arriver si la photo est floue, trop sombre, ou si la page provient d'une ancienne version du cahier (générée avant l'ajout du QR).")
+            Text(echecScan.explication)
                 .font(AFSRFont.body(13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -446,8 +479,18 @@ struct BookletImportSheet: View {
     @MainActor
     private func runPipeline(image: UIImage) async {
         log.info("Pipeline start — image size = \(image.size.width, privacy: .public)x\(image.size.height, privacy: .public)")
-        guard let detection = await BookletQR.detect(in: image) else {
+        let detection: BookletQR.DetectionResult
+        switch await BookletQR.detect(in: image) {
+        case .trouve(let trouvee):
+            detection = trouvee
+        case .contenuEtranger:
+            log.error("QR lu, mais son contenu n'est pas un cahier RettApp")
+            echecScan = .contenuEtranger
+            phase = .unsupportedScan
+            return
+        case .illisible:
             log.error("QR detection FAILED — no readable QR in the image")
+            echecScan = .introuvable
             phase = .unsupportedScan
             return
         }
@@ -464,6 +507,7 @@ struct BookletImportSheet: View {
             qrImageRect: detection.pixelBounds
         ) else {
             log.error("BookletPixelSampler init failed")
+            echecScan = .pageIncomplete
             phase = .unsupportedScan
             return
         }
