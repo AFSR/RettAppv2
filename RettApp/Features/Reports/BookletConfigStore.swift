@@ -31,6 +31,7 @@ final class BookletConfigStore {
     var includeMoodGrid: Bool { didSet { persist() } }
     var includeMealsGrid: Bool { didSet { persist() } }
     var includeSleepGrid: Bool { didSet { persist() } }
+    var includeEliminationGrid: Bool { didSet { persist() } }
     var includeSymptomsGrid: Bool { didSet { persist() } }
     var includeFreeNotes: Bool { didSet { persist() } }
 
@@ -61,6 +62,13 @@ final class BookletConfigStore {
             self.includeMoodGrid = decoded.includeMoodGrid
             self.includeMealsGrid = decoded.includeMealsGrid
             self.includeSleepGrid = decoded.includeSleepGrid
+            // Absent des configurations enregistrées avant novembre 2026 :
+            // d'où l'optionnel et le repli, et non une valeur par défaut sur
+            // la propriété — le décodeur synthétisé de Swift ÉCHOUE sur une
+            // clé absente et ne retombe pas dessus. La même erreur sur la
+            // corbeille aurait rendu illisibles tous les fichiers existants ;
+            // ici, elle effacerait la configuration de chaque famille.
+            self.includeEliminationGrid = decoded.includeEliminationGrid ?? false
             self.includeSymptomsGrid = decoded.includeSymptomsGrid
             self.includeFreeNotes = decoded.includeFreeNotes
             self.selectedDoses = decoded.selectedDoses
@@ -74,6 +82,7 @@ final class BookletConfigStore {
             self.includeMoodGrid = true
             self.includeMealsGrid = true
             self.includeSleepGrid = false
+            self.includeEliminationGrid = false
             self.includeSymptomsGrid = false
             self.includeFreeNotes = true
             self.selectedDoses = []
@@ -93,6 +102,9 @@ final class BookletConfigStore {
         var includeMoodGrid: Bool
         var includeMealsGrid: Bool
         var includeSleepGrid: Bool
+        /// Optionnel : voir le commentaire du décodage. Ne le rendez pas
+        /// obligatoire, cela rendrait illisibles les configurations existantes.
+        var includeEliminationGrid: Bool?
         var includeSymptomsGrid: Bool
         var includeFreeNotes: Bool
         var selectedDoses: Set<DoseKey>
@@ -109,6 +121,7 @@ final class BookletConfigStore {
             includeMoodGrid: includeMoodGrid,
             includeMealsGrid: includeMealsGrid,
             includeSleepGrid: includeSleepGrid,
+            includeEliminationGrid: includeEliminationGrid,
             includeSymptomsGrid: includeSymptomsGrid,
             includeFreeNotes: includeFreeNotes,
             selectedDoses: selectedDoses,

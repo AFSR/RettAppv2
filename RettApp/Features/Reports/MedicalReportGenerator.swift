@@ -132,6 +132,11 @@ enum MedicalReportGenerator {
 
             drawSymptomAnalysis(analysis: symptomAnalysis, ctx: &ctx, context: context)
 
+            // Après les symptômes, avant la synthèse : le transit relève du
+            // constat, pas de l'interprétation. La section s'efface d'elle-même
+            // quand rien n'a été noté.
+            drawEliminationSection(input: input, ctx: &ctx, context: context)
+
             drawSynthesis(input: input, overall: overall,
                           correlations: correlations, medAnalysis: medAnalysis,
                           symptomAnalysis: symptomAnalysis,
@@ -781,6 +786,85 @@ enum MedicalReportGenerator {
             return [p.type.label, "\(p.occurrences)", intensity, duration, last]
         }
         drawTable(headers: headers, columnWidths: widths, rows: rows, ctx: &ctx, context: context)
+        ctx.y += 8
+    }
+
+    /// Transit et urines.
+    ///
+    /// Ce que le médecin cherche ici n'est pas une moyenne mais **les jours
+    /// sans selle** : la constipation est fréquente dans le syndrome de Rett,
+    /// et c'est son accumulation qui décide d'un traitement. Un jour noté
+    /// « aucune selle » compte donc, et ne se confond pas avec un jour non
+    /// renseigné — d'où le décompte séparé des deux.
+    private static func drawEliminationSection(
+        input: Input, ctx: inout DrawContext, context: UIGraphicsPDFRendererContext
+    ) {
+        let jours = input.observations
+            .filter { $0.dayStart >= input.periodStart && $0.dayStart <= input.periodEnd }
+            .filter(\.hasElimination)
+
+        guard !jours.isEmpty else { return }
+
+        ctx.ensureSpace(90, context: context)
+        drawSectionTitle("Transit et urines", ctx: &ctx)
+
+        let avecSelles = jours.filter { $0.stoolCount != nil }
+        let joursSansSelle = avecSelles.filter { $0.stoolCount == 0 }.count
+        let total = avecSelles.compactMap(\.stoolCount).reduce(0, +)
+
+        var phrase = "\(jours.count) jour\(jours.count > 1 ? "s" : "") renseigné\(jours.count > 1 ? "s" : "") sur la période."
+        if !avecSelles.isEmpty {
+            let moyenne = Double(total) / Double(avecSelles.count)
+            phrase += String(
+                format: " Selles notées %d jour%@, dont %d sans aucune selle. Moyenne : %.1f par jour noté.",
+                avecSelles.count, avecSelles.count > 1 ? "s" : "", joursSansSelle, moyenne
+            )
+        }
+        drawText(phrase, italic: true, ctx: &ctx)
+
+        if !avecSelles.isEmpty {
+            let parAspect = StoolAspect.allCases.map { aspect in
+                [aspect.label, "\(jours.filter { $0.stoolAspect == aspect }.count)"]
+            }
+            let nonRenseigne = jours.filter { $0.stoolCount != nil && $0.stoolAspect == nil }.count
+            let lignes = parAspect + (nonRenseigne > 0 ? [["Aspect non noté", "\(nonRenseigne)"]] : [])
+            drawTable(headers: ["Aspect des selles", "Jours"], columnWidths: [240, 80],
+                      rows: lignes, ctx: &ctx, context: context)
+        }
+
+        let avecUrines = jours.filter { $0.urineOutput != nil }
+        if !avecUrines.isEmpty {
+            // Du plus faible au plus abondant : c'est le côté « peu » qui
+            // alerte, et il se lit en tête.
+            let lignes = UrineOutput.allCases.map { sortie in
+                [sortie.label, "\(jours.filter { $0.urineOutput == sortie }.count)"]
+            }
+            drawTable(headers: ["Urines", "Jours"], columnWidths: [240, 80],
+                      rows: lignes, ctx: &ctx, context: context)
+        }
+
+        // Les détails écrits par le parent ou par l'école — douleurs, sang,
+        // odeur — sont ce qui oriente un examen. Ils ne se résument pas.
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "fr_FR")
+        df.dateFormat = "dd/MM/yyyy"
+
+        let details = jours
+            .sorted { $0.dayStart < $1.dayStart }
+            .compactMap { jour -> String? in
+                let notes = [jour.stoolNotes, jour.urineNotes]
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                guard !notes.isEmpty else { return nil }
+                return "\(df.string(from: jour.dayStart)) — " + notes.joined(separator: " / ")
+            }
+
+        if !details.isEmpty {
+            ctx.y += 4
+            drawText("Détails notés :", ctx: &ctx)
+            for ligne in details { drawText("• " + ligne, ctx: &ctx) }
+        }
+
         ctx.y += 8
     }
 

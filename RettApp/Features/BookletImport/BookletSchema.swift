@@ -27,6 +27,7 @@ struct BookletSchema: Codable, Equatable {
     ///   L = Repas (Lunch et autres)
     ///   H = Hydratation (toujours avec L si présent)
     ///   P = Sommeil (sleeP)
+    ///   T = Selles et urines (Transit)
     ///   Y = Symptômes Rett
     ///   E = Événements particuliers
     let incl: String
@@ -87,7 +88,7 @@ struct BookletSchema: Codable, Equatable {
     }
 
     enum Section: String, Hashable {
-        case medication, seizure, mood, meals, hydration, sleep, symptoms, events
+        case medication, seizure, mood, meals, hydration, sleep, elimination, symptoms, events
 
         init?(letter: String) {
             switch letter {
@@ -97,6 +98,7 @@ struct BookletSchema: Codable, Equatable {
             case "L": self = .meals
             case "H": self = .hydration
             case "P": self = .sleep
+            case "T": self = .elimination
             case "Y": self = .symptoms
             case "E": self = .events
             default:  return nil
@@ -111,6 +113,7 @@ struct BookletSchema: Codable, Equatable {
             case .meals:      return "L"
             case .hydration:  return "H"
             case .sleep:      return "P"
+            case .elimination: return "T"
             case .symptoms:   return "Y"
             case .events:     return "E"
             }
@@ -138,6 +141,10 @@ struct BookletSchema: Codable, Equatable {
             sections.append(.hydration)
         }
         if options.includeSleepGrid      { sections.append(.sleep) }
+        // Après le sommeil, comme dans le générateur : l'ordre des lettres
+        // n'entre pas dans le placement, mais le lire dans l'ordre des
+        // sections évite de chercher longtemps en cas de doute.
+        if options.includeEliminationGrid { sections.append(.elimination) }
         if options.includeSymptomsGrid   { sections.append(.symptoms) }
         if options.includeFreeNotes      { sections.append(.events) }
 

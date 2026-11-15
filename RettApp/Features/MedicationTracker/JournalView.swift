@@ -84,7 +84,11 @@ struct JournalView: View {
                         Label("Symptôme", systemImage: "stethoscope")
                     }
                     Button { showObservationSheet = true } label: {
-                        Label("Repas et sommeil", systemImage: "fork.knife")
+                        // Les selles sont nommées dans le libellé, et pas
+                        // seulement présentes dans la feuille : un parent qui
+                        // vient noter une selle ne la cherche pas sous
+                        // « Repas et sommeil ».
+                        Label("Repas, sommeil et selles", systemImage: "fork.knife")
                     }
                     if epilepsyEnabled {
                         Divider()

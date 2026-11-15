@@ -169,6 +169,26 @@ enum BookletLayoutEngine {
             }
         }
 
+        // ── Selles et urines : 3 sous-grilles de 4 options
+        //
+        // Calqué sur le sommeil, et sur ce que dessine `drawEliminationGrid` :
+        // un titre, puis trois `drawMultiCheckGrid` à colonne gauche de 220.
+        // Les deux doivent rester identiques — un décalage ici ferait lire les
+        // cases du voisin, sans que rien ne le signale.
+        if included.contains(.elimination) {
+            y += sectionTitleHeight
+            for rowIdx in 0..<3 {
+                y += dayHeaderHeight + codeHeaderHeight
+                cells.append(contentsOf: multiCheckCells(
+                    section: .elimination, rowCount: 1,
+                    optionCount: 4,  // 0/1/2/3+ · Dur/Norm/Mou/Liq · 0/Peu/Norm/Abond
+                    schema: schema, leftColumnWidth: 220, rowHeight: rowH, yStart: &y,
+                    rowIndexOffset: rowIdx
+                ))
+                y += sectionGap
+            }
+        }
+
         // ── Symptômes Rett : 2 cases (M/A) par jour
         // Note : le bandeau jour des symptômes fait 12 pt (pas 11 comme les
         // autres multi-options) — c'est la valeur du générateur.
