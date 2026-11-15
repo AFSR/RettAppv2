@@ -28,6 +28,7 @@ struct BookletImportSheet: View {
         case processing
         case review
         case unsupportedScan
+        case choixCahier
     }
 
     /// Pourquoi le scan n'a pas abouti.
@@ -64,6 +65,9 @@ struct BookletImportSheet: View {
 
     @State private var phase: Phase = .intro
     @State private var echecScan: EchecScan = .introuvable
+    /// Les cahiers que l'app a imprimés, relus au moment d'un échec. Vide tant
+    /// que rien n'a été imprimé depuis la version qui les mémorise.
+    @State private var cahiersImprimes: [PrintedBookletStore.Item] = []
     @State private var showScanner = false
     @State private var progress: String = ""
     @State private var scanError: String?
@@ -114,6 +118,7 @@ struct BookletImportSheet: View {
         case .processing:      processingView
         case .review:          reviewView
         case .unsupportedScan: unsupportedScanView
+        case .choixCahier:     choixCahierView
         }
     }
 
@@ -225,6 +230,20 @@ struct BookletImportSheet: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.afsrPurpleAdaptive)
 
+                // Repli : l'app sait ce qu'elle a imprimé. Proposé seulement
+                // s'il y a quelque chose à proposer — un bouton qui mènerait à
+                // une liste vide serait pire que pas de bouton.
+                if !cahiersImprimes.isEmpty {
+                    Button {
+                        phase = .choixCahier
+                    } label: {
+                        Label("Identifier le cahier sans le QR", systemImage: "list.bullet.rectangle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.afsrPurpleAdaptive)
+                }
+
                 Button {
                     dismiss()
                 } label: {
@@ -235,6 +254,68 @@ struct BookletImportSheet: View {
             .padding(.horizontal, 24)
             Spacer()
         }
+    }
+
+    // MARK: - Repli : choisir le cahier dans l'historique
+
+    private var choixCahierView: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 8) {
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.system(size: 44, weight: .light))
+                    .foregroundStyle(.afsrPurpleAdaptive)
+                Text("Quel cahier avez-vous photographié ?")
+                    .font(AFSRFont.title(18))
+                    .multilineTextAlignment(.center)
+                Text("RettApp garde la trace des cahiers qu'elle imprime. Choisissez celui qui correspond à la feuille : les cases seront lues à leur position théorique, et vous verrez tout ce qui a été lu avant d'enregistrer.")
+                    .font(AFSRFont.body(13))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 12)
+
+            List(cahiersImprimes) { cahier in
+                Button {
+                    choisirCahier(cahier)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(cahier.libelle)
+                                .font(AFSRFont.body(15))
+                            Text(cahier.detail)
+                                .font(AFSRFont.caption())
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .listStyle(.plain)
+
+            Button {
+                phase = .unsupportedScan
+            } label: {
+                Text("Revenir").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+        }
+    }
+
+    private func choisirCahier(_ cahier: PrintedBookletStore.Item) {
+        guard let image = scannedImage else { return }
+        log.info("Repli sans QR — cahier du \(cahier.schema.start, privacy: .public)")
+        phase = .processing
+        analyse(image: image, schema: cahier.schema, ancrageQR: nil)
     }
 
     // MARK: - Review (par jour)
@@ -479,40 +560,58 @@ struct BookletImportSheet: View {
     @MainActor
     private func runPipeline(image: UIImage) async {
         log.info("Pipeline start — image size = \(image.size.width, privacy: .public)x\(image.size.height, privacy: .public)")
-        let detection: BookletQR.DetectionResult
         switch await BookletQR.detect(in: image) {
-        case .trouve(let trouvee):
-            detection = trouvee
+        case .trouve(let detection):
+            log.info("QR detected — schema days=\(detection.schema.days, privacy: .public) sections=\(detection.schema.incl, privacy: .public) meds=\(detection.schema.meds.count, privacy: .public)")
+            analyse(image: image, schema: detection.schema, ancrageQR: detection.pixelBounds)
         case .contenuEtranger:
             log.error("QR lu, mais son contenu n'est pas un cahier RettApp")
-            echecScan = .contenuEtranger
-            phase = .unsupportedScan
-            return
+            echouer(.contenuEtranger)
         case .illisible:
             log.error("QR detection FAILED — no readable QR in the image")
-            echecScan = .introuvable
-            phase = .unsupportedScan
-            return
+            echouer(.introuvable)
         }
-        log.info("QR detected — schema days=\(detection.schema.days, privacy: .public) sections=\(detection.schema.incl, privacy: .public) meds=\(detection.schema.meds.count, privacy: .public)")
+    }
+
+    /// Échec de lecture. On relit l'historique des cahiers imprimés **ici**,
+    /// et non au lancement : c'est le seul moment où il sert, et le lire plus
+    /// tôt donnerait une liste périmée si une impression a eu lieu entre-temps.
+    @MainActor
+    private func echouer(_ raison: EchecScan) {
+        echecScan = raison
+        cahiersImprimes = PrintedBookletStore.items()
+        phase = .unsupportedScan
+    }
+
+    /// Lit les cases de la page, puis passe à la relecture.
+    ///
+    /// `ancrageQR` porte le cadre du QR retrouvé dans la photo. À `nil`, on est
+    /// en repli : le schéma vient de l'historique d'impression, et la page sert
+    /// de repère à elle-même.
+    @MainActor
+    private func analyse(image: UIImage, schema: BookletSchema, ancrageQR: CGRect?) {
         progress = "Analyse des cases à cocher…"
 
-        let qrPDFRect = CGRect(x: BookletLayoutEngine.qrOrigin.x,
-                                y: BookletLayoutEngine.qrOrigin.y,
-                                width: BookletLayoutEngine.qrSize,
-                                height: BookletLayoutEngine.qrSize)
-        guard let sampler = BookletPixelSampler(
-            image: image,
-            qrPDFRect: qrPDFRect,
-            qrImageRect: detection.pixelBounds
-        ) else {
+        let sampler: BookletPixelSampler?
+        if let ancrageQR {
+            sampler = BookletPixelSampler(
+                image: image,
+                qrPDFRect: CGRect(x: BookletLayoutEngine.qrOrigin.x,
+                                  y: BookletLayoutEngine.qrOrigin.y,
+                                  width: BookletLayoutEngine.qrSize,
+                                  height: BookletLayoutEngine.qrSize),
+                qrImageRect: ancrageQR
+            )
+        } else {
+            sampler = BookletPixelSampler(pageImage: image)
+        }
+        guard let sampler else {
             log.error("BookletPixelSampler init failed")
-            echecScan = .pageIncomplete
-            phase = .unsupportedScan
+            echouer(.pageIncomplete)
             return
         }
         log.info("Paper reference luma = \(sampler.paperReference, privacy: .public)")
-        let cells = BookletLayoutEngine.cells(for: detection.schema)
+        let cells = BookletLayoutEngine.cells(for: schema)
         log.info("Layout produced \(cells.count, privacy: .public) cells")
         var checks: [BookletLayoutEngine.Cell: Bool] = [:]
         var checkedCount = 0
@@ -538,7 +637,7 @@ struct BookletImportSheet: View {
         }
         log.info("Sampler: \(checkedCount, privacy: .public)/\(cells.count, privacy: .public) cells checked")
         log.info("Histogramme ratios — <50%: \(bucket_lt50, privacy: .public) · 50-72%: \(bucket_50_72, privacy: .public) · 72-85%: \(bucket_72_85, privacy: .public) · 85-95%: \(bucket_85_95, privacy: .public) · ≥95%: \(bucket_ge95, privacy: .public)")
-        scanResult = BookletScanResult(schema: detection.schema, checks: checks)
+        scanResult = BookletScanResult(schema: schema, checks: checks)
         selectedDayIndex = 0
         phase = .review
         log.info("Phase = .review, scanResult set")

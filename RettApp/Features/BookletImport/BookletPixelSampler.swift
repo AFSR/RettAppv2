@@ -18,8 +18,6 @@ import UIKit
 struct BookletPixelSampler {
 
     let image: CGImage
-    let qrPDFRect: CGRect    // QR position dans le PDF (en pt)
-    let qrImageRect: CGRect  // QR position détectée dans l'image (en px)
 
     /// Échelle PDF→image et offset (calculés une fois)
     private let scaleX: CGFloat
@@ -34,15 +32,52 @@ struct BookletPixelSampler {
     /// absolu 0.85 : marche avec un mauvais éclairage / papier jaunâtre.
     let paperReference: CGFloat
 
+    /// Ancrage sur le QR : la voie normale, et la plus précise — le QR est un
+    /// repère **à l'intérieur** de la page, insensible à la façon dont le
+    /// scanner de documents a détouré la feuille.
     init?(image: UIImage, qrPDFRect: CGRect, qrImageRect: CGRect) {
-        guard let cgImage = image.cgImage else { return nil }
+        guard let cgImage = image.cgImage,
+              qrPDFRect.width > 0, qrPDFRect.height > 0,
+              qrImageRect.width > 0, qrImageRect.height > 0
+        else { return nil }
+        self.init(cgImage: cgImage, pdfRect: qrPDFRect, imageRect: qrImageRect)
+    }
+
+    /// Repli sans QR : la page sert de repère à elle-même.
+    ///
+    /// `VNDocumentCameraViewController` rend une feuille **déjà redressée et
+    /// détourée**. L'image entière correspond donc à la page entière, et la
+    /// transformation se réduit à un rapport de tailles.
+    ///
+    /// Moins précis que l'ancrage sur le QR, et c'est assumé : le détourage
+    /// peut mordre un millimètre de page ou laisser un millimètre de table.
+    /// Ce qui rend ce repli acceptable n'est pas sa précision, c'est l'écran
+    /// de relecture — rien n'est écrit sans que le parent ait vu ce qui a été
+    /// lu, et une case mal placée se corrige d'une touche. Sans cet écran, ce
+    /// repli serait à refuser.
+    init?(pageImage image: UIImage) {
+        guard let cgImage = image.cgImage, cgImage.width > 0, cgImage.height > 0
+        else { return nil }
+        self.init(
+            cgImage: cgImage,
+            pdfRect: CGRect(x: 0, y: 0,
+                            width: BookletLayoutEngine.pageWidth,
+                            height: BookletLayoutEngine.pageHeight),
+            imageRect: CGRect(x: 0, y: 0,
+                              width: CGFloat(cgImage.width),
+                              height: CGFloat(cgImage.height))
+        )
+    }
+
+    /// Les deux cadres ne sont pas conservés : seule la transformation qu'ils
+    /// définissent sert ensuite, et une copie inerte de l'ancrage induirait en
+    /// erreur sur ce dont dépend l'échantillonnage.
+    private init(cgImage: CGImage, pdfRect: CGRect, imageRect: CGRect) {
         self.image = cgImage
-        self.qrPDFRect = qrPDFRect
-        self.qrImageRect = qrImageRect
-        let sx = qrImageRect.width / qrPDFRect.width
-        let sy = qrImageRect.height / qrPDFRect.height
-        let ox = qrImageRect.minX - qrPDFRect.minX * sx
-        let oy = qrImageRect.minY - qrPDFRect.minY * sy
+        let sx = imageRect.width / pdfRect.width
+        let sy = imageRect.height / pdfRect.height
+        let ox = imageRect.minX - pdfRect.minX * sx
+        let oy = imageRect.minY - pdfRect.minY * sy
         self.scaleX = sx
         self.scaleY = sy
         self.offsetX = ox
@@ -62,7 +97,10 @@ struct BookletPixelSampler {
             CGPoint(x: 587, y: 100),                   // marge droite haute
             CGPoint(x: 587, y: 400),                   // marge droite centrale
             CGPoint(x: 587, y: 800),                   // marge droite basse
-            CGPoint(x: qrPDFRect.midX, y: 8)           // au-dessus du QR
+            // Au-dessus du QR — blanc dans les deux modes d'ancrage, donc on
+            // vise sa position connue dans la page et non la zone de
+            // référence, qui en repli couvre la feuille entière.
+            CGPoint(x: BookletLayoutEngine.qrOrigin.x + BookletLayoutEngine.qrSize / 2, y: 8)
         ]
         let samples: [CGFloat] = pointsForPaper.map {
             BookletPixelSampler.sample(in: cgImage, scaleX: sx, scaleY: sy,

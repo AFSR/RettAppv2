@@ -243,6 +243,11 @@ enum FollowUpBookletGenerator {
     private static func drawHeader(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options) {
         // QR code en haut à droite (sert d'ancrage au scan + transporte le schéma)
         let schema = BookletSchema.from(options: options, weekStart: options.weekStart)
+        // Mémorisé ici, au moment du dessin : c'est le seul endroit où l'on
+        // tient ce qui part réellement à l'impression. Jusqu'ici le schéma
+        // n'existait qu'à l'intérieur du QR — un QR illisible et la feuille
+        // remplie par l'école devenait définitivement inexploitable.
+        PrintedBookletStore.record(schema)
         let qrSize: CGFloat = BookletLayoutEngine.qrSize
         let qrOrigin = BookletLayoutEngine.qrOrigin
         if let qrImage = BookletQR.image(for: schema, sizeInPoints: qrSize) {
