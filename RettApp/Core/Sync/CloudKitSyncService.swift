@@ -1922,13 +1922,21 @@ final class CloudKitSyncService {
         // Shared zones probe
         if let zones = try? await container.sharedCloudDatabase.allRecordZones() {
             snap.sharedZonesCount = zones.count
-            // L'identifiant du propriétaire est abrégé : il ne donne aucun
-            // accès, mais il désigne un compte iCloud et part lui aussi dans
-            // le rapport de support. Huit caractères suffisent à dire si deux
-            // zones ont le même propriétaire, qui est la seule question qu'on
-            // se pose ici.
-            snap.sharedZones = zones.map {
-                "\($0.zoneID.zoneName) / \($0.zoneID.ownerName.prefix(8))…"
+            // Le propriétaire est désigné par un RANG, pas par son
+            // identifiant. Celui-ci ne donne aucun accès, mais il désigne un
+            // compte iCloud, et le rapport est fait pour être envoyé à
+            // l'association. La seule question qu'on se pose ici est « ces
+            // zones ont-elles le même propriétaire ? » : une lettre y répond
+            // et ne désigne personne.
+            //
+            // L'ordre vient de CloudKit et peut changer d'un appel à l'autre ;
+            // on trie donc sur l'identifiant pour que deux diagnostics pris à
+            // la suite se lisent pareil, sans jamais l'afficher.
+            let proprietaires = Array(Set(zones.map(\.zoneID.ownerName))).sorted()
+            snap.sharedZones = zones.map { zone in
+                let rang = proprietaires.firstIndex(of: zone.zoneID.ownerName) ?? 0
+                let lettre = String(UnicodeScalar(UInt8(65 + min(rang, 25))))
+                return "\(zone.zoneID.zoneName) / propriétaire \(lettre)"
             }
             for zone in zones {
                 if (try? await fetchZoneShare(database: container.sharedCloudDatabase, zoneID: zone.zoneID)) != nil {

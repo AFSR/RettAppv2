@@ -23,6 +23,11 @@ struct JournalView: View {
     @State private var showManualSeizureEntry = false
     @State private var showBookletImport = false
 
+    /// L'entrée dont on vient de demander la suppression. Une confirmation
+    /// s'intercale : le geste est irréversible pour l'autre parent, même si la
+    /// corbeille garde l'entrée trente jours de ce côté-ci.
+    @State private var aSupprimer: JournalFeedItem?
+
     private var profile: ChildProfile? { profiles.first }
     private var epilepsyEnabled: Bool { profile?.hasEpilepsy ?? false }
 
@@ -165,6 +170,23 @@ struct JournalView: View {
         }
         .onChange(of: seizureTracker.phase) { _, newValue in
             if case .qualifying = newValue { showSeizureQualification = true }
+        }
+        .confirmationDialog(
+            "Supprimer \(aSupprimer?.libelle ?? "cette entrée") ?",
+            isPresented: Binding(
+                get: { aSupprimer != nil },
+                set: { if !$0 { aSupprimer = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: aSupprimer
+        ) { item in
+            Button("Supprimer", role: .destructive) {
+                supprimer(item)
+                aSupprimer = nil
+            }
+            Button("Annuler", role: .cancel) { aSupprimer = nil }
+        } message: { _ in
+            Text("L'entrée part en corbeille et reste récupérable trente jours, dans Réglages → Données. Chez l'autre parent, elle disparaît et ne revient pas.")
         }
         .sheet(isPresented: $showMoodSheet) { MoodSheet() }
         .sheet(isPresented: $showSymptomSheet) { SymptomSheet() }
@@ -420,7 +442,7 @@ private struct JournalContent: View {
                             JournalFeedRow(
                                 item: item,
                                 onToggle: { log in toggle(log) },
-                                onDelete: { delete($0) },
+                                onDelete: { aSupprimer = $0 },
                                 onEditTakenTime: { editingTakenTimeFor = $0 },
                                 onSeizureTap: { showSeizureHistory() }
                             )
@@ -451,8 +473,31 @@ private struct JournalContent: View {
         return items.sorted { $0.time < $1.time }
     }
 
-    private func delete(_ log: MedicationLog) {
-        modelContext.delete(log)
+    /// Supprime une entrée du fil, quel que soit son type.
+    ///
+    /// La pierre tombale est déposée AVANT la suppression, tant que l'objet
+    /// est encore lisible — c'est ce que demande `TrashStore.record`, et c'est
+    /// ce qui rend la suppression opposable. Sans elle, l'appareil de l'autre
+    /// parent repousse l'enregistrement au cycle suivant et l'entrée revient
+    /// d'entre les morts chez celui qui l'avait retirée.
+    ///
+    /// C'était le cas des prises de médicaments, supprimées par un
+    /// `context.delete` nu jusqu'en novembre 2026.
+    private func supprimer(_ item: JournalFeedItem) {
+        switch item {
+        case .medication(let log):
+            TrashStore.record(log: log)
+            modelContext.delete(log)
+        case .seizure(let event):
+            TrashStore.record(seizure: event)
+            modelContext.delete(event)
+        case .mood(let entry):
+            TrashStore.record(mood: entry)
+            modelContext.delete(entry)
+        case .symptom(let event):
+            TrashStore.record(symptom: event)
+            modelContext.delete(event)
+        }
         try? modelContext.saveTouching()
         sync.scheduleSync(context: modelContext, priority: .urgent)
     }
@@ -617,21 +662,47 @@ private enum JournalFeedItem: Identifiable {
         case .symptom(let s): return s.timestamp
         }
     }
+
+    /// Ce que la confirmation nomme. « Supprimer cette entrée ? » ne dit pas
+    /// assez : sur un fil qui mêle quatre natures d'enregistrement, on ne sait
+    /// pas ce qu'on s'apprête à perdre.
+    var libelle: String {
+        switch self {
+        case .medication(let l): return "la prise de \(l.medicationName)"
+        case .seizure(let s): return "cette crise (\(s.seizureType.label))"
+        case .mood: return "cette humeur"
+        case .symptom(let s): return "ce symptôme (\(s.symptomType.label))"
+        }
+    }
 }
 
 private struct JournalFeedRow: View {
     let item: JournalFeedItem
     let onToggle: (MedicationLog) -> Void
-    let onDelete: (MedicationLog) -> Void
+    let onDelete: (JournalFeedItem) -> Void
     let onEditTakenTime: (MedicationLog) -> Void
     let onSeizureTap: () -> Void
 
     var body: some View {
+        contenu
+            // Un menu contextuel, et non un balayage : le fil est un
+            // `LazyVStack` et non une `List`, où `swipeActions` n'existe pas.
+            // L'appui long est aussi plus difficile à déclencher par accident
+            // qu'un balayage, ce qui convient à une suppression.
+            .contextMenu {
+                Button("Supprimer", systemImage: "trash", role: .destructive) {
+                    onDelete(item)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var contenu: some View {
         switch item {
         case .medication(let log):
             JournalEntryRow(log: log,
                             onToggle: { onToggle(log) },
-                            onDelete: { onDelete(log) },
+                            onDelete: { onDelete(item) },
                             onEditTakenTime: { onEditTakenTime(log) })
         case .seizure(let s):
             SeizureRowCompact(event: s, onTap: onSeizureTap)

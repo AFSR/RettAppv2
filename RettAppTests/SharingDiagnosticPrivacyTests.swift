@@ -31,7 +31,7 @@ final class SharingDiagnosticPrivacyTests: XCTestCase {
             privateZoneShareExists: true,
             privateZoneShareHasURL: true,
             sharedZonesCount: 1,
-            sharedZones: ["FamilyData / _a1b2c3d4…"],
+            sharedZones: ["FamilyData / propriétaire A"],
             sharedZoneShareExists: true,
             currentShareHasURL: true,
             pendingWriteCount: 3,
@@ -74,7 +74,7 @@ final class SharingDiagnosticPrivacyTests: XCTestCase {
     /// Le message d'erreur vient de CloudKit et part tel quel dans le rapport
     /// de support. C'est le seul texte libre du système qui quitte l'appareil.
     func test_uneErreurQuiCiteraitLeLienEstFiltree() throws {
-        let resultat = try XCTUnwrap(SharingDiagnosticView.sansLien(
+        let resultat = try XCTUnwrap(SharingDiagnosticView.anonymise(
             "Échec sur https://www.icloud.com/share/0abc123 — réessayez"
         ))
         XCTAssertFalse(resultat.contains("https://"))
@@ -85,9 +85,31 @@ final class SharingDiagnosticPrivacyTests: XCTestCase {
         XCTAssertTrue(resultat.contains("réessayez"))
     }
 
+    /// Un identifiant d'enregistrement ou de zone ne donne pas accès aux
+    /// données, mais il désigne un enregistrement précis d'une famille
+    /// précise. Le rapport est fait pour être envoyé : il n'a pas à le porter.
+    func test_unIdentifiantEstRetireLuiAussi() throws {
+        let resultat = try XCTUnwrap(SharingDiagnosticView.anonymise(
+            "Zone 3F2B4A1C-9D8E-4C7B-A1F0-5E6D7C8B9A01 introuvable"
+        ))
+        XCTAssertFalse(resultat.contains("3F2B4A1C"))
+        XCTAssertTrue(resultat.contains("[identifiant retiré]"))
+        XCTAssertTrue(resultat.contains("introuvable"))
+    }
+
+    /// Les zones partagées sont désignées par un rang, pas par le compte
+    /// iCloud de leur propriétaire : deux zones du même parent portent la même
+    /// lettre, et personne n'est nommé.
+    func test_lesZonesPartageesNeNommentPersonne() {
+        for zone in instantane().sharedZones {
+            XCTAssertTrue(zone.contains("propriétaire "), "La zone « \(zone) » devrait désigner un rang.")
+            XCTAssertFalse(zone.contains("_"), "Un identifiant CloudKit commence par « _ ».")
+        }
+    }
+
     func test_uneErreurOrdinaireNEstPasAbimee() {
         let message = "Network unavailable, retry later"
-        XCTAssertEqual(SharingDiagnosticView.sansLien(message), message)
-        XCTAssertNil(SharingDiagnosticView.sansLien(nil))
+        XCTAssertEqual(SharingDiagnosticView.anonymise(message), message)
+        XCTAssertNil(SharingDiagnosticView.anonymise(nil))
     }
 }
