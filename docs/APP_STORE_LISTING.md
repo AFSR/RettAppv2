@@ -355,10 +355,10 @@ qualification.
 - L'écran de don n'apparaît **pas** dans la fiche : il renvoie vers Safari tant que le
   don n'est pas actif dans l'app.
 
-### Ce que je ne peux pas faire
+### Ce qui reste à produire à la main
 
-Il n'y a pas de macOS dans les sessions Claude de ce dépôt : ni simulateur, ni capture.
-Les images sont à produire sur un Mac ou un iPhone. Tout le reste de ce document ne
+Les captures ne se génèrent pas depuis les sessions Claude de ce dépôt (pas de
+macOS, ni simulateur, ni capture) : elles sont à produire sur un Mac ou un iPhone. Tout le reste de ce document ne
 dépend pas d'elles.
 
 ---
@@ -463,7 +463,7 @@ Access » reste *No*.
 | Royaume-Uni | **No** |
 | États-Unis | **No** |
 
-Aucune certification CE, UKCA ou FDA. Justification complète dans `SECURITY.md`.
+Aucune certification CE, UKCA ou FDA. Justification complète dans `AUDIT_SECURITE.md`.
 
 ---
 
@@ -522,7 +522,7 @@ Merci pour votre revue.
 ### Ce qui est déjà préparé
 
 Les **pages de produit personnalisées** sont documentées à part, dans
-`APP_STORE_CUSTOM_PRODUCT_PAGES.md` (PR #62). Quatre pages y sont décrites, chacune avec
+`APP_STORE_CUSTOM_PRODUCT_PAGES.md`. Quatre pages y sont décrites, chacune avec
 sa propre URL à mettre dans une newsletter ou un QR code. Deux corrections à y porter
 avant usage : la page 4 montre l'écran de don, qui est écarté de la fiche ; et les
 légendes incrustées qu'elle suppose ne s'appliquent plus, puisque les captures sont

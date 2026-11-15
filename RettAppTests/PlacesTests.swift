@@ -10,8 +10,8 @@ import XCTest
 /// nombre d'avis qui la fonde, une recherche qui rate les accents, un texte
 /// d'avis absent qu'on prendrait pour une absence d'avis.
 ///
-/// Portés depuis la branche `claude/eager-pascal-nz59mz` (PR #63), où une
-/// autre session avait construit l'annuaire en parallèle. Son implémentation
+/// Portés depuis une branche parallèle, où une autre session avait construit
+/// l'annuaire de son côté. Son implémentation
 /// n'a pas été retenue — celle de `main` était déjà alignée sur l'épingle, les
 /// extensions du client HTTP et la politique de confidentialité corrigée — mais
 /// ses tests couvraient précisément ce qui n'était gardé par rien ici.

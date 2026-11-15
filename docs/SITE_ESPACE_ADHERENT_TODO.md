@@ -1,7 +1,7 @@
 # Site afsr.fr : ce qu'il faut faire pour l'espace adhérent natif et Face ID
 
-Complète `SITE_AFSR_TODO.md`. Code concerné : dépôt AFSR/website, branche
-`claude/eager-pascal-nz59mz` (API `/api/membre`, voir `docs/api-membre.md` là-bas).
+Complète `SITE_AFSR_TODO.md`. Code concerné : dépôt AFSR/website (API `/api/membre`,
+voir `docs/api-membre.md` là-bas).
 
 ## A. Déploiement (bloquant)
 

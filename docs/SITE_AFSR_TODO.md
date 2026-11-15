@@ -1,5 +1,12 @@
 # Modifications à faire sur le site AFSR (afsr.fr)
 
+> **Document d'archive.** Cette liste de travail a été rédigée avant la première
+> publication de l'application, qui est depuis sur l'App Store. L'état réel de chaque
+> ligne (« à créer », « à produire »…) n'a **pas** été revérifié : ne vous y fiez pas pour
+> savoir ce qui reste à faire. L'état à jour des engagements publics est suivi dans
+> `.claude/rules/promesses-confidentialite.md`, et celui de l'espace adhérent dans
+> `SITE_ESPACE_ADHERENT_TODO.md`.
+
 Ce document liste **toutes les actions** à mener côté site web et back-office Statamic
 pour que l'app **RettApp** soit pleinement opérationnelle, conforme RGPD, et publiable
 sur l'App Store.
@@ -115,7 +122,7 @@ dans `.env` (`AFSR_API_TOKEN=...`) et le communiquer pour qu'on configure
 
 > Recommandation : laisser l'API **publique** pour les actualités (elles le sont déjà sur
 > le site). Pas de plus-value à les restreindre, et ça évite de gérer un secret embarqué
-> dans le binaire iOS (mauvaise pratique sécurité — voir `SECURITY.md` §4).
+> dans le binaire iOS (mauvaise pratique sécurité — voir `AUDIT_SECURITE.md` §5).
 
 ### 1.6 CORS
 
@@ -148,7 +155,7 @@ dédié `https://afsr.fr/rettapp/` (modèle de contrôleur et vues : dépôt AFS
    et dans les versions de l'app déjà distribuées.
 2. Mettre à jour `RettApp/Core/AFSRLinks.swift`, `docs/APP_STORE_LISTING.md` et App Store Connect
    (Privacy Policy URL, Support URL, Marketing URL).
-3. Le texte de la politique doit refléter l'état réel de l'app (**voir `SECURITY.md`**) :
+3. Le texte de la politique doit refléter l'état réel de l'app (**voir `AUDIT_SECURITE.md`**) :
    stockage local SwiftData **et** synchronisation CloudKit entre parents, HealthKit, espace
    adhérent (jeton 90 j / 365 j max, empreinte seule côté serveur, Face ID), pas de Sign in
    with Apple, mineurs et consentement parental (art. 8 et 9.2.a RGPD), avertissement médical
@@ -215,15 +222,16 @@ Champs à remplir :
 - Mots-clés (100 car.) : « épilepsie, syndrome de rett, médicaments, suivi, santé »
 - Screenshots (iPhone 6.7", 6.5", iPad 12.9", 11") — à produire
 
-### 4.4 Privacy Manifest (déjà côté code à créer)
+### 4.4 Privacy Manifest
 
-**Toujours absent** de `RettApp/Resources/` : à créer côté code (voir `SECURITY.md` §7)
-et à inclure dans la build avant soumission.
+Présent : `RettApp/Resources/PrivacyInfo.xcprivacy`, copié dans la phase *Resources*
+du projet. Ce qu'il déclare, et un écart relevé sur la position précise, sont dans
+`AUDIT_SECURITE.md` §8.
 
 ### 4.5 Déclaratif "Regulated medical device"
 
 → Sélectionner **No** (justifié par l'absence de certification CE/FDA/UKCA, voir
-`SECURITY.md` §10).
+`AUDIT_SECURITE.md` §11).
 
 ---
 
@@ -235,7 +243,7 @@ Ajouter une **fiche RettApp** au registre de l'AFSR : suivi quotidien par parent
 personnes concernées : enfants (mineurs) et leurs parents/aidants ; données : identité,
 santé (crises, médicaments, humeur, symptômes), identifiants CloudKit/adhérent ; sous-traitant :
 Apple (CloudKit, HealthKit, iCloud — DPA Apple, DPF) ; conservation : contrôlée par
-l'utilisateur ; sécurité : `SECURITY.md`.
+l'utilisateur ; sécurité : `AUDIT_SECURITE.md`.
 
 ### 5.2 DPIA (analyse d'impact)
 

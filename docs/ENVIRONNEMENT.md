@@ -1,8 +1,9 @@
 # L'environnement de session
 
 Ce que la machine d'une session Claude sait faire sur ce projet, et ce qu'elle
-ne sait pas. Écrit le 11 novembre 2026, après une journée de tâtonnements qu'il
-est inutile de refaire.
+ne sait pas. Écrit le 11 novembre 2026 pour épargner à la session suivante des
+tâtonnements déjà faits. Il décrit un environnement jetable : il n'intéresse
+pas qui travaille depuis son propre Mac.
 
 ## Pas de macOS
 
@@ -46,10 +47,10 @@ mkdir -p /run/mysqld && chown mysql:mysql /run/mysqld
 for i in $(seq 1 20); do sleep 3; mysqladmin -uroot -proot status >/dev/null 2>&1 && break; done
 ```
 
-Il écoute sur `127.0.0.1:3306`, utilisateur `root`, mot de passe `root`, base
-`afsr`. Sans le mot de passe, `mysqladmin status` répond « Access denied » — ce
+Il écoute sur `127.0.0.1:3306`, utilisateur `root`, mot de passe `root` (identifiants
+de la machine de session, jetable et non exposée), base `afsr`. Sans le mot de passe, `mysqladmin status` répond « Access denied » — ce
 n'est **pas** un serveur éteint, c'est une authentification manquante. Cette
-confusion m'a fait relancer un serveur qui tournait.
+confusion a déjà fait relancer un serveur qui tournait.
 
 Si la base n'existe pas :
 
@@ -89,7 +90,7 @@ verra donc pas localement.
 
 Allowlist : `afsr.fr`, `www.afsr.fr` et l'hôte Salesforce Sites de l'association.
 Ce dernier n'est pas nommé ici, volontairement : il n'a pas à figurer dans un
-dépôt qui se lit au-delà de l'équipe. Il est dans les réglages de
+dépôt public. Il est dans les réglages de
 l'environnement (`get_environment`).
 Les registres de paquets (composer, npm, apt) passent sans être listés.
 
@@ -102,7 +103,7 @@ UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 
 curl -s -A "$UA" -o /dev/null -w '%{http_code}\n' https://afsr.fr/
 ```
 
-J'ai conclu que le site entier était cassé avant de comprendre.
+Ce 403 a déjà fait conclure que le site entier était cassé.
 
 Le sous-domaine `rettapp.afsr.fr` est hors allowlist. Il est de toute façon
 obsolète : ses pages sont servies par le dépôt du site depuis novembre 2026.

@@ -121,7 +121,7 @@ l'unicité cross-device.
 | Révocation | Propriétaire peut retirer un participant à tout moment |
 | Pas de tiers | Apple uniquement, sous DPF (transferts UE → US encadrés) |
 | Consentement | À ajouter au flow d'invitation : "Vous allez partager les données de santé de [Prénom] avec [parent invité]. Confirmer ?" |
-| Audit (SECURITY.md) | À mettre à jour avec la nouvelle catégorie de traitement (sous-traitance Apple iCloud) |
+| Audit (`AUDIT_SECURITE.md`) | À mettre à jour avec la nouvelle catégorie de traitement (sous-traitance Apple iCloud) |
 
 ## Pré-requis côté Apple Developer
 

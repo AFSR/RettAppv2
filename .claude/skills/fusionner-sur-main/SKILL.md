@@ -17,8 +17,8 @@ git log --oneline HEAD..origin/main | wc -l   # ce que vous ignorez
 ```
 
 D'autres sessions Claude écrivent sur ces dépôts en même temps. Le retard n'est
-pas théorique : j'ai écrit une API entière en double pour avoir lu un `main`
-local périmé. Si le second compteur n'est pas nul :
+pas théorique : une API entière a déjà été écrite en double à partir d'un
+`main` local périmé. Si le second compteur n'est pas nul :
 
 ```bash
 git merge origin/main --no-edit
@@ -47,9 +47,9 @@ Vérifiez ensuite que la version n'a pas régressé — voir
 
 Lisez-les. En particulier : si `main` apporte une version d'un fichier que vous
 avez aussi écrit, demandez-vous **lequel des deux est le meilleur**, et dites-le.
-Un `PrivacyInfo.xcprivacy` vide venu de `main` a été remplacé par le mien, qui
-le complétait ; une API de lieux que j'avais écrite en double a été jetée, parce
-que celle de `main` était mieux placée.
+Un `PrivacyInfo.xcprivacy` vide venu de `main` a été remplacé par la version de
+la branche, qui le complétait ; une API de lieux écrite en double sur la branche
+a été jetée, parce que celle de `main` était mieux placée.
 
 ## 3. Pousser
 
@@ -87,7 +87,7 @@ Bouclez dessus en tâche de fond jusqu'à `completed`. Ne fusionnez pas avant.
 refusé. Prenez-le avec `git rev-parse <branche>`.
 
 Pourquoi `merge` et non `squash` : la branche de l'app est réutilisée d'une
-session à l'autre, et un squash l'en ferait divergper.
+session à l'autre, et un squash l'en ferait diverger.
 
 ## 7. Réaligner la branche de travail
 
@@ -117,13 +117,14 @@ UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 
 curl -s -A "$UA" -o /dev/null -w '%{http_code}\n' https://afsr.fr/politique-de-confidentialite
 ```
 
-J'ai cru le site entièrement cassé à cause de ce 403, page d'accueil comprise.
+Ce 403 a déjà fait croire le site entièrement cassé, page d'accueil comprise.
 
 ## Ce qu'il ne faut pas faire
 
 - **Ouvrir une pull request sans qu'on l'ait demandée.**
 - Fusionner une PR dont la CI n'est pas verte.
-- Forcer un push sur une branche partagée.
+- Forcer un push sur une branche partagée, ou réécrire l'historique : c'est une
+  décision du mainteneur, jamais celle d'une session.
 - Toucher aux branches des autres sessions. Au 11 novembre 2026, le dépôt de
-  l'app en portait trois qui ne m'appartenaient pas, dont une écrite dans la
-  minute.
+  l'app en portait trois qui n'appartenaient pas à la session en cours, dont
+  une écrite dans la minute.

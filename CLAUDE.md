@@ -3,6 +3,10 @@
 Application de suivi pour les familles touchées par le syndrome de Rett, éditée
 par l'Association Française du Syndrome de Rett. Publiée sur l'App Store.
 
+> Ce fichier est lu par les assistants de code (Claude Code). Il est public parce
+> que le dépôt l'est : qui contribue à la main trouvera l'essentiel dans
+> `README.md` et `docs/`. Les trois règles ci-dessous valent pour tout le monde.
+
 ## Les trois règles non négociables
 
 Elles ont été posées explicitement par l'association. Une modification qui les
@@ -56,8 +60,8 @@ propres au site sont dans son propre `CLAUDE.md`.
 
 ## Avant d'écrire : `git fetch`
 
-Plusieurs sessions Claude travaillent sur ces dépôts **en même temps**. J'ai
-écrit une API entière en double pour avoir lu un `main` local périmé.
+Plusieurs sessions Claude travaillent sur ces dépôts **en même temps**. Une
+API entière a déjà été écrite en double à partir d'un `main` local périmé.
 
 ```bash
 git fetch origin main && git log --oneline origin/main -5

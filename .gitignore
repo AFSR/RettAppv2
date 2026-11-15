@@ -16,10 +16,9 @@ xcuserdata/
 *.xcuserstate
 *.xcworkspace
 
-# Generated project (regenerate with `ruby scripts/generate_xcodeproj.rb` or `xcodegen generate`).
-# We commit RettApp.xcodeproj so the project opens immediately after clone,
-# but it can be fully regenerated at any time from project.yml / the Ruby script.
-AFSR.xcodeproj/
+# RettApp.xcodeproj est généré et versionné : le projet s'ouvre dès le clonage,
+# et `ruby scripts/generate_xcodeproj.rb` le régénère à tout moment. Il n'y a pas
+# d'autre générateur (voir .claude/rules/xcodeproj.md).
 
 # Swift Package Manager
 .build/
