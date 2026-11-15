@@ -41,7 +41,10 @@ final class CloudKitSyncService {
         case unavailable
     }
 
-    enum ShareRole: Equatable {
+    /// `String` comme valeur brute parce que le rôle est conservé d'un
+    /// lancement à l'autre : un entier rendrait le réglage illisible, et un
+    /// cas réordonné changerait silencieusement de sens.
+    enum ShareRole: String, Equatable {
         case none
         case owner
         case participant
@@ -57,7 +60,30 @@ final class CloudKitSyncService {
 
     var accountStatus: AccountStatus = .unknown
     var syncState: SyncState = .idle
-    var role: ShareRole = .none
+    /// Le rôle de cet appareil dans le partage, **conservé d'un lancement à
+    /// l'autre**.
+    ///
+    /// Il ne l'était pas, et c'est ce qui rendait le partage invisible au
+    /// parent invité : à chaque ouverture il repartait de `.none`, donc
+    /// l'écran annonçait « Aucun partage actif » jusqu'à ce qu'une requête
+    /// réseau aboutisse. Et comme `performCycle` commence par
+    /// `guard role != .none`, rien ne se synchronisait pendant ce temps —
+    /// hors ligne, jamais.
+    ///
+    /// La valeur relue au lancement n'est qu'un point de départ :
+    /// `refreshShareStatus()` la corrige dès qu'elle a la réponse du serveur.
+    /// C'est le même raisonnement que la préservation du rôle en cas d'échec
+    /// réseau, étendu d'une session à la suivante.
+    var role: ShareRole = ShareRole(rawValue: UserDefaults.standard.string(forKey: CloudKitSyncService.roleKey) ?? "") ?? .none {
+        didSet {
+            guard role != oldValue else { return }
+            UserDefaults.standard.set(role.rawValue, forKey: Self.roleKey)
+            Self.log.info("rôle: \(oldValue.rawValue, privacy: .public) → \(self.role.rawValue, privacy: .public)")
+        }
+    }
+
+    private nonisolated static let roleKey = "afsr.sync.role"
+
     var lastSyncedAt: Date?
     var participantCount: Int = 0
     var lastErrorMessage: String?
@@ -1922,13 +1948,21 @@ final class CloudKitSyncService {
         // Shared zones probe
         if let zones = try? await container.sharedCloudDatabase.allRecordZones() {
             snap.sharedZonesCount = zones.count
-            // L'identifiant du propriétaire est abrégé : il ne donne aucun
-            // accès, mais il désigne un compte iCloud et part lui aussi dans
-            // le rapport de support. Huit caractères suffisent à dire si deux
-            // zones ont le même propriétaire, qui est la seule question qu'on
-            // se pose ici.
-            snap.sharedZones = zones.map {
-                "\($0.zoneID.zoneName) / \($0.zoneID.ownerName.prefix(8))…"
+            // Le propriétaire est désigné par un RANG, pas par son
+            // identifiant. Celui-ci ne donne aucun accès, mais il désigne un
+            // compte iCloud, et le rapport est fait pour être envoyé à
+            // l'association. La seule question qu'on se pose ici est « ces
+            // zones ont-elles le même propriétaire ? » : une lettre y répond
+            // et ne désigne personne.
+            //
+            // L'ordre vient de CloudKit et peut changer d'un appel à l'autre ;
+            // on trie donc sur l'identifiant pour que deux diagnostics pris à
+            // la suite se lisent pareil, sans jamais l'afficher.
+            let proprietaires = Array(Set(zones.map(\.zoneID.ownerName))).sorted()
+            snap.sharedZones = zones.map { zone in
+                let rang = proprietaires.firstIndex(of: zone.zoneID.ownerName) ?? 0
+                let lettre = String(UnicodeScalar(UInt8(65 + min(rang, 25))))
+                return "\(zone.zoneID.zoneName) / propriétaire \(lettre)"
             }
             for zone in zones {
                 if (try? await fetchZoneShare(database: container.sharedCloudDatabase, zoneID: zone.zoneID)) != nil {

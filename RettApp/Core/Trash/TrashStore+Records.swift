@@ -79,4 +79,79 @@ extension TrashStore {
             payload: payload
         )
     }
+
+    // MARK: - Prises
+
+    /// Une prise supprimée depuis le journal.
+    ///
+    /// Elle passait auparavant par un `context.delete` nu : la suppression
+    /// n'était pas opposable, l'appareil de l'autre parent la repoussait au
+    /// cycle suivant, et la prise revenait d'entre les morts chez celui qui
+    /// l'avait retirée.
+    static func record(log l: MedicationLog) {
+        var payload = emptyBackup()
+        payload.medicationLogs = [
+            CombinedBackup.LogBackup(
+                id: l.id, medicationId: l.medicationId,
+                medicationName: l.medicationName,
+                scheduledTime: l.scheduledTime, takenTime: l.takenTime,
+                taken: l.taken, dose: l.dose, doseUnitRaw: l.doseUnitRaw,
+                childProfileId: l.childProfileId,
+                isAdHoc: l.isAdHoc, adhocReason: l.adhocReason,
+                lastModifiedAt: l.lastModifiedAt
+            )
+        ]
+
+        let quand = l.effectiveTime.formatted(date: .abbreviated, time: .shortened)
+        record(
+            recordName: l.id.uuidString,
+            recordType: CKRecordType.medicationLog,
+            summary: "Prise — \(l.medicationName), \(quand)",
+            payload: payload
+        )
+    }
+
+    // MARK: - Humeur
+
+    static func record(mood m: MoodEntry) {
+        var payload = emptyBackup()
+        payload.moods = [
+            CombinedBackup.MoodBackup(
+                id: m.id, timestamp: m.timestamp, levelRaw: m.levelRaw,
+                notes: m.notes, childProfileId: m.childProfileId,
+                lastModifiedAt: m.lastModifiedAt
+            )
+        ]
+
+        let quand = m.timestamp.formatted(date: .abbreviated, time: .shortened)
+        record(
+            recordName: m.id.uuidString,
+            recordType: CKRecordType.mood,
+            summary: "Humeur — \(m.level.label), \(quand)",
+            payload: payload
+        )
+    }
+
+    // MARK: - Symptômes
+
+    static func record(symptom s: SymptomEvent) {
+        var payload = emptyBackup()
+        payload.symptoms = [
+            CombinedBackup.SymptomBackup(
+                id: s.id, timestamp: s.timestamp,
+                symptomTypeRaw: s.symptomTypeRaw, intensityRaw: s.intensityRaw,
+                durationMinutes: s.durationMinutes, notes: s.notes,
+                childProfileId: s.childProfileId,
+                lastModifiedAt: s.lastModifiedAt
+            )
+        ]
+
+        let quand = s.timestamp.formatted(date: .abbreviated, time: .shortened)
+        record(
+            recordName: s.id.uuidString,
+            recordType: CKRecordType.symptom,
+            summary: "Symptôme — \(s.symptomType.label), \(quand)",
+            payload: payload
+        )
+    }
 }

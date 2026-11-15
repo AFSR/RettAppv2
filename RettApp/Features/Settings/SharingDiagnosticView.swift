@@ -46,7 +46,7 @@ struct SharingDiagnosticView: View {
                         Label("Lancer le diagnostic", systemImage: "stethoscope")
                     }
                 } footer: {
-                    Text("Un ping CloudKit qui affiche l'état du partage sur cet appareil : rôle, zones existantes, abonnements, dernière erreur. À joindre en capture d'écran si vous nous contactez — il ne contient aucun lien d'accès à vos données.")
+                    Text("Un ping CloudKit qui affiche l'état du partage sur cet appareil : rôle, zones existantes, abonnements, dernière erreur. À joindre si vous nous contactez — rien de ce qu'il montre ne vous identifie ni ne donne accès à vos données.")
                 }
             }
         }
@@ -107,7 +107,7 @@ struct SharingDiagnosticView: View {
             } else {
                 row("Dernier sync", "jamais")
             }
-            row("Dernière erreur", Self.sansLien(snap.lastErrorMessage) ?? "aucune")
+            row("Dernière erreur", Self.anonymise(snap.lastErrorMessage) ?? "aucune")
             row("Lien du partage courant émis ?", snap.currentShareHasURL ? "oui" : "non")
         }
         Section {
@@ -117,29 +117,38 @@ struct SharingDiagnosticView: View {
                 Label("Copier tout le rapport", systemImage: "doc.on.doc")
             }
         } footer: {
-            Text("Copie l'état de la synchronisation, à coller dans un courriel de support. Aucun lien de partage n'y figure : un lien d'invitation donne accès au suivi, il ne s'envoie que par AirDrop, en main propre.")
+            Text("Copie l'état de la synchronisation, à coller dans un courriel de support. Le rapport est anonyme : ni lien de partage, ni identifiant de compte ou d'enregistrement. Vous pouvez l'envoyer tel quel.")
         }
     }
 
-    /// Retire d'un message d'erreur tout ce qui ressemble à une adresse web.
+    /// Retire d'un message d'erreur ce qui désigne quelqu'un ou ouvre un accès.
     ///
     /// Le message vient de CloudKit et part tel quel dans le rapport de
     /// support. Rien ne garantit qu'il ne cite jamais l'URL du partage, et
     /// cette URL est une clé d'accès au dossier de l'enfant. Le diagnostic est
     /// le seul endroit où un texte libre du système sort de l'appareil : il
     /// est donc filtré, plutôt que de parier sur ce qu'Apple y met.
-    static func sansLien(_ message: String?) -> String? {
+    static func anonymise(_ message: String?) -> String? {
         guard let message else { return nil }
-        let filtre = message
+
+        return message
             .split(separator: " ", omittingEmptySubsequences: false)
             .map { mot -> Substring in
                 let bas = mot.lowercased()
-                return bas.contains("http") || bas.contains("icloud.com")
-                    ? "[lien retiré]"
-                    : mot
+                if bas.contains("http") || bas.contains("icloud.com") {
+                    return "[lien retiré]"
+                }
+                // Un identifiant d'enregistrement ou de zone ne donne pas
+                // accès aux données, mais il désigne un enregistrement précis
+                // d'une famille précise, et le rapport part par courriel. On
+                // le reconnaît à sa forme : long, et fait de caractères
+                // d'identifiant plutôt que de mots.
+                if mot.count >= 16, mot.allSatisfy({ $0.isHexDigit || $0 == "-" || $0 == "_" }) {
+                    return "[identifiant retiré]"
+                }
+                return mot
             }
             .joined(separator: " ")
-        return filtre
     }
 
     private func row(_ label: String, _ value: String, mono: Bool = false) -> some View {
@@ -162,7 +171,10 @@ struct SharingDiagnosticView: View {
 
     private func renderPlainText(_ s: CloudKitSyncService.DiagnosticSnapshot) -> String {
         """
-        === RettApp — Diagnostic sync ===
+        === RettApp — Diagnostic de synchronisation ===
+        Rapport anonyme : ni lien de partage, ni identifiant de compte ou
+        d'enregistrement. Il peut être envoyé tel quel.
+
         Compte iCloud       : \(s.accountStatus)
         Rôle                : \(s.role)
         Subscriptions       : \(s.subscriptionsRegistered ? "oui" : "non")
@@ -177,7 +189,7 @@ struct SharingDiagnosticView: View {
 
         Écritures en attente: \(s.pendingWriteCount)
         Dernier sync        : \(s.lastSyncedAt ?? "jamais")
-        Dernière erreur     : \(Self.sansLien(s.lastErrorMessage) ?? "aucune")
+        Dernière erreur     : \(Self.anonymise(s.lastErrorMessage) ?? "aucune")
         Lien partage courant: \(s.currentShareHasURL ? "oui" : "non")
         """
     }
