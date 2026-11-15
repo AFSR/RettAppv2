@@ -86,7 +86,25 @@ Ajouter un type à `CKRecordType` impose donc d'inscrire au suivi de version :
 - **Deploy Schema Changes** vers Production ;
 - vérifier dans l'onglet Production.
 
-`Tombstone` est dans ce cas au 11 novembre 2026 : ajouté, pas déployé.
+### L'historique des déploiements
+
+Tenez-le à jour : c'est la seule trace de ce qui est réellement en production,
+et une session suivante n'a aucun moyen de le deviner.
+
+| Date | Déployé | Confirmé par |
+|---|---|---|
+| 15 novembre 2026 | `authorName` sur `SeizureEvent` | vérifié dans le Dashboard avant le déploiement |
+
+`Tombstone`, ajouté le 11 novembre 2026, et les champs ajoutés le 15 — les
+quatre autres `authorName`, les cinq champs de selles et urines sur
+`DailyObservation` — ne sont déployés **que si** le geste qui les crée avait
+été fait avant de cliquer. À vérifier dans l'onglet Production avant de les
+croire en place.
+
+> **Le piège du bouton.** « Deploy Schema Changes » ne promeut que ce que
+> l'environnement de développement connaît déjà, et le développement
+> n'apprend un champ qu'en le voyant passer. Déployer sans avoir produit la
+> donnée ne déploie rien — sans erreur, et sans le dire.
 
 ## La synchronisation ne tourne pas sans rôle
 
