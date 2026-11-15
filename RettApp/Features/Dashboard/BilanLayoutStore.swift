@@ -5,7 +5,7 @@ import Observation
 /// « Ce que montrent vos données » ne figurent pas ici : elles ne se
 /// réordonnent pas, elles font partie du cadre du Bilan.
 enum BilanChart: String, CaseIterable, Identifiable {
-    case frequency, intensity, mood, adherence, symptoms
+    case frequency, intensity, mood, adherence, symptoms, factors
 
     var id: String { rawValue }
 
@@ -16,6 +16,7 @@ enum BilanChart: String, CaseIterable, Identifiable {
         case .mood:      return "Humeur moyenne"
         case .adherence: return "Observance médicamenteuse"
         case .symptoms:  return "Symptômes Rett"
+        case .factors:   return "Facteurs associés"
         }
     }
 
@@ -26,6 +27,7 @@ enum BilanChart: String, CaseIterable, Identifiable {
         case .mood:      return "face.smiling"
         case .adherence: return "pill.fill"
         case .symptoms:  return "stethoscope"
+        case .factors:   return "link"
         }
     }
 
