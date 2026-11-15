@@ -46,8 +46,23 @@ C'était vrai quand la position ne servait qu'à centrer la carte. Dès lors qu'
 épingle posée sur soi part avec l'avis comme emplacement du lieu, la phrase
 était fausse **en production**.
 
+**Le diagnostic qui donnait la clé.** L'écran `Réglages → Partage → Diagnostic`
+affichait l'URL du `CKShare` en clair, sélectionnable, et son bouton copiait
+tout le rapport « pour le coller dans un email de support ». Or cette URL
+**est** la clé : le partage est en `publicPermission = .readWrite`, donc
+quiconque l'ouvre rejoint le partage et lit tout le suivi de l'enfant. L'app
+demandait donc aux familles d'envoyer à l'AFSR une clé de leur dossier — par
+le canal exact que la règle AirDrop existe pour fermer, et dans une boîte aux
+lettres de l'association.
+
+Corrigé en novembre 2026 : l'instantané ne collecte plus les URL du tout, il
+ne porte que l'état (« le lien a-t-il été émis »), et
+`RettAppTests/SharingDiagnosticPrivacyTests.swift` parcourt l'instantané par
+réflexion pour qu'un champ ajouté plus tard soit examiné lui aussi.
+
 La leçon : la question n'est pas « demande-t-on une permission ? » mais **« que
-sort-il de l'appareil, et pour quoi ? »**.
+sort-il de l'appareil, et pour quoi ? »** — et un écran de débogage sort de
+l'appareil dès qu'on demande à l'utilisateur de l'envoyer.
 
 ## L'état des promesses au 11 novembre 2026
 
@@ -55,7 +70,7 @@ sort-il de l'appareil, et pour quoi ? »**.
 |---|---|
 | Le suivi ne quitte pas l'appareil / l'iCloud personnel | Aucun appel réseau dans `Features/SeizureTracker`, `MedicationTracker`, `HealthData` |
 | Apple Santé est **lu**, jamais écrit, et rien par défaut | `Core/HealthKit/HealthKitManager.swift` |
-| L'invitation au partage passe par **AirDrop seulement** | `Core/Sync/ProximityShareSheet.swift`, `excludedActivityTypes` |
+| L'invitation au partage passe par **AirDrop seulement** | `Core/Sync/ProximityShareSheet.swift`, `excludedActivityTypes` — **et** `SharingDiagnosticView`, qui ne doit porter aucune URL |
 | Aucune mesure d'audience, aucun rapporteur d'incidents | Aucune dépendance tierce dans le projet |
 | La photo du cahier est traitée sur l'appareil et effacée | `Features/BookletImport/BookletScannerView.swift` |
 | Pas de caméra à détection de profondeur, aucune donnée faciale | Aucun usage d'`ARFaceTracking` ; Face ID ne rend qu'un booléen |
