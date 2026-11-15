@@ -27,6 +27,16 @@ struct ParentSharingView: View {
     /// sur AirDrop une fois le prénom connu.
     @State private var inviterApres = false
 
+    /// L'avertissement affiché juste avant la feuille de partage.
+    ///
+    /// iOS ne sait pas restreindre `UIActivityViewController` à AirDrop : la
+    /// liste d'exclusions ne porte que sur les canaux d'Apple, et toute
+    /// application tierce capable d'ouvrir une adresse — messagerie comprise —
+    /// reste proposée. La promesse « AirDrop seulement » ne peut donc pas être
+    /// tenue par le code ; elle le devient par la main de la personne, à qui
+    /// l'on dit ce qu'elle tient et ce qu'elle risque.
+    @State private var avertirAvantPartage = false
+
     var body: some View {
         Form {
             accountSection
@@ -58,6 +68,12 @@ struct ParentSharingView: View {
             Button("Continuer") { validerPrenom() }
         } message: {
             Text("Ce prénom apparaîtra sur l'appareil de l'autre parent, à côté de ce que vous notez. Il reste dans l'iCloud de votre famille : l'AFSR ne le reçoit pas.")
+        }
+        .alert("Ce lien ouvre le dossier de votre enfant", isPresented: $avertirAvantPartage) {
+            Button("Annuler", role: .cancel) { }
+            Button("Continuer") { presentShareSheet() }
+        } message: {
+            Text("Toute personne qui ouvre ce lien voit le suivi de votre enfant et peut le modifier. Choisissez l'autre iPhone dans la liste AirDrop, les deux appareils côte à côte. Si une autre application apparaît dans la liste, ne la choisissez pas.")
         }
         .confirmationDialog(
             sync.role == .participant ? "Quitter le partage ?" : "Arrêter le partage ?",
@@ -308,7 +324,7 @@ struct ParentSharingView: View {
         } header: {
             Text("Actions")
         } footer: {
-            Text("Invitation strictement en présentiel via AirDrop : approchez les deux iPhones, touchez le bouton ci-dessus, puis sélectionnez l'autre iPhone dans la liste AirDrop qui s'affiche. Messages, Mail et autres canaux à distance sont volontairement exclus. La synchronisation est ensuite automatique des deux côtés.")
+            Text("Approchez les deux iPhones, touchez le bouton ci-dessus, puis choisissez l'autre iPhone dans la liste AirDrop. Messages, Mail et les autres canaux d'Apple sont retirés de cette liste ; si une autre application y figure, ne la choisissez pas — le lien donne accès au suivi. La synchronisation est ensuite automatique des deux côtés.")
         }
     }
 
@@ -384,7 +400,7 @@ struct ParentSharingView: View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
                 Label {
-                    Text("**Présentiel obligatoire** : l'invitation se transmet uniquement via AirDrop, donc en présence physique des deux appareils.")
+                    Text("**En présentiel** : transmettez l'invitation par AirDrop, les deux appareils côte à côte. Le lien donne accès au suivi : il ne doit pas voyager dans une messagerie.")
                 } icon: {
                     Image(systemName: "person.2.wave.2.fill").foregroundStyle(.afsrPurpleAdaptive)
                 }
@@ -437,7 +453,7 @@ struct ParentSharingView: View {
             inviterApres = true
             demandePrenom = true
         } else {
-            presentShareSheet()
+            avertirAvantPartage = true
         }
     }
 
@@ -450,7 +466,7 @@ struct ParentSharingView: View {
             // Un partage déjà créé porte l'ancien nom, ou aucun : on le
             // corrige côté serveur avant d'inviter.
             await sync.updateOwnerDisplayName()
-            if enchainer { presentShareSheet() }
+            if enchainer { avertirAvantPartage = true }
         }
     }
 
