@@ -74,12 +74,18 @@ extension JournalFactors {
             if let l = logsByDay[cursor], !l.isEmpty {
                 day.factors[.adherence] = Double(l.filter(\.taken).count) / Double(l.count)
 
-                // Plan médicamenteux, médicament par médicament. La dose vient
-                // des prises planifiées (et non des prises faites) : ainsi
-                // une prise oubliée ne se déguise pas en baisse de dosage,
-                // elle est portée par `.medicationTaken`.
-                for (medId, group) in Dictionary(grouping: l, by: \.medicationId) {
-                    let ref = MedicationRef(id: medId, name: names[medId] ?? group[0].medicationName)
+                // Plan médicamenteux, traitement par traitement (regroupés par
+                // nom : un dosage changé est un plan arrêté et un autre créé).
+                // La dose vient des prises planifiées (et non des prises
+                // faites) : une prise oubliée ne se déguise pas en baisse de
+                // dosage, elle est portée par `.medicationTaken`. Le jour du
+                // changement, les deux plans se côtoient : on additionne,
+                // c'est ce qui a réellement été prévu ce jour-là.
+                let byTreatment = Dictionary(grouping: l) {
+                    MedicationPlanChange.seriesKey(forName: names[$0.medicationId] ?? $0.medicationName)
+                }
+                for (_, group) in byTreatment {
+                    let ref = MedicationRef(name: names[group[0].medicationId] ?? group[0].medicationName)
                     day.factors[.medicationDose(ref)] = group.reduce(0) { $0 + $1.dose }
                     day.factors[.medicationTaken(ref)] = Double(group.filter(\.taken).count) / Double(group.count)
                 }
