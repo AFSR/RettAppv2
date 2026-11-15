@@ -5,7 +5,13 @@ import UserNotifications
 // MARK: - Configuration du suivi
 
 /// Sous-page Réglages → Configuration du suivi.
-/// Regroupe Plan médicamenteux, Jeu du Regard, Notifications, Apple Santé.
+/// Regroupe Plan médicamenteux, Notifications et Apple Santé.
+///
+/// Le « Jeu du Regard » était annoncé ici et n'a jamais existé dans l'app : il
+/// vit sur la branche `rett-app-ios`, jamais fusionnée. Ce commentaire est ce
+/// qui m'a fait écrire une description App Store annonçant une fonction
+/// absente — et qui contredisait le manifeste de confidentialité sur la
+/// caméra à détection de profondeur.
 struct ConfigurationSubView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Medication.createdAt) private var medications: [Medication]

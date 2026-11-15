@@ -25,7 +25,6 @@ struct SettingsView: View {
     @State private var showDemoConfirm = false
     @State private var showPurgeDemoConfirm = false
     @State private var demoSummary: String?
-    @State private var showSharingSoon = false
     @State private var showRoleChangeConfirm = false
     @State private var pendingRole: DeviceRole?
     @State private var exportURL: URL?
@@ -207,11 +206,6 @@ struct SettingsView: View {
             Button("Annuler", role: .cancel) { pendingRole = nil }
         } message: { newRole in
             Text(roleChangeWarning(target: newRole))
-        }
-        .alert("Partage entre parents", isPresented: $showSharingSoon) {
-            Button("OK") { }
-        } message: {
-            Text("La synchronisation iCloud entre parents arrive dans une prochaine version. En attendant, vous pouvez exporter vos données en CSV (Réglages → Données → Exporter) et les transmettre par AirDrop, Messages ou e-mail.")
         }
     }
 
