@@ -25,14 +25,23 @@ enum JournalFactors {
         var symptomCounts: [RettSymptom: Int] = [:]
     }
 
-    /// Un médicament du plan, identifié par son `id` seul : le nom peut être
-    /// corrigé en cours de route (faute de frappe, marque → générique) sans
-    /// que ses jours se scindent en deux séries.
+    /// Un traitement, identifié par son **nom normalisé** et non par
+    /// l'identifiant d'un plan. Changer un dosage se fait en arrêtant un plan
+    /// et en en créant un autre (voir `MedicationPlanChange`) : deux
+    /// identifiants pour un seul traitement. Les séparer donnerait deux
+    /// séries à dose constante, et le changement de dose — ce qu'on cherche —
+    /// disparaîtrait de l'analyse.
     struct MedicationRef: Hashable {
-        let id: UUID
+        let key: String
         let name: String
-        static func == (a: Self, b: Self) -> Bool { a.id == b.id }
-        func hash(into h: inout Hasher) { h.combine(id) }
+
+        init(name: String) {
+            self.name = name
+            self.key = MedicationPlanChange.seriesKey(forName: name)
+        }
+
+        static func == (a: Self, b: Self) -> Bool { a.key == b.key }
+        func hash(into h: inout Hasher) { h.combine(key) }
     }
 
     /// Ce qu'on sait croiser : les champs du journal et le plan médicamenteux.
@@ -60,8 +69,8 @@ enum JournalFactors {
             case .urine:        return "urine"
             case .mood:         return "mood"
             case .adherence:    return "adherence"
-            case .medicationDose(let m):  return "dose|\(m.id)"
-            case .medicationTaken(let m): return "taken|\(m.id)"
+            case .medicationDose(let m):  return "dose|\(m.key)"
+            case .medicationTaken(let m): return "taken|\(m.key)"
             }
         }
 

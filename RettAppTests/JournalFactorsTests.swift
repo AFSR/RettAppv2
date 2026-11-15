@@ -73,7 +73,7 @@ final class JournalFactorsTests: XCTestCase {
 
     // MARK: - Plan médicamenteux
 
-    private let keppra = JournalFactors.MedicationRef(id: UUID(), name: "Keppra")
+    private let keppra = JournalFactors.MedicationRef(name: "Keppra")
 
     /// 30 jours : la dose passe de 250 à 500 au 16e jour.
     private func daysWithDoseChange(seizures: (Int) -> Int) -> [JournalFactors.Day] {
@@ -107,8 +107,11 @@ final class JournalFactorsTests: XCTestCase {
                       "sans variation de dose, il n'y a rien à corréler")
     }
 
-    func test_deuxNomsPourLeMemeMedicament_nFontQu_uneSerie() {
-        let renomme = JournalFactors.MedicationRef(id: keppra.id, name: "Lévétiracétam")
-        XCTAssertEqual(JournalFactors.Factor.medicationDose(keppra), .medicationDose(renomme))
+    func test_planArreteEtRecree_resteUnSeulTraitement() {
+        // « Keppra » arrêté puis « keppra » recréé : même série.
+        let recree = JournalFactors.MedicationRef(name: "  keppra ")
+        XCTAssertEqual(JournalFactors.Factor.medicationDose(keppra), .medicationDose(recree))
+        let accent = JournalFactors.MedicationRef(name: "Lévétiracétam")
+        XCTAssertEqual(accent, JournalFactors.MedicationRef(name: "levetiracetam"))
     }
 }
