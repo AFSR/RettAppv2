@@ -128,6 +128,15 @@ struct SettingsView: View {
 
             // ── 7. AIDE & LÉGAL
             Section {
+                // Pas de Bilan en usage « découverte » : ce qui ne sert pas
+                // n'apparaît pas.
+                if isSuivi {
+                    NavigationLink {
+                        FactorsHelpView()
+                    } label: {
+                        AFSRRowLabel(title: "Comprendre les facteurs du Bilan", systemImage: "link", color: .afsrPurple)
+                    }
+                }
                 NavigationLink {
                     MedicalDisclaimerSubView()
                 } label: {

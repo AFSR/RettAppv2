@@ -20,6 +20,7 @@ struct DashboardView: View {
     /// Ordre et choix des graphiques, propres à cet appareil.
     private let layout = BilanLayoutStore.shared
     @State private var showLayoutEditor = false
+    @State private var showFactorsHelp = false
     /// Mode d'affichage des graphiques de symptômes : fréquence ou intensité moyenne.
     @State private var symptomChartMode: SymptomChartMode = .frequency
 
@@ -130,6 +131,16 @@ struct DashboardView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showLayoutEditor) { BilanLayoutEditor(store: layout) }
+        .sheet(isPresented: $showFactorsHelp) {
+            NavigationStack {
+                FactorsHelpView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("OK") { showFactorsHelp = false }
+                        }
+                    }
+            }
+        }
         .onChange(of: viewModel.scale) { _, _ in crosshairDate = nil }
         .onChange(of: viewModel.referenceDate) { _, _ in crosshairDate = nil }
     }
@@ -574,6 +585,13 @@ struct DashboardView: View {
                     .font(AFSRFont.caption())
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    showFactorsHelp = true
+                } label: {
+                    Label("Comment lire ces résultats ?", systemImage: "questionmark.circle")
+                        .font(AFSRFont.caption())
+                }
+                .foregroundStyle(.afsrPurpleAdaptive)
             }
         }
     }
