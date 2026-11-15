@@ -123,6 +123,13 @@ struct RettAppApp: App {
                     }
 
                     await syncService.refreshAccountStatus()
+                    // Invitation arrivée avant que cette vue n'existe — le
+                    // lien AirDrop touché app fermée. Traitée ici, et AVANT
+                    // `refreshShareStatus`, dont la lecture dépend du rôle que
+                    // l'acceptation vient tout juste de poser.
+                    if let invitation = PendingShareInvitation.prelever() {
+                        await accepte(invitation)
+                    }
                     await syncService.refreshShareStatus()
                     // Enregistre les CKDatabaseSubscription pour recevoir des
                     // pushes silencieux quand l'autre parent modifie un record.
@@ -163,13 +170,10 @@ struct RettAppApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: RettAppDelegate.didReceiveShareMetadata)) { note in
                     guard let metadata = note.object as? CKShare.Metadata else { return }
                     Task { @MainActor in
-                        do {
-                            try await syncService.acceptShare(metadata)
-                            try await syncService.pullChanges(into: sharedModelContainer.mainContext)
-                            await syncService.refreshShareStatus()
-                        } catch {
-                            syncService.lastErrorMessage = error.localizedDescription
-                        }
+                        // Prise en charge ici : on vide le tampon pour que le
+                        // `.task` ne rejoue pas la même acceptation.
+                        _ = PendingShareInvitation.prelever()
+                        await accepte(metadata)
                     }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
@@ -191,6 +195,26 @@ struct RettAppApp: App {
                 }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    /// Accepte une invitation, puis rafraîchit ce qui en dépend.
+    ///
+    /// Deux chemins y mènent — la notification quand l'app tourne déjà, le
+    /// tampon quand elle vient d'être lancée par le lien — et le corps est
+    /// commun exprès : le parent invité doit voir la même chose dans les deux
+    /// cas, alors que seul le premier chemin était écrit.
+    ///
+    /// Le pull est ici et non laissé au cycle suivant : sans lui, l'écran de
+    /// partage dirait « connecté » devant un journal encore vide.
+    @MainActor
+    private func accepte(_ metadata: CKShare.Metadata) async {
+        do {
+            try await syncService.acceptShare(metadata)
+            try await syncService.pullChanges(into: sharedModelContainer.mainContext)
+            await syncService.refreshShareStatus()
+        } catch {
+            syncService.lastErrorMessage = error.localizedDescription
+        }
     }
 }
 
