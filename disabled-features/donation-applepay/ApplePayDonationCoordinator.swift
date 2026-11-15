@@ -51,9 +51,12 @@ final class ApplePayDonationCoordinator: NSObject {
         case cancelled
     }
 
-    /// URL du backend Vercel qui crée le PaymentIntent Stripe.
-    /// À remplacer par l'URL réelle après déploiement.
-    static let backendURL = URL(string: "https://rettapp-donations-backend.vercel.app/api/donate")!
+    /// URL du backend qui crée le PaymentIntent Stripe.
+    /// Volontairement non résolvable : l'ancien backend Vercel a été supprimé, et
+    /// un sous-domaine abandonné peut être repris par un tiers qui recevrait alors
+    /// les montants et les identifiants de paiement. `.invalid` (RFC 2606) ne
+    /// résout jamais ; la réactivation du don doit y mettre l'URL réelle.
+    static let backendURL = URL(string: "https://backend.invalid/api/donate")!
 
     private let log = Logger(subsystem: "fr.afsr.RettApp", category: "Donation")
     private let amount: Decimal
