@@ -107,10 +107,8 @@ struct DashboardView: View {
 
                 insightsSection
 
-                // Décision 3 : le Bilan est pour le parent, réduit à
-                // l'essentiel. Par défaut seule la fréquence est affichée ;
-                // les autres graphiques servent à préparer une consultation
-                // et se choisissent, dans l'ordre voulu, ici.
+                // Tous les graphiques sont affichés par défaut ; chacun peut
+                // être masqué ou déplacé depuis « Personnaliser le Bilan ».
                 ForEach(layout.visibleCharts) { chart in
                     chartView(for: chart)
                 }

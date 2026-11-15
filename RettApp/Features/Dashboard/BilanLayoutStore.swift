@@ -29,10 +29,9 @@ enum BilanChart: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Seule la fréquence est visible au départ : le Bilan est pour le parent,
-    /// réduit à l'essentiel (voir `DashboardView`). Les autres graphiques
-    /// servent à préparer une consultation et se choisissent.
-    var visibleByDefault: Bool { self == .frequency }
+    /// Tous les graphiques sont visibles au départ : l'utilisateur retire ce
+    /// qui ne l'intéresse pas, plutôt que de devoir découvrir ce qui existe.
+    var visibleByDefault: Bool { true }
 }
 
 /// Ordre et visibilité des graphiques du Bilan, mémorisés sur cet appareil.
