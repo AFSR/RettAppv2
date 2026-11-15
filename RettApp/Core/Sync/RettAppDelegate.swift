@@ -84,15 +84,64 @@ final class RettAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
     }
 }
 
+/// L'invitation reçue, mise de côté jusqu'à ce que quelqu'un l'écoute.
+///
+/// `NotificationCenter` ne rejoue rien : une notification émise sans
+/// observateur est perdue, définitivement et sans trace. Or iOS remet la
+/// metadata **dès que la scène se connecte**, donc avant que SwiftUI ait
+/// construit `LaunchSplash { RootView() }` et posé son `.onReceive` — ce qui
+/// est précisément le cas quand le parent invité touche le lien AirDrop alors
+/// que l'app est fermée, c'est-à-dire le cas normal.
+///
+/// Le symptôme était muet et très déroutant : l'app s'ouvrait sur son écran
+/// habituel, aucune erreur, aucun partage. Le parent qui avait invité voyait
+/// son invitation partie, l'autre n'avait « rien ».
+@MainActor
+enum PendingShareInvitation {
+
+    private static var metadata: CKShare.Metadata?
+
+    static func depose(_ nouvelle: CKShare.Metadata) {
+        metadata = nouvelle
+    }
+
+    /// Rend l'invitation **une seule fois** : l'acceptation est un appel
+    /// réseau, la rejouer à chaque passage au premier plan serait inutile.
+    static func prelever() -> CKShare.Metadata? {
+        defer { metadata = nil }
+        return metadata
+    }
+}
+
 /// Scene delegate qui réceptionne les invitations CloudKit.
 final class RettAppSceneDelegate: NSObject, UIWindowSceneDelegate {
     var window: UIWindow?
 
+    /// App déjà lancée : iOS appelle ceci.
     func windowScene(_ windowScene: UIWindowScene,
                      userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata) {
+        Self.receptionne(cloudKitShareMetadata)
+    }
+
+    /// App fermée : iOS la lance et passe la metadata **ici**, dans les
+    /// options de connexion de la scène. Les deux chemins existent et il faut
+    /// les deux — celui-ci manquait.
+    func scene(_ scene: UIScene,
+               willConnectTo session: UISceneSession,
+               options connectionOptions: UIScene.ConnectionOptions) {
+        if let metadata = connectionOptions.cloudKitShareMetadata {
+            Self.receptionne(metadata)
+        }
+    }
+
+    /// Déposée **avant** d'être émise, dans cet ordre : au lancement à froid
+    /// l'émission ne touche personne, et seul le dépôt sauve l'invitation.
+    @MainActor
+    private static func receptionne(_ metadata: CKShare.Metadata) {
+        PendingShareInvitation.depose(metadata)
         NotificationCenter.default.post(
             name: RettAppDelegate.didReceiveShareMetadata,
-            object: cloudKitShareMetadata
+            object: metadata
         )
     }
 }

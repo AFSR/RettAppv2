@@ -592,11 +592,29 @@ final class CloudKitSyncService {
         }
     }
 
+    /// Ce participant est-il le propriétaire du partage ?
+    ///
+    /// La comparaison directe des identifiants était fausse dans notre cas :
+    /// sur un partage à `publicPermission` ouvert — le nôtre, parce qu'une
+    /// invitation AirDrop ne nomme personne — les identités sont presque
+    /// toujours vides, et **`nil == nil` vaut `true`**. Chaque participant
+    /// était donc pris pour le propriétaire, le décompte tombait à zéro, et
+    /// l'initiateur ne voyait jamais que quelqu'un avait accepté.
+    ///
+    /// Sans identifiant, on s'en remet à `role`, que CloudKit renseigne
+    /// toujours — c'est le seul signal fiable ici.
+    private nonisolated static func estLeProprietaire(_ p: CKShare.Participant, de share: CKShare) -> Bool {
+        guard let sien = p.userIdentity.userRecordID,
+              let celuiDuProprietaire = share.owner.userIdentity.userRecordID
+        else { return false }
+        return sien == celuiDuProprietaire
+    }
+
     private func applyOwnedShare(_ share: CKShare) async {
         currentShare = share
         role = .owner
         let infos = share.participants.map { p in
-            ParticipantInfo(from: p, isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID)
+            ParticipantInfo(from: p, isOwnerSlot: Self.estLeProprietaire(p, de: share))
         }
         participants = infos
         participantCount = max(0, infos.filter { !$0.isOwner && $0.acceptanceStatus != .removed }.count)
@@ -610,7 +628,7 @@ final class CloudKitSyncService {
         // mémoire — sinon un pull ultérieur pousserait dans la mauvaise zone.
         ownedZone = nil
         let infos = share.participants.map { p in
-            ParticipantInfo(from: p, isOwnerSlot: p.userIdentity.userRecordID == share.owner.userIdentity.userRecordID)
+            ParticipantInfo(from: p, isOwnerSlot: Self.estLeProprietaire(p, de: share))
         }
         participants = infos
         participantCount = max(0, infos.filter { !$0.isOwner && $0.acceptanceStatus != .removed }.count)
