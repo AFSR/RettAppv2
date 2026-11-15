@@ -106,22 +106,30 @@ enum BookletQR {
         case contenuEtranger
     }
 
+    /// Une tentative de lecture : le tampon à lire, et la région de l'image
+    /// entière qu'il recouvre — la région reste celle d'origine même quand le
+    /// tampon a été agrandi, puisque Vision rend des coordonnées normalisées.
+    private struct Tentative {
+        let tampon: CGImage
+        let origine: CGPoint
+        let taille: CGSize
+    }
+
     /// Tente de détecter et de décoder le QR dans l'image fournie.
+    ///
+    /// Plusieurs passes, de la moins chère à la plus agressive, parce qu'un QR
+    /// imprimé est souvent **à la limite** du lisible : 21 mm de côté, et un
+    /// cahier chargé y met près de 70 modules. Chaque passe est un appel
+    /// Vision sur une petite image, le coût reste négligeable devant le fait
+    /// de redemander une photo à une famille — ou de lui faire ressaisir à la
+    /// main une semaine remplie par l'école.
     static func detect(in image: UIImage) async -> Detection {
         guard let cgImage = image.cgImage else { return .illisible }
         let taille = CGSize(width: CGFloat(cgImage.width), height: CGFloat(cgImage.height))
 
-        var qrVu = false
-        switch await lire(cgImage) {
-        case .decode(let schema, let cadre):
-            return .trouve(resultat(schema: schema, cadre: cadre,
-                                    zoneOrigine: .zero, zoneTaille: taille,
-                                    imageTaille: taille))
-        case .qrEtranger: qrVu = true
-        case .rien:       break
-        }
+        var tentatives = [Tentative(tampon: cgImage, origine: .zero, taille: taille)]
 
-        // Seconde passe sur le haut-droit de la page.
+        // Passes suivantes : le haut-droit de la page seul.
         //
         // Vision sous-échantillonne une grande image avant d'y chercher un
         // code : sur une photo de 4 000 px de large, les modules d'un QR de
@@ -134,10 +142,25 @@ enum BookletQR {
                           width: (taille.width * 0.50).rounded(.down),
                           height: (taille.height * 0.35).rounded(.down))
         if zone.width > 1, zone.height > 1, let recadre = cgImage.cropping(to: zone) {
-            switch await lire(recadre) {
+            tentatives.append(Tentative(tampon: recadre, origine: zone.origin, taille: zone.size))
+            // Dernier recours : agrandi et contrasté. L'agrandissement
+            // n'ajoute aucune information, mais il change la résolution de
+            // travail que Vision se choisit, et un code trop petit pour son
+            // seuil repasse au-dessus. Le contraste, lui, sépare une encre
+            // pâle d'un papier gris — le cas d'une imprimante familiale en
+            // fin de cartouche, qui est exactement celle des familles.
+            if let rehausse = rehausse(recadre, facteur: 3) {
+                tentatives.append(Tentative(tampon: rehausse, origine: zone.origin, taille: zone.size))
+            }
+        }
+
+        var qrVu = false
+        for tentative in tentatives {
+            switch await lire(tentative.tampon) {
             case .decode(let schema, let cadre):
                 return .trouve(resultat(schema: schema, cadre: cadre,
-                                        zoneOrigine: zone.origin, zoneTaille: zone.size,
+                                        zoneOrigine: tentative.origine,
+                                        zoneTaille: tentative.taille,
                                         imageTaille: taille))
             case .qrEtranger: qrVu = true
             case .rien:       break
@@ -145,6 +168,17 @@ enum BookletQR {
         }
 
         return qrVu ? .contenuEtranger : .illisible
+    }
+
+    /// Agrandit et durcit le contraste d'un tampon.
+    private static func rehausse(_ tampon: CGImage, facteur: CGFloat) -> CGImage? {
+        let traite = CIImage(cgImage: tampon)
+            .applyingFilter("CIColorControls", parameters: [
+                kCIInputSaturationKey: 0,
+                kCIInputContrastKey: 1.8
+            ])
+            .transformed(by: CGAffineTransform(scaleX: facteur, y: facteur))
+        return CIContext(options: nil).createCGImage(traite, from: traite.extent)
     }
 
     /// Ce qu'a donné la lecture d'un tampon d'image.
