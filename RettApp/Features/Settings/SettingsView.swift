@@ -294,12 +294,42 @@ struct SettingsView: View {
             NavigationLink {
                 ParentSharingView()
             } label: {
-                AFSRRowLabel(title: "Partage entre parents", systemImage: "person.2.fill", color: Color(hex: "#3949AB"))
+                // L'état se lit ICI, sans ouvrir la sous-page. Un parent
+                // invité ouvrait un journal rempli d'entrées qu'il n'avait pas
+                // écrites, et rien dans l'app ne lui disait d'où elles
+                // venaient : le bandeau de synchronisation ne paraît qu'en cas
+                // d'erreur ou d'attente, donc jamais quand tout va bien.
+                AFSRRowLabel(title: "Partage entre parents",
+                             systemImage: "person.2.fill",
+                             color: Color(hex: "#3949AB"),
+                             subtitle: etatDuPartage)
             }
         } header: {
             Text("Partage")
         } footer: {
             Text("Synchronisez le suivi avec un second parent via iCloud (CloudKit Sharing).")
+        }
+    }
+
+    /// Ce que la ligne « Partage entre parents » annonce sans qu'on l'ouvre.
+    ///
+    /// `nil` quand rien n'est partagé : une ligne qui dirait « aucun partage »
+    /// occuperait de la place pour ne rien apprendre.
+    private var etatDuPartage: String? {
+        switch sync.role {
+        case .none:
+            return nil
+        case .owner:
+            let acceptes = sync.participants.filter { !$0.isOwner && $0.acceptanceStatus == .accepted }.count
+            if acceptes > 0 {
+                return acceptes == 1 ? "Partagé avec 1 autre parent" : "Partagé avec \(acceptes) autres parents"
+            }
+            return "Invitation en attente d'acceptation"
+        case .participant:
+            if let nom = sync.ownerDisplayNameFromShare, !nom.isEmpty {
+                return "Vous recevez le suivi noté par \(nom)"
+            }
+            return "Vous recevez le suivi noté par l'autre parent"
         }
     }
 

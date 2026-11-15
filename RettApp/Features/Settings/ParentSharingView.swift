@@ -209,10 +209,14 @@ struct ParentSharingView: View {
             }
             return "Invitation prête à envoyer"
         case .participant:
+            // Même forme que le titre du propriétaire — « Partagé avec … » —
+            // parce que c'est la même chose vue de l'autre côté. « Vous avez
+            // accepté une invitation » décrivait un geste passé, pas l'état
+            // présent, et ne disait pas que des données ARRIVENT.
             if let name = sync.ownerDisplayNameFromShare, !name.isEmpty {
-                return "Partagé par \(name)"
+                return "Partagé avec \(name)"
             }
-            return "Vous avez accepté l'invitation d'un autre parent"
+            return "Partagé avec l'autre parent"
         }
     }
     private var roleSubtitle: String {
@@ -222,7 +226,10 @@ struct ParentSharingView: View {
         case .owner:
             return "Vous êtes le propriétaire des données partagées."
         case .participant:
-            return "Les modifications faites par les deux parents sont automatiquement synchronisées."
+            let qui = sync.ownerDisplayNameFromShare?.isEmpty == false
+                ? sync.ownerDisplayNameFromShare!
+                : "l'autre parent"
+            return "Vous recevez ce que note \(qui), et ce que vous notez lui parvient."
         }
     }
 

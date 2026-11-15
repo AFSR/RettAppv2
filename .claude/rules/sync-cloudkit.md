@@ -42,6 +42,22 @@ Trois mécanismes tiennent ensemble, ne cassez pas l'un en touchant l'autre :
 3. `CombinedBackupService` saute à l'import tout ce qui a été supprimé après la
    date de la sauvegarde.
 
+> **La corbeille tient sur trois fichiers**, et chercher dans le seul
+> `TrashStore.swift` fait conclure à tort qu'une méthode n'existe pas — je m'y
+> suis laissé prendre :
+>
+> - `TrashStore.swift` — le magasin, `record`, `items`, `forget`,
+>   `purgeExpired`, `restore`, `wasDeleted`, `recordNamesDeleted` ;
+> - `TrashStore+Records.swift` — une enveloppe par type : `record(seizure:)`,
+>   `record(medication:)`, `record(log:)`, `record(mood:)`, `record(symptom:)` ;
+> - `TrashStore+CloudKit.swift` — l'aller-retour avec la zone partagée, dont
+>   **`shouldRejectIncoming`** et `applyCloudRecord`.
+>
+> Un type qu'on peut supprimer depuis l'interface doit avoir son enveloppe dans
+> le deuxième fichier. Sans elle, on appelle `context.delete` tout nu, et la
+> suppression n'est plus opposable — c'était le cas des prises de médicaments
+> supprimées depuis le journal jusqu'en novembre 2026.
+
 Une pierre tombale **reçue** n'est jamais renvoyée : sinon deux appareils se la
 relanceraient indéfiniment. C'est le rôle du drapeau `restorable`.
 

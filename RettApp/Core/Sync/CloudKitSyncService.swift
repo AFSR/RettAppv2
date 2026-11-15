@@ -41,7 +41,10 @@ final class CloudKitSyncService {
         case unavailable
     }
 
-    enum ShareRole: Equatable {
+    /// `String` comme valeur brute parce que le rôle est conservé d'un
+    /// lancement à l'autre : un entier rendrait le réglage illisible, et un
+    /// cas réordonné changerait silencieusement de sens.
+    enum ShareRole: String, Equatable {
         case none
         case owner
         case participant
@@ -57,7 +60,30 @@ final class CloudKitSyncService {
 
     var accountStatus: AccountStatus = .unknown
     var syncState: SyncState = .idle
-    var role: ShareRole = .none
+    /// Le rôle de cet appareil dans le partage, **conservé d'un lancement à
+    /// l'autre**.
+    ///
+    /// Il ne l'était pas, et c'est ce qui rendait le partage invisible au
+    /// parent invité : à chaque ouverture il repartait de `.none`, donc
+    /// l'écran annonçait « Aucun partage actif » jusqu'à ce qu'une requête
+    /// réseau aboutisse. Et comme `performCycle` commence par
+    /// `guard role != .none`, rien ne se synchronisait pendant ce temps —
+    /// hors ligne, jamais.
+    ///
+    /// La valeur relue au lancement n'est qu'un point de départ :
+    /// `refreshShareStatus()` la corrige dès qu'elle a la réponse du serveur.
+    /// C'est le même raisonnement que la préservation du rôle en cas d'échec
+    /// réseau, étendu d'une session à la suivante.
+    var role: ShareRole = ShareRole(rawValue: UserDefaults.standard.string(forKey: CloudKitSyncService.roleKey) ?? "") ?? .none {
+        didSet {
+            guard role != oldValue else { return }
+            UserDefaults.standard.set(role.rawValue, forKey: Self.roleKey)
+            Self.log.info("rôle: \(oldValue.rawValue, privacy: .public) → \(self.role.rawValue, privacy: .public)")
+        }
+    }
+
+    private nonisolated static let roleKey = "afsr.sync.role"
+
     var lastSyncedAt: Date?
     var participantCount: Int = 0
     var lastErrorMessage: String?
