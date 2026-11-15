@@ -52,7 +52,75 @@ enum MealSlot: String, CaseIterable, Identifiable {
     }
 }
 
-/// Synthèse qualitative et quantitative quotidienne — repas, hydratation, sommeil.
+/// Aspect des selles, en quatre cases.
+///
+/// Volontairement plus grossier que l'échelle de Bristol, qui fait référence
+/// chez les gastro-entérologues : le cahier de suivi est rempli par un
+/// enseignant ou un éducateur, qui ne connaît pas Bristol, et sept cases par
+/// jour alourdiraient une grille déjà dense. Quatre niveaux suffisent à
+/// distinguer une constipation d'une diarrhée, qui est la question posée au
+/// médecin.
+enum StoolAspect: Int, Codable, CaseIterable, Identifiable {
+    case hard = 1
+    case normal = 2
+    case soft = 3
+    case liquid = 4
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .hard:   return "Dures"
+        case .normal: return "Normales"
+        case .soft:   return "Molles"
+        case .liquid: return "Liquides"
+        }
+    }
+
+    /// Libellé court pour la grille imprimée, où la place manque.
+    var shortLabel: String {
+        switch self {
+        case .hard:   return "Dur"
+        case .normal: return "Norm"
+        case .soft:   return "Mou"
+        case .liquid: return "Liq"
+        }
+    }
+}
+
+/// Quantité d'urines sur la journée, en quatre cases.
+///
+/// Suit l'hydratation, déjà notée ici, et signale une déshydratation — que
+/// rien d'autre ne révèle chez un enfant qui ne parle pas.
+enum UrineOutput: Int, Codable, CaseIterable, Identifiable {
+    case none = 1
+    case low = 2
+    case normal = 3
+    case high = 4
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .none:   return "Aucune"
+        case .low:    return "Peu"
+        case .normal: return "Normales"
+        case .high:   return "Abondantes"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .none:   return "0"
+        case .low:    return "Peu"
+        case .normal: return "Norm"
+        case .high:   return "Abond"
+        }
+    }
+}
+
+/// Synthèse qualitative et quantitative quotidienne — repas, hydratation,
+/// sommeil, selles et urines.
 /// Une seule entrée par jour (clé : `dayStart`).
 @Model
 final class DailyObservation {
@@ -88,6 +156,25 @@ final class DailyObservation {
     var napDurationMinutes: Int = 0
     var napNotes: String = ""
 
+    // ── Selles et urines (ajouté novembre 2026)
+    //
+    // `-1` pour « non renseigné », et non `0` : zéro selle dans la journée est
+    // une information, et c'est même celle qui compte le plus — le premier
+    // signe d'une constipation, fréquente dans le syndrome de Rett. Les
+    // confondre ferait disparaître précisément ce qu'on cherche à suivre.
+    //
+    // Des champs sur le jour existant plutôt qu'un nouveau `@Model` : la
+    // récupération du magasin efface les données en cas d'échec de migration,
+    // et la règle du dépôt réserve un nouveau modèle à une décision prise avec
+    // l'association. Des propriétés avec valeur par défaut sont la forme de
+    // migration légère la moins risquée.
+    var stoolCountRaw: Int = -1
+    var stoolAspectRaw: Int = 0
+    var stoolNotes: String = ""
+
+    var urineOutputRaw: Int = 0
+    var urineNotes: String = ""
+
     var generalNotes: String = ""
 
     var childProfileId: UUID?
@@ -108,6 +195,11 @@ final class DailyObservation {
         nightSleepNotes: String = "",
         napDurationMinutes: Int = 0,
         napNotes: String = "",
+        stoolCount: Int? = nil,
+        stoolAspect: StoolAspect? = nil,
+        stoolNotes: String = "",
+        urineOutput: UrineOutput? = nil,
+        urineNotes: String = "",
         generalNotes: String = "",
         childProfileId: UUID? = nil
     ) {
@@ -128,6 +220,11 @@ final class DailyObservation {
         self.nightSleepNotes = nightSleepNotes
         self.napDurationMinutes = napDurationMinutes
         self.napNotes = napNotes
+        self.stoolCountRaw = stoolCount.map { max(0, min(Self.stoolCountCap, $0)) } ?? -1
+        self.stoolAspectRaw = stoolAspect?.rawValue ?? 0
+        self.stoolNotes = stoolNotes
+        self.urineOutputRaw = urineOutput?.rawValue ?? 0
+        self.urineNotes = urineNotes
         self.generalNotes = generalNotes
         self.childProfileId = childProfileId
     }
@@ -182,6 +279,50 @@ final class DailyObservation {
         QualityRating(rawValue: averageMealRatingRaw)
     }
 
+    // MARK: - Selles et urines
+
+    /// Au-delà, on ne compte plus : la case du cahier dit « 3 et plus ».
+    /// Compter précisément n'apporte rien au médecin passé ce seuil, et la
+    /// grille imprimée n'a pas la place.
+    static let stoolCountCap = 3
+
+    /// Nombre de selles dans la journée, `nil` si rien n'a été noté.
+    /// `stoolCountCap` signifie « ce nombre ou davantage ».
+    var stoolCount: Int? {
+        get { stoolCountRaw < 0 ? nil : stoolCountRaw }
+        set { stoolCountRaw = newValue.map { max(0, min(Self.stoolCountCap, $0)) } ?? -1 }
+    }
+
+    /// Ce qu'affichent le journal, le cahier et le rapport. `nil` quand rien
+    /// n'a été noté — à ne pas confondre avec « aucune selle », qui se dit.
+    var stoolCountLabel: String? {
+        guard let stoolCount else { return nil }
+        if stoolCount == 0 { return "Aucune" }
+        return stoolCount >= Self.stoolCountCap
+            ? "\(Self.stoolCountCap) et plus"
+            : "\(stoolCount)"
+    }
+
+    var stoolAspect: StoolAspect? {
+        get { StoolAspect(rawValue: stoolAspectRaw) }
+        set { stoolAspectRaw = newValue?.rawValue ?? 0 }
+    }
+
+    var urineOutput: UrineOutput? {
+        get { UrineOutput(rawValue: urineOutputRaw) }
+        set { urineOutputRaw = newValue?.rawValue ?? 0 }
+    }
+
+    /// Vrai dès qu'une des deux rubriques porte quelque chose. Sert au journal
+    /// et au rapport à ne pas afficher une section vide.
+    var hasElimination: Bool {
+        stoolCountRaw >= 0
+            || stoolAspectRaw > 0
+            || urineOutputRaw > 0
+            || !stoolNotes.isEmpty
+            || !urineNotes.isEmpty
+    }
+
     var hydrationRating: QualityRating? {
         get { QualityRating(rawValue: hydrationRatingRaw) }
         set { hydrationRatingRaw = newValue?.rawValue ?? 0 }
@@ -193,7 +334,8 @@ final class DailyObservation {
 
     /// True si au moins un champ a été renseigné.
     var isPopulated: Bool {
-        averageMealRatingRaw > 0
+        hasElimination
+            || averageMealRatingRaw > 0
             || hydrationRatingRaw > 0
             || nightSleepRatingRaw > 0
             || nightSleepDurationMinutes > 0

@@ -89,7 +89,8 @@ struct FollowUpBookletView: View {
     private var atLeastOneSectionSelected: Bool {
         let c = BookletConfigStore.shared
         return c.includeMedicationGrid || c.includeSeizureGrid || c.includeMoodGrid
-            || c.includeMealsGrid || c.includeSleepGrid || c.includeSymptomsGrid || c.includeFreeNotes
+            || c.includeMealsGrid || c.includeSleepGrid || c.includeEliminationGrid
+            || c.includeSymptomsGrid || c.includeFreeNotes
     }
 
     private func defaultPeriodLabel() -> String {
@@ -123,6 +124,7 @@ struct FollowUpBookletView: View {
             includeMoodGrid: config.includeMoodGrid,
             includeMealsGrid: config.includeMealsGrid,
             includeSleepGrid: config.includeSleepGrid,
+            includeEliminationGrid: config.includeEliminationGrid,
             includeSymptomsGrid: config.includeSymptomsGrid,
             includeFreeNotes: config.includeFreeNotes,
             medications: medications,

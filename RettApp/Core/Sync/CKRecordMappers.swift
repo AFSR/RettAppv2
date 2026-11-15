@@ -442,6 +442,11 @@ extension DailyObservation {
         r["nightSleepNotes"] = nightSleepNotes as CKRecordValue
         r["napDurationMinutes"] = napDurationMinutes as CKRecordValue
         r["napNotes"] = napNotes as CKRecordValue
+        r["stoolCountRaw"] = stoolCountRaw as CKRecordValue
+        r["stoolAspectRaw"] = stoolAspectRaw as CKRecordValue
+        r["stoolNotes"] = stoolNotes as CKRecordValue
+        r["urineOutputRaw"] = urineOutputRaw as CKRecordValue
+        r["urineNotes"] = urineNotes as CKRecordValue
         r["generalNotes"] = generalNotes as CKRecordValue
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
@@ -486,6 +491,14 @@ extension DailyObservation {
         target.nightSleepNotes = record["nightSleepNotes"] as? String ?? ""
         target.napDurationMinutes = record["napDurationMinutes"] as? Int ?? 0
         target.napNotes = record["napNotes"] as? String ?? ""
+        // `-1` et non `0` en repli : un enregistrement écrit par une version
+        // antérieure n'a pas ce champ, et le lire comme « zéro selle » ferait
+        // apparaître une constipation qui n'a jamais été constatée.
+        target.stoolCountRaw = record["stoolCountRaw"] as? Int ?? -1
+        target.stoolAspectRaw = record["stoolAspectRaw"] as? Int ?? 0
+        target.stoolNotes = record["stoolNotes"] as? String ?? ""
+        target.urineOutputRaw = record["urineOutputRaw"] as? Int ?? 0
+        target.urineNotes = record["urineNotes"] as? String ?? ""
         target.generalNotes = record["generalNotes"] as? String ?? ""
         target.childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
         target.lastModifiedAt = record.incomingLastModified ?? Date()

@@ -26,6 +26,13 @@ struct DailyObservationSheet: View {
     @State private var napDurationMinutes: Int = 0
     @State private var napNotes: String = ""
 
+    @State private var stoolCount: Int?
+    @State private var stoolAspect: StoolAspect?
+    @State private var stoolNotes: String = ""
+
+    @State private var urineOutput: UrineOutput?
+    @State private var urineNotes: String = ""
+
     @State private var generalNotes: String = ""
 
     var body: some View {
@@ -84,6 +91,50 @@ struct DailyObservationSheet: View {
                         .lineLimit(1...3)
                 }
 
+                Section {
+                    // « Non noté » est une réponse à part entière, et il faut
+                    // qu'elle se distingue de « aucune selle ». Confondre les
+                    // deux ferait apparaître une constipation qui n'a jamais
+                    // été constatée — exactement ce qu'on vient suivre ici.
+                    Picker("Nombre de selles", selection: $stoolCount) {
+                        Text("Non noté").tag(Int?.none)
+                        Text("Aucune").tag(Optional(0))
+                        Text("1").tag(Optional(1))
+                        Text("2").tag(Optional(2))
+                        Text("3 et plus").tag(Optional(DailyObservation.stoolCountCap))
+                    }
+
+                    Picker("Aspect", selection: $stoolAspect) {
+                        Text("Non noté").tag(StoolAspect?.none)
+                        ForEach(StoolAspect.allCases) { aspect in
+                            Text(aspect.label).tag(Optional(aspect))
+                        }
+                    }
+
+                    TextField("Détails (douleurs, sang, effort…)", text: $stoolNotes, axis: .vertical)
+                        .lineLimit(1...3)
+                } header: {
+                    Text("Selles")
+                } footer: {
+                    Text("La constipation est fréquente dans le syndrome de Rett. Noter « aucune » les jours sans selle est ce qui la rend visible au médecin.")
+                }
+
+                Section {
+                    Picker("Quantité sur la journée", selection: $urineOutput) {
+                        Text("Non noté").tag(UrineOutput?.none)
+                        ForEach(UrineOutput.allCases) { sortie in
+                            Text(sortie.label).tag(Optional(sortie))
+                        }
+                    }
+
+                    TextField("Détails (odeur, couleur, douleur…)", text: $urineNotes, axis: .vertical)
+                        .lineLimit(1...3)
+                } header: {
+                    Text("Urines")
+                } footer: {
+                    Text("Des urines rares signalent une déshydratation, que rien d'autre ne montre chez un enfant qui ne parle pas.")
+                }
+
                 Section("Notes générales (optionnel)") {
                     TextField("Tout autre élément du jour", text: $generalNotes, axis: .vertical)
                         .lineLimit(2...6)
@@ -135,6 +186,11 @@ struct DailyObservationSheet: View {
             nightSleepNotes = found.nightSleepNotes
             napDurationMinutes = found.napDurationMinutes
             napNotes = found.napNotes
+            stoolCount = found.stoolCount
+            stoolAspect = found.stoolAspect
+            stoolNotes = found.stoolNotes
+            urineOutput = found.urineOutput
+            urineNotes = found.urineNotes
             generalNotes = found.generalNotes
         }
     }
@@ -153,6 +209,11 @@ struct DailyObservationSheet: View {
             existing.nightSleepNotes = nightSleepNotes
             existing.napDurationMinutes = napDurationMinutes
             existing.napNotes = napNotes
+            existing.stoolCount = stoolCount
+            existing.stoolAspect = stoolAspect
+            existing.stoolNotes = stoolNotes
+            existing.urineOutput = urineOutput
+            existing.urineNotes = urineNotes
             existing.generalNotes = generalNotes
         } else {
             let obs = DailyObservation(
@@ -172,6 +233,11 @@ struct DailyObservationSheet: View {
                 nightSleepNotes: nightSleepNotes,
                 napDurationMinutes: napDurationMinutes,
                 napNotes: napNotes,
+                stoolCount: stoolCount,
+                stoolAspect: stoolAspect,
+                stoolNotes: stoolNotes,
+                urineOutput: urineOutput,
+                urineNotes: urineNotes,
                 generalNotes: generalNotes,
                 childProfileId: profiles.first?.id
             )

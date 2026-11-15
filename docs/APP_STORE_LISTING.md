@@ -20,7 +20,7 @@ Connect, et qu'il faut aller les y chercher :
 | Affirmation de la fiche 1.0 | Réalité vérifiée dans le code |
 |---|---|
 | « Authentification sécurisée par Sign in with Apple » | Aucun `AuthenticationServices`, rien dans les entitlements. Connexion par code à usage unique. |
-| « JEU DU REGARD — caméra TrueDepth », décrit sur six lignes | N'existe pas dans l'app. Il vit sur la branche `rett-app-ios`, jamais fusionnée. Il n'en reste qu'un commentaire orphelin dans un fichier mort. |
+| « JEU DU REGARD — caméra TrueDepth », décrit sur six lignes | N'existe pas dans l'app. Il vit sur la branche `rett-app-ios`, jamais fusionnée. Seul un commentaire de `SettingsSubviews.swift` l'annonçait encore — c'est lui qui avait égaré cette fiche, et il est corrigé. |
 | « Toutes les données restent sur votre iPhone » | Vrai du **suivi**. Faux en bloc : l'espace adhérent envoie identité et coordonnées à afsr.fr, l'épingle envoie une position précise. |
 
 Les deux premières sont le genre qui attire un rejet : une description qui annonce une

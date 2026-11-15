@@ -531,6 +531,7 @@ struct BookletImportSheet: View {
         case .meals:      return "fork.knife"
         case .hydration:  return "drop.fill"
         case .sleep:      return "bed.double.fill"
+        case .elimination: return "toilet.fill"
         case .symptoms:   return "stethoscope"
         case .events:     return "exclamationmark.bubble.fill"
         }
@@ -544,6 +545,7 @@ struct BookletImportSheet: View {
         case .meals:      return "Repas"
         case .hydration:  return "Hydratation"
         case .sleep:      return "Sommeil"
+        case .elimination: return "Selles et urines"
         case .symptoms:   return "Symptômes Rett"
         case .events:     return "Événements"
         }
@@ -560,6 +562,7 @@ struct BookletImportSheet: View {
             return ["B": "Petit-déjeuner", "L": "Déjeuner", "S": "Goûter", "D": "Dîner"][String(l)]
         case .hydration:  return "Hydratation"
         case .sleep:      return ["Sommeil de nuit (durée)", "Qualité du sommeil", "Sieste matin", "Sieste après-midi", "Réveils nocturnes"][safe: rowIndex]
+        case .elimination: return ["Selles, nombre", "Selles, aspect", "Urines"][safe: rowIndex]
         case .symptoms:
             guard let s = schema.symptoms[safe: rowIndex],
                   let sym = RettSymptom(rawValue: s) else { return nil }
@@ -581,6 +584,13 @@ struct BookletImportSheet: View {
             case 1: return ["Bonne", "Moyenne", "Difficile"]
             case 2, 3: return ["Non", "<30min", "30-60min", ">60min"]
             case 4: return ["0 réveil", "1-2", "3+"]
+            default: return []
+            }
+        case .elimination:
+            switch rowIndex {
+            case 0: return ["Aucune", "1", "2", "3 et plus"]
+            case 1: return ["Dures", "Normales", "Molles", "Liquides"]
+            case 2: return ["Aucune", "Peu", "Normales", "Abondantes"]
             default: return []
             }
         case .symptoms:   return ["Matin", "Après-midi"]
@@ -623,7 +633,9 @@ struct BookletImportSheet: View {
 
 private extension BookletSchema.Section {
     static var allCasesOrdered: [BookletSchema.Section] {
-        [.medication, .seizure, .mood, .meals, .hydration, .sleep, .symptoms, .events]
+        // Même ordre que la page imprimée : on relit l'écran de contrôle en
+        // tenant le cahier à côté.
+        [.medication, .seizure, .mood, .meals, .hydration, .sleep, .elimination, .symptoms, .events]
     }
 }
 

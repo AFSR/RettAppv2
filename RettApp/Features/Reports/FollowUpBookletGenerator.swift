@@ -23,6 +23,7 @@ enum FollowUpBookletGenerator {
         var includeMoodGrid: Bool
         var includeMealsGrid: Bool
         var includeSleepGrid: Bool
+        var includeEliminationGrid: Bool
         var includeSymptomsGrid: Bool
         var includeFreeNotes: Bool       // « événements particuliers » sous forme de cases
         var medications: [Medication]
@@ -55,6 +56,15 @@ enum FollowUpBookletGenerator {
     private static let napLegend         = "Sieste, en minutes"
     private static let nightWakeCodes    = ["0", "1-2", "3+"]
     private static let nightWakeLegend   = "Nombre de réveils nocturnes"
+    // « 0 » en première case, et non l'absence de case : un jour sans selle est
+    // le premier signe d'une constipation, et c'est ce que le médecin cherche.
+    // Ne rien cocher veut dire « on n'a pas regardé », ce qui est autre chose.
+    private static let stoolCountCodes   = ["0", "1", "2", "3+"]
+    private static let stoolCountLegend  = "Nombre de selles dans la journée — cocher 0 si aucune"
+    private static let stoolAspectCodes  = ["Dur", "Norm", "Mou", "Liq"]
+    private static let stoolAspectLegend = "Dur/Norm/Mou/Liq = Dures · Normales · Molles · Liquides"
+    private static let urineCodes        = ["0", "Peu", "Norm", "Abond"]
+    private static let urineLegend       = "Quantité d'urines sur la journée"
 
     static func generate(_ options: Options) throws -> URL {
         let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
@@ -91,6 +101,9 @@ enum FollowUpBookletGenerator {
             if options.includeSleepGrid {
                 drawSleepGrid(in: context, y: &y, options: options, rowHeight: plan.sleepRowHeight)
             }
+            if options.includeEliminationGrid {
+                drawEliminationGrid(in: context, y: &y, options: options, rowHeight: plan.eliminationRowHeight)
+            }
             if options.includeSymptomsGrid && !options.selectedSymptoms.isEmpty {
                 drawSymptomsGrid(in: context, y: &y, options: options, rowHeight: plan.symptomsRowHeight)
             }
@@ -112,6 +125,7 @@ enum FollowUpBookletGenerator {
         var moodRowHeight: CGFloat
         var mealsRowHeight: CGFloat
         var sleepRowHeight: CGFloat
+        var eliminationRowHeight: CGFloat
         var symptomsRowHeight: CGFloat
         var eventsRowHeight: CGFloat
     }
@@ -123,6 +137,7 @@ enum FollowUpBookletGenerator {
         let moodRows = 5
         let mealsRows = options.selectedMealSlots.count + 1   // + hydratation
         let sleepRows = 5
+        let eliminationRows = 3   // nombre de selles, aspect, urines
         let symptomRows = options.selectedSymptoms.count
         let eventsRows = 6
 
@@ -134,6 +149,7 @@ enum FollowUpBookletGenerator {
         if options.includeMoodGrid { fixedOverhead += sectionOverhead }
         if options.includeMealsGrid && mealsRows > 1 { fixedOverhead += sectionOverhead }
         if options.includeSleepGrid { fixedOverhead += sectionOverhead }
+        if options.includeEliminationGrid { fixedOverhead += sectionOverhead }
         if options.includeSymptomsGrid && symptomRows > 0 { fixedOverhead += sectionOverhead + 10 }  // + bandeau M/A
         if options.includeFreeNotes { fixedOverhead += sectionOverhead }
 
@@ -142,6 +158,7 @@ enum FollowUpBookletGenerator {
             + (options.includeMoodGrid ? moodRows : 0)
             + (options.includeMealsGrid ? mealsRows : 0)
             + (options.includeSleepGrid ? sleepRows : 0)
+            + (options.includeEliminationGrid ? eliminationRows : 0)
             + (options.includeSymptomsGrid ? symptomRows : 0)
             + (options.includeFreeNotes ? eventsRows : 0)
 
@@ -160,6 +177,7 @@ enum FollowUpBookletGenerator {
             moodRowHeight: perRow,
             mealsRowHeight: perRow,
             sleepRowHeight: perRow,
+            eliminationRowHeight: perRow,
             symptomsRowHeight: perRow,
             eventsRowHeight: perRow
         )
@@ -351,6 +369,27 @@ enum FollowUpBookletGenerator {
     }
 
     /// Symptômes Rett : 2 cases par jour (matin / après-midi).
+    /// Selles et urines.
+    ///
+    /// Trois sous-grilles, construites comme celles du sommeil : même largeur
+    /// de colonne gauche (220) et même enchaînement titre → sous-grilles.
+    /// `BookletLayoutEngine` reproduit cette suite à l'identique pour retrouver
+    /// les cases au scan : toute modification ici doit y être reportée, sinon
+    /// le scan lit les cases d'à côté sans rien signaler.
+    private static func drawEliminationGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
+        drawSectionTitle("Selles et urines", legend: "Voir légendes ci-dessous", y: &y)
+
+        // Ligne 0 — nombre de selles
+        drawMultiCheckGrid(rows: ["Selles, nombre — \(stoolCountLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: stoolCountCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
+        // Ligne 1 — aspect
+        drawMultiCheckGrid(rows: ["Selles, aspect — \(stoolAspectLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: stoolAspectCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
+        // Ligne 2 — urines
+        drawMultiCheckGrid(rows: ["Urines — \(urineLegend)"], dayHeaders: dayHeaders(count: options.dayCount),
+                           options: urineCodes, y: &y, leftColumnWidth: 220, rowHeight: rowHeight)
+    }
+
     private static func drawSymptomsGrid(in context: UIGraphicsPDFRendererContext, y: inout CGFloat, options: Options, rowHeight: CGFloat) {
         drawSectionTitle("Symptômes Rett", legend: "M = matin · A = après-midi", y: &y)
 

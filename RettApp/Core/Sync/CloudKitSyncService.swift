@@ -1862,11 +1862,27 @@ final class CloudKitSyncService {
         var accountStatus: String
         var privateZoneExists: Bool
         var privateZoneShareExists: Bool
-        var privateZoneShareURL: String?
+        /// Le serveur a-t-il émis le lien d'invitation — **pas** le lien.
+        ///
+        /// L'URL de partage EST la clé d'accès : notre partage est en
+        /// `publicPermission = .readWrite`, donc quiconque l'ouvre rejoint le
+        /// partage et lit tout le suivi médical de l'enfant. Elle était
+        /// affichée ici en clair, sélectionnable, et le bouton « Copier »
+        /// l'envoyait dans le presse-papiers « pour le coller dans un email de
+        /// support ». L'app demandait donc aux familles de confier à l'AFSR
+        /// une clé de leur dossier, par le canal même que la règle
+        /// « AirDrop seulement » existe pour fermer.
+        ///
+        /// Le booléen garde tout ce que le diagnostic avait à dire : un partage
+        /// peut exister sans URL — c'est le bug de la copie locale récupérée à
+        /// la place de l'enregistrement serveur — et c'est cette distinction
+        /// qu'on vient lire ici, pas l'adresse.
+        var privateZoneShareHasURL: Bool
         var sharedZonesCount: Int
         var sharedZones: [String]              // "zoneName / ownerName"
         var sharedZoneShareExists: Bool
-        var currentShareURL: String?
+        /// Même raison que `privateZoneShareHasURL` : l'état, jamais l'adresse.
+        var currentShareHasURL: Bool
         var pendingWriteCount: Int
         var lastSyncedAt: String?
         var lastErrorMessage: String?
@@ -1879,11 +1895,11 @@ final class CloudKitSyncService {
             accountStatus: describe(accountStatus),
             privateZoneExists: false,
             privateZoneShareExists: false,
-            privateZoneShareURL: nil,
+            privateZoneShareHasURL: false,
             sharedZonesCount: 0,
             sharedZones: [],
             sharedZoneShareExists: false,
-            currentShareURL: currentShare?.url?.absoluteString,
+            currentShareHasURL: currentShare?.url != nil,
             pendingWriteCount: PendingWriteStore.shared.pendingCount,
             lastSyncedAt: lastSyncedAt.map { ISO8601DateFormatter().string(from: $0) },
             lastErrorMessage: lastErrorMessage,
@@ -1897,7 +1913,7 @@ final class CloudKitSyncService {
             snap.privateZoneExists = true
             if let share = try? await fetchZoneShare(database: container.privateCloudDatabase, zoneID: privateZoneID) {
                 snap.privateZoneShareExists = true
-                snap.privateZoneShareURL = share.url?.absoluteString
+                snap.privateZoneShareHasURL = share.url != nil
             }
         } catch {
             // Zone absente → OK, on laisse false.
@@ -1906,7 +1922,14 @@ final class CloudKitSyncService {
         // Shared zones probe
         if let zones = try? await container.sharedCloudDatabase.allRecordZones() {
             snap.sharedZonesCount = zones.count
-            snap.sharedZones = zones.map { "\($0.zoneID.zoneName) / \($0.zoneID.ownerName)" }
+            // L'identifiant du propriétaire est abrégé : il ne donne aucun
+            // accès, mais il désigne un compte iCloud et part lui aussi dans
+            // le rapport de support. Huit caractères suffisent à dire si deux
+            // zones ont le même propriétaire, qui est la seule question qu'on
+            // se pose ici.
+            snap.sharedZones = zones.map {
+                "\($0.zoneID.zoneName) / \($0.zoneID.ownerName.prefix(8))…"
+            }
             for zone in zones {
                 if (try? await fetchZoneShare(database: container.sharedCloudDatabase, zoneID: zone.zoneID)) != nil {
                     snap.sharedZoneShareExists = true

@@ -33,6 +33,7 @@ struct BookletConfigurationView: View {
                 Toggle("État général / humeur", isOn: $config.includeMoodGrid)
                 Toggle("Repas et hydratation", isOn: $config.includeMealsGrid)
                 Toggle("Sommeil / siestes", isOn: $config.includeSleepGrid)
+                Toggle("Selles et urines", isOn: $config.includeEliminationGrid)
                 Toggle("Symptômes Rett (matin / après-midi)", isOn: $config.includeSymptomsGrid)
                 Toggle("Événements particuliers", isOn: $config.includeFreeNotes)
             }

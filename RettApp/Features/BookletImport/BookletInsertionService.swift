@@ -166,6 +166,31 @@ enum BookletInsertionService {
                     log.error("Ligne sommeil inconnue : \(cell.rowIndex, privacy: .public)")
                 }
 
+            case .elimination:
+                guard let obs = observations[cell.dayIndex] else { continue }
+                switch cell.rowIndex {
+                case 0:
+                    // Nombre : 0/1/2/3+ — l'indice de case EST le nombre, et
+                    // la case « 0 » vaut zéro selle, pas « non renseigné ».
+                    // C'est toute la raison d'avoir une case « 0 » imprimée.
+                    obs.stoolCount = cell.optionIndex
+                    log.info("Jour \(cell.dayIndex, privacy: .public) — Selles = \(cell.optionIndex, privacy: .public)")
+                case 1:
+                    // Aspect : Dur/Norm/Mou/Liq, dans l'ordre de l'énumération.
+                    if let aspect = StoolAspect(rawValue: cell.optionIndex + 1) {
+                        obs.stoolAspect = aspect
+                        log.info("Jour \(cell.dayIndex, privacy: .public) — Aspect = \(aspect.label, privacy: .public)")
+                    }
+                case 2:
+                    // Urines : 0/Peu/Norm/Abond, dans l'ordre de l'énumération.
+                    if let sortie = UrineOutput(rawValue: cell.optionIndex + 1) {
+                        obs.urineOutput = sortie
+                        log.info("Jour \(cell.dayIndex, privacy: .public) — Urines = \(sortie.label, privacy: .public)")
+                    }
+                default:
+                    log.error("Ligne selles/urines inconnue : \(cell.rowIndex, privacy: .public)")
+                }
+
             case .symptoms:
                 guard cell.rowIndex < result.schema.symptoms.count,
                       let symptom = RettSymptom(rawValue: result.schema.symptoms[cell.rowIndex])
