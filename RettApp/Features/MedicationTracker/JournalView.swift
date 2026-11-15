@@ -23,11 +23,6 @@ struct JournalView: View {
     @State private var showManualSeizureEntry = false
     @State private var showBookletImport = false
 
-    /// L'entrée dont on vient de demander la suppression. Une confirmation
-    /// s'intercale : le geste est irréversible pour l'autre parent, même si la
-    /// corbeille garde l'entrée trente jours de ce côté-ci.
-    @State private var aSupprimer: JournalFeedItem?
-
     private var profile: ChildProfile? { profiles.first }
     private var epilepsyEnabled: Bool { profile?.hasEpilepsy ?? false }
 
@@ -170,23 +165,6 @@ struct JournalView: View {
         }
         .onChange(of: seizureTracker.phase) { _, newValue in
             if case .qualifying = newValue { showSeizureQualification = true }
-        }
-        .confirmationDialog(
-            "Supprimer \(aSupprimer?.libelle ?? "cette entrée") ?",
-            isPresented: Binding(
-                get: { aSupprimer != nil },
-                set: { if !$0 { aSupprimer = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: aSupprimer
-        ) { item in
-            Button("Supprimer", role: .destructive) {
-                supprimer(item)
-                aSupprimer = nil
-            }
-            Button("Annuler", role: .cancel) { aSupprimer = nil }
-        } message: { _ in
-            Text("L'entrée part en corbeille et reste récupérable trente jours, dans Réglages → Données. Chez l'autre parent, elle disparaît et ne revient pas.")
         }
         .sheet(isPresented: $showMoodSheet) { MoodSheet() }
         .sheet(isPresented: $showSymptomSheet) { SymptomSheet() }
@@ -362,6 +340,14 @@ private struct JournalContent: View {
     @Query private var moods: [MoodEntry]
     @Query private var observations: [DailyObservation]
     @State private var editingTakenTimeFor: MedicationLog?
+
+    /// L'entrée dont on vient de demander la suppression. Une confirmation
+    /// s'intercale : le geste est irréversible pour l'autre parent, même si la
+    /// corbeille garde l'entrée trente jours de ce côté-ci.
+    ///
+    /// Ici et non dans `JournalView` : c'est `JournalContent` qui tient le fil
+    /// et la suppression. Les séparer ne compilait pas.
+    @State private var aSupprimer: JournalFeedItem?
     @Query private var seizures: [SeizureEvent]
     @Query private var symptoms: [SymptomEvent]
 
@@ -461,6 +447,30 @@ private struct JournalContent: View {
             }
             .presentationDetents([.medium])
         }
+        .confirmationDialog(
+            titreSuppression,
+            isPresented: Binding(
+                get: { aSupprimer != nil },
+                set: { if !$0 { aSupprimer = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: aSupprimer
+        ) { item in
+            Button("Supprimer", role: .destructive) {
+                supprimer(item)
+                aSupprimer = nil
+            }
+            Button("Annuler", role: .cancel) { aSupprimer = nil }
+        } message: { _ in
+            Text("L'entrée part en corbeille et reste récupérable trente jours, dans Réglages → Données. Chez l'autre parent, elle disparaît et ne revient pas.")
+        }
+    }
+
+    /// Sorti du `body` : l'interpolation à l'intérieur d'un modificateur a fait
+    /// renoncer le vérificateur de types sur une vue déjà longue
+    /// (« unable to type-check this expression in reasonable time »).
+    private var titreSuppression: String {
+        "Supprimer \(aSupprimer?.libelle ?? "cette entrée") ?"
     }
 
     /// Combine logs médicament, crises, humeurs et symptômes en un feed chronologique unique.

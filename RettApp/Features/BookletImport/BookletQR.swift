@@ -1,7 +1,12 @@
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import UIKit
-import Vision
+// `@preconcurrency` : Vision est antérieur à la concurrence stricte, et ses
+// types (`VNImageRequestHandler`, `VNDetectBarcodesRequest`) ne sont pas
+// déclarés `Sendable` alors qu'ils traversent une closure `@Sendable`. C'est la
+// suppression que recommande le compilateur ; elle ne change rien à
+// l'exécution, la détection restant confinée à une seule tâche.
+@preconcurrency import Vision
 
 /// Génération + détection du QR code intégré au cahier de suivi.
 ///
@@ -62,7 +67,10 @@ enum BookletQR {
                     cont.resume(returning: nil)
                     return
                 }
-                guard let observations = request.results as? [VNBarcodeObservation] else {
+                // `results` est déjà un `[VNBarcodeObservation]?` : le
+                // conditionnel ne convertissait rien et le compilateur le
+                // signalait. Seul le dépliage de l'optionnel sert ici.
+                guard let observations = request.results else {
                     cont.resume(returning: nil); return
                 }
                 let imageWidth = CGFloat(cgImage.width)

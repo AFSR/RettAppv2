@@ -62,6 +62,14 @@ enum MemberFormat {
 ///
 /// Le contenu reçoit aussi une fonction de rechargement, pour les écrans qui
 /// modifient quelque chose puis veulent se rafraîchir.
+/// Swift 6 avertit ici que les conformances de `Value` et `Content`
+/// « peuvent être isolées ». La correction évidente — contraindre les deux à
+/// `Sendable` — casserait la compilation : `PlaceDetailView` et
+/// `MyPlaceReviewsView` passent `AnyView`, qui ne l'est pas.
+///
+/// L'avertissement est donc laissé tel quel. Le lever demande de revoir
+/// l'isolation de cette vue, ou de retirer les `AnyView` des deux appelants ;
+/// ni l'un ni l'autre n'est un détail, et aucun ne se vérifie sans compiler.
 struct MemberResourceView<Value: Decodable, Content: View>: View {
     let session: MemberSession
     let path: String
