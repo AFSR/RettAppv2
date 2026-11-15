@@ -87,7 +87,10 @@ verra donc pas localement.
 
 ## Réseau
 
-Allowlist : `afsr.fr`, `www.afsr.fr`, `verticalsoft.my.salesforce-sites.com`.
+Allowlist : `afsr.fr`, `www.afsr.fr` et l'hôte Salesforce Sites de l'association.
+Ce dernier n'est pas nommé ici, volontairement : il n'a pas à figurer dans un
+dépôt qui se lit au-delà de l'équipe. Il est dans les réglages de
+l'environnement (`get_environment`).
 Les registres de paquets (composer, npm, apt) passent sans être listés.
 
 **Le pare-feu d'afsr.fr répond 403 à tout User-Agent commençant par `curl/`**,

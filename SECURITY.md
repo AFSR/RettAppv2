@@ -1,376 +1,318 @@
 # Audit sécurité, cyber & compliance — RettApp
 
-Version : `1.0` — date : 2026-04-24 — périmètre : app iOS (SwiftUI, iOS 17+), commit courant.
+Version : `2.0` — date : 2026-11-15 — périmètre : app iOS (SwiftUI, SwiftData, CloudKit, iOS 17+).
+Révision de l'audit `1.0` du 2026-04-24, dont une grande partie décrivait une app qui n'existe plus.
+
+**Méthode et limites.** Cette version a été établie par **lecture du code**, avec des
+recherches ciblées pour chaque affirmation. L'app **n'a été ni compilée ni exécutée** :
+rien ici n'est un résultat de test. Ne sont pas couverts : le site `afsr.fr` (dépôt
+`AFSR/website`), Salesforce, et les déclarations faites dans App Store Connect. Quand une
+chose n'a pas été vérifiée, c'est écrit.
+
+Les décisions d'architecture et leurs raisons sont dans `docs/ARCHITECTURE.md` ; ce
+document en tire les conséquences pour la sécurité.
 
 ## Sommaire
 
-1. [Portée & données traitées](#1-portée--données-traitées)
-2. [Authentification & identité](#2-authentification--identité)
-3. [Stockage local](#3-stockage-local)
-4. [Réseau & API tierces](#4-réseau--api-tierces)
-5. [Protections OS mobilisées](#5-protections-os-mobilisées)
-6. [Conformité RGPD / CNIL](#6-conformité-rgpd--cnil)
-7. [Conformité App Store](#7-conformité-app-store)
-8. [Menaces & mitigations](#8-menaces--mitigations)
-9. [Findings & recommandations priorisées](#9-findings--recommandations-priorisées)
-10. [Statut "dispositif médical" (MDR EU)](#10-statut-dispositif-médical-mdr-eu)
+1. [Ce qui a changé depuis l'audit 1.0](#1-ce-qui-a-changé-depuis-laudit-10)
+2. [Portée & données traitées](#2-portée--données-traitées)
+3. [Espace adhérent : authentification](#3-espace-adhérent--authentification)
+4. [Stockage local](#4-stockage-local)
+5. [Réseau](#5-réseau)
+6. [Protections OS mobilisées](#6-protections-os-mobilisées)
+7. [Conformité RGPD / CNIL](#7-conformité-rgpd--cnil)
+8. [Conformité App Store](#8-conformité-app-store)
+9. [Menaces & mitigations](#9-menaces--mitigations)
+10. [Findings & recommandations](#10-findings--recommandations)
+11. [Statut « dispositif médical » (MDR EU)](#11-statut--dispositif-médical--mdr-eu)
 
 ---
 
-## 1. Portée & données traitées
+## 1. Ce qui a changé depuis l'audit 1.0
 
-RettApp est une application **mobile autonome**, sans backend propre. Les seules interactions réseau sortantes sont :
+| Affirmation de l'audit 1.0 | État vérifié dans le code |
+|---|---|
+| « Application autonome, sans backend » | **Faux.** L'app parle à `afsr.fr` : espace adhérent, annuaire des lieux, actualités. |
+| Connexion par Sign in with Apple, Apple User ID dans le Keychain | **Disparu.** Aucun `ASAuthorization` ni `AuthManager`. L'app n'a pas de compte pour le suivi ; l'espace adhérent a sa propre connexion (§3). |
+| Module Actualités désactivé | **Activé** : `FeatureFlags.newsEnabled = true`. |
+| « Aucun handler JS→Swift » dans la `WKWebView` | **Faux** pour les articles : deux handlers (`contentHeight`, `imageTap`). |
+| `PrivacyInfo.xcprivacy` absent | **Présent**, et copié dans la phase *Resources* du projet. |
+| HealthKit « actif mais non utilisé » | **Utilisé**, en **lecture seule** (`requestAuthorization(toShare: [], read:)`). |
+| Caméra et Face ID pour un « jeu de regard » | Le jeu n'existe plus. La caméra scanne le cahier de suivi papier (OCR) ; Face ID verrouille l'espace adhérent. |
+| Pas de synchronisation cloud | **CloudKit** : partage entre parents dans l'iCloud personnel de la famille, invitation par AirDrop seulement. |
 
-- L'authentification Sign in with Apple (Apple ID Servers)
-- Le module Actualités (Statamic REST `https://afsr.fr/api`) — **actuellement désactivé** (`FeatureFlags.newsEnabled = false`)
-- Les notifications locales (pas de push distant pour l'instant malgré `aps-environment`)
+## 2. Portée & données traitées
 
-### Catégories de données traitées
+Deux domaines qui ne se touchent pas (`docs/ARCHITECTURE.md`) :
 
-| Donnée | Sensibilité (RGPD) | Stockage | Où |
-|---|---|---|---|
-| Prénom de l'enfant | Donnée identifiante directe d'un **mineur** | SwiftData | Appareil |
-| Date de naissance enfant | Donnée identifiante de **mineur** | SwiftData | Appareil |
-| Flag "a de l'épilepsie" | **Donnée de santé** (art. 9 RGPD) | SwiftData | Appareil |
-| Liste des médicaments | **Donnée de santé** | SwiftData | Appareil |
-| Heures de prise | **Donnée de santé** | SwiftData | Appareil |
-| Historique des crises (date, durée, type, déclencheur, notes) | **Donnée de santé** | SwiftData | Appareil |
-| Apple User ID (hash opaque) | Identifiant pseudonyme | Keychain | Appareil |
+- **Le suivi médical** vit dans SwiftData sur l'iPhone et, si le partage entre parents est
+  activé, dans l'iCloud personnel de la famille. **Aucun serveur de l'AFSR ne le reçoit.**
+- **Les données de l'association** (adhésion, dons, reçus, coordonnées) sont dans
+  Salesforce, via `afsr.fr`. L'app les affiche, elle ne les conserve pas.
 
-**Aucune** de ces données n'est exfiltrée vers les serveurs de l'AFSR ou un tiers dans l'état actuel du code. Le traitement de données de santé concernant un mineur déclenche toutefois un ensemble d'obligations RGPD décrites en §6.
+### Ce qui sort de l'appareil
 
-## 2. Authentification & identité
+| Destination | Quoi | Pourquoi |
+|---|---|---|
+| iCloud personnel (CloudKit) | Le suivi, si le partage entre parents est activé | Synchronisation entre parents ; Apple est sous-traitant de la famille, pas de l'AFSR |
+| `afsr.fr` `/api/membre` | Identité d'adhérent, avis et lieux proposés, **coordonnées de l'épingle** posée sur la carte | Espace adhérent et annuaire des lieux |
+| `afsr.fr` `/api` | Lecture des actualités (rien n'est envoyé hors la requête) | Onglet Actualités |
+| `itunes.apple.com/lookup` | Identifiant de l'app | Savoir si une mise à jour existe |
+| Apple Plans (MapKit) | Requêtes de carte | Annuaire des lieux |
 
-### Sign in with Apple
+Le client de don (`DonationAPIClient`, `/api/mobile/contribution`) existe dans le projet
+mais **aucune vue ne l'appelle** : le don ouvre la page du site. Son `appToken` est une
+chaîne vide. Le réactiver fait sortir identité et adresse postale : voir
+`.claude/rules/promesses-confidentialite.md`.
 
-- **Implémentation** : `ASAuthorizationAppleIDProvider` + `SignInWithAppleButton` SwiftUI, scope demandé `.fullName` uniquement (pas `.email`).
-- **Stockage** : l'Apple User ID (identifiant opaque `001234.abc...`) est persisté en Keychain (`AuthManager`), service `fr.afsr.RettApp`, account `afsr.auth.appleUserID`.
-- **Restauration de session** : au lancement, on valide que `credentialState(forUserID:)` renvoie `.authorized` avant de considérer l'utilisateur comme connecté. Si `revoked`/`notFound`, la session Keychain est purgée.
-- **Déconnexion** : `AuthManager.signOut()` supprime l'item Keychain ; les données locales restent intactes par design (l'app est multi-session pour un même appareil familial).
+### Catégories de données
 
-### Points positifs
+| Donnée | Sensibilité (RGPD) | Où |
+|---|---|---|
+| Prénom de l'enfant, date de naissance (optionnelle) | Identifiante, **mineur** | SwiftData |
+| Épilepsie, médicaments, prises, crises, symptômes, humeur | **Santé** (art. 9) | SwiftData, iCloud de la famille si partagé |
+| Apple Santé (sommeil, hydratation, repas, activité, rythme cardiaque) | **Santé** | **Lu**, jamais écrit ; rien n'est lu par défaut |
+| Jeton d'accès de l'espace adhérent | Secret | Keychain, derrière Face ID ou code |
+| Coordonnées d'un lieu | Position précise | Relevée **une fois**, à la demande ; part avec l'avis |
 
-- ✅ Pas de mot de passe, pas de SMS, pas d'adresse email stockée par l'app
-- ✅ Apple User ID est **opaque** et spécifique à l'app (impossible à recouper avec d'autres apps)
-- ✅ Usage de Keychain (chiffré au repos par le Secure Enclave) plutôt que `UserDefaults`
+## 3. Espace adhérent : authentification
 
-### Points à renforcer
+Connexion par code à usage unique. Le jeton d'accès est dans le Keychain
+(`MemberKeychain`, service `fr.afsr.RettApp.member`).
 
-- ⚠️ L'item Keychain utilise la classe par défaut (`kSecClassGenericPassword`) sans `kSecAttrAccessible` explicite → il reste accessible même quand l'appareil est verrouillé. **Fix recommandé** : ajouter `kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
-- ⚠️ Aucun verrouillage biométrique de l'app en soi. Si plusieurs personnes utilisent l'iPhone du parent, toutes peuvent voir les données. **Fix recommandé** : proposer un verrouillage Face ID/Touch ID optionnel à l'ouverture de l'app (`LocalAuthentication.framework`).
-- ⚠️ Le flux `handle()` accepte la session sans vérifier `identityToken` ou `authorizationCode` (qui devraient être vérifiés côté serveur dans une architecture full-stack, mais sans backend on ne peut pas).
+- **Jeton d'accès** : `SecAccessControl` avec `.biometryCurrentSet` **ou** `.devicePasscode`,
+  classe `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`. Sans code de verrouillage sur
+  l'iPhone, l'enregistrement est **refusé** (`deviceNotSecured`) : le jeton n'est jamais
+  stocké sans protection. Si les visages enregistrés changent, la biométrie n'ouvre plus rien,
+  le code reste.
+- **Jeton de révocation** : hors verrou, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`,
+  pour pouvoir révoquer sans demander Face ID.
+- **Client HTTP** : session **éphémère**, sans cache disque ni cookies ; une réponse 401
+  déclenche la déconnexion.
+- **Politique d'échec** : annuler l'invite Face ID ne compte pas comme un échec ; un refus, oui.
 
-## 3. Stockage local
+**Limites.** Ce verrou ne protège **que l'espace adhérent**. Le suivi médical n'a aucun
+verrouillage propre : quiconque déverrouille l'iPhone voit les données de l'enfant. Le jeton
+qui identifie l'*application* auprès du site est extractible du binaire (c'est dit dans
+`docs/ARCHITECTURE.md`) : la protection réelle est côté serveur, **non vérifiée ici**.
+
+## 4. Stockage local
 
 ### SwiftData
 
-- Fichier SQLite créé par `ModelContainer` dans le container de l'app (`~/Library/Application Support/default.store`).
-- **Chiffrement au repos** : iOS applique automatiquement *Data Protection* classe `NSFileProtectionComplete` tant que l'appareil est verrouillé (si un code est configuré). Le fichier SQLite hérite de la classe par défaut du target. **À vérifier et forcer** via `ModelConfiguration` ou en ajoutant l'attribut `com.apple.developer.default-data-protection = NSFileProtectionComplete` dans les entitlements.
-- **Sauvegardes iCloud/iTunes** : le fichier est par défaut inclus dans les backups. Pour un parent qui partage son iCloud avec le conjoint, cela signifie que les données de santé de l'enfant peuvent se retrouver sur un autre appareil. **Recommandation** : marquer le fichier avec `URLResourceKey.isExcludedFromBackupKey = true`, ou documenter clairement le comportement dans la politique de confidentialité.
+- Le fichier est dans le container de l'app. **Aucune classe de protection n'est forcée** :
+  ni `NSFileProtection` dans le code, ni `com.apple.developer.default-data-protection`
+  dans les entitlements. C'est donc la classe par défaut d'iOS qui s'applique, soit
+  *Complete Until First User Authentication* : le fichier reste lisible après le premier
+  déverrouillage qui suit le démarrage, même écran verrouillé.
+- Le fichier **n'est pas exclu des sauvegardes** (aucun `isExcludedFromBackupKey`).
+- ⚠️ La récupération du magasin **efface le fichier** en cas d'échec d'ouverture
+  (`RettAppApp.swift`) : toute évolution de schéma est un risque pour les données des
+  familles. Voir `.claude/rules/sync-cloudkit.md`.
+
+### Autres fichiers locaux
+
+- Corbeille, écritures en attente, instantanés de sécurité : fichiers JSON dans
+  *Application Support*.
+- **Exports CSV** : `SeizureHistoryView.exportCSV` écrit dans `temporaryDirectory` et ne
+  supprime rien après le partage ; l'export complet des Réglages (`exportAllCSV`) crée un
+  dossier `rettapp-export-…` dans le même répertoire, **sans suppression visible** non plus.
+  Ces fichiers contiennent des données de santé nominatives et restent jusqu'à la purge
+  d'iOS.
+- **Documents de l'espace adhérent** : répertoire dédié `afsr-documents` dans
+  `temporaryDirectory`, avec une routine de suppression (`MemberAPIClient.swift`) ; son
+  moment d'exécution n'a pas été vérifié.
+- **UserDefaults** : bien plus qu'un chronomètre — jetons de synchronisation CloudKit,
+  sélection de types Apple Santé, version ignorée, indicateur de session. L'inventaire
+  complet n'a pas été refait ; le manifeste déclare le motif `CA92.1`.
 
 ### Keychain
 
-- Un seul item : l'Apple User ID (voir §2).
-- Service : `fr.afsr.RettApp`, account : `afsr.auth.appleUserID`.
-- **Chiffrement** : via Secure Enclave, clé dérivée du code de déverrouillage de l'appareil.
-- **Point d'amélioration** : voir §2 sur `kSecAttrAccessible`.
-
-### Fichiers temporaires (exports CSV & imports)
-
-- Exports CSV (`SeizureHistoryView.exportCSV`, `SettingsView.exportAllCSV`) et templates d'import écrivent dans `FileManager.default.temporaryDirectory`.
-- iOS purge automatiquement ce répertoire, mais **pas immédiatement** — les fichiers y restent parfois plusieurs jours.
-- ⚠️ Les fichiers CSV contiennent des **données de santé nominatives** (nom du médicament, date des crises). Si un utilisateur connecte son iPhone à un ordi non chiffré et partage le volume, ces fichiers sont accessibles.
-- **Fix recommandé** : supprimer explicitement le fichier temporaire après le partage réussi (callback `UIActivityViewController.completionWithItemsHandler`).
-
-### UserDefaults
-
-- Utilisation : clé `afsr.seizure.recordingStartedAt` pour reprendre un chronomètre de crise après crash ou kill de l'app.
-- **Pas sensible** : une simple timestamp, pas d'info médicale dedans. Pas de risque majeur.
-
-## 4. Réseau & API tierces
-
-### Posture actuelle
-
-- **Module Actualités désactivé** (feature flag). Aucun appel réseau n'est fait en dehors des services Apple.
-- **Pas d'analytics, pas de crash reporter, pas de SDK tiers.** Aucun Firebase, Sentry, Mixpanel, etc.
-- **App Transport Security** : `NSAllowsArbitraryLoads = false` dans `Info.plist` — impossible de parler à un serveur HTTP non-TLS par accident.
-
-### Quand le module News sera réactivé
-
-- Endpoint `https://afsr.fr/api/collections/actualites/entries` — TLS forcé.
-- **Token bearer** (`APIConfig.apiKey`) dans le binaire si configuré : **mauvaise pratique**. Les secrets embarqués dans une app iOS sont triviaux à extraire (class-dump, strings, jailbreak). **Recommandation** : si un token est nécessaire, ne pas le distribuer avec l'app — soit l'endpoint est public en lecture (collection publiée), soit passer par un intermédiaire (Lambda/Cloud Function) qui détient le secret. En pratique, pour des actualités publiques, aucun token ne devrait être requis.
-- **URLCache** : 50 Mo disque, 10 Mo RAM. Le cache stocke du HTML potentiellement privé ? Non, actualités publiques uniquement. OK.
-- **Contenu HTML affiché dans `WKWebView`** : risque d'**XSS** si le CMS est compromis et injecte du JS malveillant qui tenterait de lire d'autres contenus. Mitigation :
-  - `WKWebView` est sandboxé et ne peut pas accéder au système de fichiers ni aux données SwiftData
-  - Aucun handler JS→Swift n'est bridgé
-  - **Recommandation** : ajouter une Content-Security-Policy dans le HTML injecté (`<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: https:; script-src 'none';">`) pour interdire l'exécution JS dans le contenu des articles.
-
-### Sign in with Apple
-
-- Communication chiffrée, gérée par le framework système. Rien à auditer.
-
-## 5. Protections OS mobilisées
-
-- ✅ **Sandbox iOS** : l'app ne peut pas lire les données d'autres apps.
-- ✅ **Keychain** chiffré par Secure Enclave (voir §3).
-- ✅ **Data Protection** — à renforcer explicitement (§3).
-- ✅ **Permissions granulaires** : Camera (jeu regard), FaceID (jeu regard), HealthKit (entitlements actifs mais non utilisés actuellement), UserNotifications (médicaments).
-- ✅ **Sign in with Apple** : pas de gestion de mot de passe côté app.
-- ⚠️ **App Attest / DeviceCheck** : non utilisé. Pour une app sans backend et sans donnée partagée, l'apport est nul, OK de s'en passer.
-- ⚠️ **Jailbreak detection** : non implémenté. Sur un appareil jailbreaké, les protections Keychain et Data Protection peuvent être contournées. Détection simple possible (`access("/Applications/Cydia.app", F_OK)`) mais contournable ; pas prioritaire pour cette app.
-
-## 6. Conformité RGPD / CNIL
-
-### Nature des traitements
-
-- **Catégorie** : données de santé d'un **mineur** → art. 9 RGPD (catégorie particulière) + art. 8 (consentement parental requis pour < 15 ans en France).
-- **Finalité** : suivi personnel par le parent/aidant. Pas de partage, pas de recherche, pas de marketing.
-- **Base légale** : art. 9.2.h (médecine préventive, intérêt vital) OU art. 9.2.a (consentement explicite). Le plus propre ici est **art. 9.2.a consentement explicite du titulaire de l'autorité parentale**.
-
-### Exigences & statut
-
-| Exigence | Statut | Action à faire |
-|---|---|---|
-| Politique de confidentialité accessible dans l'app | ✅ Servie par le dépôt du site, en trois langues, à `afsr.fr/rettapp/confidentialite` | Renseigner RNA, SIREN et directeur de publication en production ; relecture RGPD recommandée |
-| Consentement explicite recueilli | ❌ Absent | Ajouter un écran de consentement au premier lancement, cocher explicitement "Je donne mon consentement pour le traitement des données de santé de mon enfant" |
-| Droit d'accès / portabilité | ✅ Export CSV complet dans les Réglages | OK |
-| Droit à l'effacement | ✅ "Effacer les données de l'application" dans les Réglages | OK |
-| Droit à la rectification | ✅ Édition du profil et des enregistrements | OK |
-| Minimisation | ✅ Seuls le prénom + date de naissance (optionnelle) sont demandés | OK |
-| Conservation limitée | ⚠️ Aucune politique de purge automatique | Documenter dans la CGU : "vous êtes responsable de la purge ; l'app ne supprime rien automatiquement" |
-| Registre des traitements (RGPD art. 30) | ❌ À créer côté AFSR | Tenu par le DPO |
-| Sous-traitants / DPA | ✅ Aucun (pas de backend, pas de SDK tiers) | N/A |
-| Transferts hors UE | ⚠️ Sign in with Apple : transfert vers Apple Inc. (USA) sous DPF ; iCloud backup éventuel | Mentionner dans la politique de confidentialité |
-| Notification de violation | ⚠️ Sans backend, toute fuite vient du terminal utilisateur → responsabilité de l'utilisateur, mais AFSR doit être informée si elle apprend une brèche | Procédure à définir |
-| DPIA (analyse d'impact) | ⚠️ Obligatoire dès lors qu'on traite des données de santé de mineurs à grande échelle | À faire si déploiement national |
-
-### Recommandation consentement
-
-Ajouter un **écran dédié** après le Sign in with Apple et avant le setup du profil :
-
-```
-Consentement parental
----------------------
-RettApp traite des données de santé concernant votre enfant
-(épilepsie, médicaments, crises). Ces données sont stockées
-uniquement sur cet appareil et ne sont transmises à personne.
-
-[ ] Je confirme être le titulaire de l'autorité parentale
-[ ] Je consens au traitement de ces données par l'application
-
-              [Lire la politique de confidentialité]
-
-                       [Continuer]  [Refuser]
-```
-
-Un refus doit empêcher l'usage de l'app (pas juste un warning).
-
-## 7. Conformité App Store
-
-### Exigences Apple à satisfaire avant soumission
-
-| Exigence | Statut | Action |
-|---|---|---|
-| Privacy Manifest (`PrivacyInfo.xcprivacy`) | ❌ Absent — **obligatoire depuis iOS 17** pour les apps qui utilisent des APIs à raison requise | À créer — voir ci-dessous |
-| App Tracking Transparency | ✅ N/A (aucun tracking) | — |
-| Kids Category / pour enfants | ⚠️ L'app n'est pas dans la catégorie Kids (elle cible les parents) mais traite des données d'enfants. Documenter l'audience cible dans App Store Connect | — |
-| Usage Descriptions (`NS*UsageDescription`) | ✅ Toutes présentes (Camera, Face ID, Health Share, Health Update) | OK |
-| Sign in with Apple | ✅ Entitlements et flow implémentés correctement | OK |
-| Rejet "Sensitive health data" | ⚠️ Apple demande la mise à jour régulière et une politique de confidentialité explicite | OK si §6 appliqué |
-| Age rating | ⚠️ 4+ a priori (aucun contenu sensible), mais avec catégorie Médical | À confirmer dans App Store Connect |
-
-### Privacy Manifest requis
-
-Créer `RettApp/Resources/PrivacyInfo.xcprivacy` :
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>NSPrivacyTracking</key>
-  <false/>
-  <key>NSPrivacyTrackingDomains</key>
-  <array/>
-  <key>NSPrivacyCollectedDataTypes</key>
-  <array/>
-  <key>NSPrivacyAccessedAPITypes</key>
-  <array>
-    <dict>
-      <key>NSPrivacyAccessedAPIType</key>
-      <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
-      <key>NSPrivacyAccessedAPITypeReasons</key>
-      <array><string>CA92.1</string></array>
-    </dict>
-    <dict>
-      <key>NSPrivacyAccessedAPIType</key>
-      <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
-      <key>NSPrivacyAccessedAPITypeReasons</key>
-      <array><string>C617.1</string></array>
-    </dict>
-  </array>
-</dict>
-</plist>
-```
-
-### Déclaration Data Collection (App Store Connect → Privacy)
-
-Les réponses à la question "Quelles données collectez-vous ?" :
-
-- **Contact Info > Name** : oui (prénom enfant), liée à l'utilisateur, utilisée pour App Functionality uniquement, non partagée, non trackée.
-- **Health & Fitness** : oui, liée à l'utilisateur, App Functionality, non partagée, non trackée.
-- **Identifiers > User ID** : oui (Apple User ID), App Functionality, non partagée, non trackée.
-- **Tout le reste** : non.
-
-## 8. Menaces & mitigations
-
-Modèle : **STRIDE simplifié appliqué à une app mobile sans backend**.
-
-| Menace | Vecteur | Impact | Mitigation en place | Gap |
-|---|---|---|---|---|
-| **S**poofing | Quelqu'un se connecte avec ton Apple ID | Accès aux données | Apple ID = Face ID/Touch ID | ❌ Pas de 2e verrouillage app-level |
-| **T**ampering local | Jailbreak + modification du SQLite | Falsification de l'historique | Sandbox iOS + chiffrement au repos | ⚠️ Pas de signature/checksum sur les données |
-| **R**epudiation | "Ce n'est pas moi qui ai enregistré cette crise" | Faible (usage perso) | Timestamp fiable | OK |
-| **I**nformation disclosure | Partage de l'iPhone, backup iCloud, export CSV | Divulgation de données de santé | Keychain, `tempDirectory` partiel | ⚠️ Exports CSV persistent, backup non-exclu |
-| **D**enial of Service | — | Faible (pas de backend) | — | N/A |
-| **E**levation of privilege | App bug permettant écriture hors sandbox | Aucune écriture hors app | Sandbox iOS, pas de code natif C unsafe | OK |
-
-### Scénarios concrets
-
-1. **iPhone perdu/volé, code déverrouillage simple** : Data Protection tient tant que l'appareil reste verrouillé. Une fois déverrouillé par brute-force (code à 4 chiffres = 10 000 combinaisons), les données sont en clair.
-   → Fix : sensibiliser à utiliser un code à 6 chiffres ou biométrie + ajouter un verrouillage Face ID dans l'app.
-
-2. **Partage du téléphone au sein de la famille** : autre membre voit tout.
-   → Fix : verrouillage Face ID optionnel dans Réglages.
-
-3. **Fuite via CSV exporté envoyé à un médecin** : le fichier quitte l'écosystème Apple. C'est voulu (portabilité) mais à documenter.
-
-4. **Injection XSS via CMS Statamic compromis** (news réactivé) : cf. §4, sandbox `WKWebView` limite le blast radius.
-
-5. **Reverse engineering du binaire pour extraire un token API** : aucun token sensible n'est embarqué aujourd'hui. À respecter.
-
-## 9. Findings & recommandations priorisées
-
-### 🔴 P0 — Bloquant avant publication App Store
-
-1. **Créer `PrivacyInfo.xcprivacy`** — obligatoire iOS 17, l'app sera rejetée sans. (§7)
-2. ~~**Rédiger et publier la politique de confidentialité**~~ — fait : servie par le dépôt du site à `afsr.fr/rettapp/confidentialite`, avec ses versions anglaise et portugaise. Reste à déployer le site et à renseigner RNA, SIREN et directeur de publication. (§6)
-3. **Ajouter un écran de consentement parental explicite** au premier lancement — exigence RGPD art. 8 + 9. (§6)
-
-### 🟠 P1 — Avant déploiement national
-
-4. **Forcer `NSFileProtectionComplete` via entitlements** pour garantir le chiffrement au repos du SQLite SwiftData. Ajouter dans `RettApp.entitlements` :
-   ```xml
-   <key>com.apple.developer.default-data-protection</key>
-   <string>NSFileProtectionComplete</string>
-   ```
-5. **Durcir le Keychain** : ajouter `kSecAttrAccessible: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` dans `AuthManager`.
-6. **Ajouter un verrouillage biométrique (Face ID/Touch ID) optionnel** dans les Réglages (`LocalAuthentication` framework) — *defense in depth*.
-7. **Exclure le store SwiftData des backups iCloud** (`URLResourceKey.isExcludedFromBackupKey`) OU documenter que les backups sont chiffrés si l'utilisateur active l'iCloud chiffré de bout en bout.
-8. **Supprimer les CSV temporaires après partage** via `UIActivityViewController.completionWithItemsHandler`.
-
-### 🟡 P2 — Recommandé
-
-9. **CSP dans le HTML des articles** (quand News réactivé) — `<meta http-equiv="Content-Security-Policy">` dans le wrapper HTML de `NewsDetailView`.
-10. **DPIA** (analyse d'impact RGPD) à conduire par le DPO de l'AFSR si l'app dépasse quelques centaines d'utilisateurs.
-11. **Journalisation des actions sensibles** (export, effacement) dans un log local consultable par l'utilisateur, non transmis. Utile en cas de litige / audit.
-12. **Registre des traitements RGPD art. 30** tenu par le DPO AFSR.
-13. **Ne jamais introduire de SDK tiers** (analytics, crash reporting) sans repasser cet audit. Préférer `MetricKit` (Apple, pas de sortie réseau) pour des métriques anonymisées si besoin.
-
-### 🟢 P3 — Nice-to-have
-
-14. **Détection jailbreak** basique — faible valeur ajoutée pour une app de suivi personnel, à ignorer sauf demande spécifique.
-15. **Test de pénétration externe** si le module News devient un vrai backend (authent, écriture côté serveur).
-16. **MASVS Level 1** (OWASP Mobile AppSec) : auto-évaluation, l'app coche la plupart des contrôles niveau 1 par design (pas de backend, pas de secrets, pas de SDK tiers).
-
----
-
-## Appendice A — Surface d'attaque résumée
-
-```
-┌──────────────────────────────────┐
-│  Appareil iOS (utilisateur)       │
-│                                   │
-│   ┌──────────┐    ┌──────────┐   │
-│   │  Face ID │    │ Keychain │   │
-│   │  + code  │    │  (Apple  │   │
-│   │          │    │   User   │   │
-│   └────┬─────┘    │   ID)    │   │
-│        │          └──────────┘   │
-│   ┌────▼─────────────────────┐   │
-│   │    App RettApp           │   │
-│   │  ┌────────┐  ┌────────┐ │   │
-│   │  │SwiftData│ │tempDir │ │   │
-│   │  │(santé) │  │(exports)│ │   │
-│   │  └────────┘  └────────┘ │   │
-│   └──┬──────────────┬───────┘   │
-│      │              │            │
-└──────┼──────────────┼────────────┘
-       │              │
-       ▼              ▼
-  ┌────────┐    ┌──────────┐
-  │ Apple  │    │ Partage  │
-  │ IDaaS  │    │ utilisat.│
-  └────────┘    └──────────┘
-```
-
----
-
-## Appendice B — Checklist de revue par release
-
-- [ ] Aucun SDK tiers ajouté sans audit
-- [ ] Aucun secret embarqué (grep sur `apiKey`, `token`, `password`, `secret` dans les sources)
-- [ ] Aucun log contenant des données de santé (grep sur `print(`, `os_log`)
-- [ ] Le Privacy Manifest est à jour par rapport aux APIs effectivement utilisées
-- [ ] La politique de confidentialité `afsr.fr/rettapp/confidentialite` reste publiée, accessible, et décrit toujours ce que l'app fait vraiment (ses affirmations sont vérifiables dans ce dépôt : stockage local, partage par AirDrop seulement, rien de lu par défaut dans Apple Santé)
-- [ ] Les entitlements actifs correspondent aux features réellement utilisées (pas de HealthKit actif si non utilisé)
-- [ ] ATS reste strict (`NSAllowsArbitraryLoads = false`)
-- [ ] Les tests de schéma SwiftData ne cassent pas la migration pour les données existantes d'utilisateurs
-
----
-
-*Audit à refaire à chaque ajout de dépendance tierce, activation du module News, ou ajout d'une synchronisation cloud.*
-
----
-
-## 10. Statut "dispositif médical" (MDR EU)
-
-### Position retenue : **non-dispositif médical**
-
-RettApp **n'est pas un dispositif médical** au sens du Règlement européen 2017/745 (MDR), du UK Medical Device Regulations, ni des règles FDA. Aucune certification CE médicale, marquage UKCA, ou clearance FDA n'est requise dans le périmètre actuel.
-
-### Justification
-
-D'après le **MDCG 2019-11** (guide officiel européen de classification des logiciels santé) et l'art. 2 du MDR, un logiciel est qualifié de dispositif médical s'il est destiné au "diagnostic, traitement, prédiction, pronostic, atténuation" d'une maladie. Pour chaque fonctionnalité actuelle de RettApp :
-
-| Fonctionnalité | Qualification |
+Deux éléments, tous deux de l'espace adhérent (§3). L'item « Apple User ID » de l'audit 1.0
+n'existe plus.
+
+## 5. Réseau
+
+- **ATS strict** : `NSAllowsArbitraryLoads = false`.
+- **Aucun SDK tiers** : le projet ne contient aucune référence à un paquet Swift. Pas
+  d'analytics, pas de rapporteur d'incidents.
+- **Hôtes contactés** : `afsr.fr`, `itunes.apple.com`, Apple (CloudKit, Plans). Les images
+  des actualités sont chargées depuis l'URL que le contenu donne.
+- **Cache des actualités** : 50 Mo disque, 10 Mo mémoire. Contenu public uniquement. Le
+  client de l'espace adhérent n'a, lui, **aucun cache**.
+
+### `WKWebView` (actualités et espace adhérent)
+
+Les articles sont rendus en HTML dans une `WKWebView`, base `https://afsr.fr`.
+
+- JavaScript actif, avec **deux handlers** vers Swift (hauteur du contenu, toucher d'image)
+  et un script injecté. Ils ne transmettent qu'un nombre et une URL d'image, mais l'audit 1.0
+  se trompait en disant qu'il n'y en avait aucun.
+- **Aucune Content-Security-Policy** dans le HTML encapsulé (recherche vide). Un CMS compromis
+  pourrait injecter du script dans un article. Le bac à sable de la `WKWebView` limite les
+  dégâts (pas d'accès à SwiftData ni au Keychain), mais pas ce que fait le script dans la
+  page.
+- Le délégué de navigation n'a pas été relu pour cet audit.
+
+## 6. Protections OS mobilisées
+
+- ✅ Bac à sable iOS ; Keychain avec contrôle d'accès (§3) ; Face ID n'expose qu'un booléen.
+- ✅ Permissions à usage précis (`Info.plist`) : Apple Santé (lecture), Face ID, caméra
+  (scan du cahier), position **à l'usage**, une seule fois.
+- ⚠️ Data Protection non renforcée (§4).
+- ⚠️ `aps-environment` vaut `development` dans le fichier d'entitlements versionné, avec le
+  mode d'arrière-plan `remote-notification` déclaré. Xcode le remplace à l'archivage de
+  distribution : **à confirmer sur une archive réelle**, c'est une cause classique de
+  régression silencieuse.
+- App Attest / DeviceCheck, détection de jailbreak : non utilisés. Pour une app sans compte
+  côté AFSR, l'apport est faible.
+
+## 7. Conformité RGPD / CNIL
+
+L'AFSR **ne détient pas** les données de suivi. Cela change son rôle, et la qualification
+exacte (responsable de traitement, sous-traitant, ou aucun des deux pour ces données) est
+**une question juridique que ce document ne tranche pas**.
+
+| Exigence | Statut |
 |---|---|
-| Journal des crises (date, durée, type, notes) | Patient diary / logbook → **non-MD** |
-| Plan médicamenteux + rappels horaires | Aide à l'observance, dose saisie par l'utilisateur → **non-MD** |
-| Export CSV vers le neurologue | Outil de communication patient/médecin → **non-MD** |
-| Jeu eye-tracking « tarte à la crème » | Loisir / éveil, pas de revendication thérapeutique → **non-MD** |
+| Politique de confidentialité | Servie par le site, en trois langues, à `afsr.fr/rettapp/confidentialite`. Chaque affirmation vérifiable est suivie dans `.claude/rules/promesses-confidentialite.md` |
+| Droit d'accès / portabilité | Export CSV complet dans les Réglages |
+| Droit à l'effacement | « Effacer les données de l'application » dans les Réglages ; corbeille ; pierres tombales pour le partage |
+| Minimisation | Prénom et date de naissance optionnelle seulement |
+| Consentement parental explicite | **Absent** : aucun écran dédié (recherche vide). Il y a un avertissement médical à cocher à la création du profil. À trancher avec le DPO |
+| Registre art. 30, DPIA | Côté AFSR, non vérifiables ici |
+| Transferts hors UE | iCloud et Apple Plans : Apple Inc. À mentionner dans la politique |
+| Procédure de violation | À définir |
+| Conservation | Aucune purge automatique |
 
-### Lignes rouges à ne pas franchir
+Les données de l'espace adhérent (identité, adresse, téléphone) sont, elles, bien dans le
+périmètre de l'AFSR : elles sont déclarées au manifeste (§8) et relèvent de Salesforce.
 
-L'app basculerait en **dispositif médical classe IIa minimum** (et donc obligation CE) si elle implémentait :
+## 8. Conformité App Store
 
-- Recommandation automatique de dose
-- Détection automatique de crise (caméra, accéléromètre, IA)
-- Alertes prédictives (pré-crise)
-- Analyse statistique avec interprétation clinique ("votre épilepsie s'aggrave")
-- Tout texte marketing du type "diagnostique l'épilepsie", "réduit les crises", "améliore le traitement"
+| Exigence | Statut |
+|---|---|
+| Privacy Manifest | ✅ Présent ; dans la phase *Resources* du projet |
+| Suivi (ATT) | ✅ Aucun (`NSPrivacyTracking = false`) |
+| API à motif requis | ✅ `UserDefaults` (`CA92.1`), horodatage de fichiers (`C617.1`) |
+| Clés d'usage `Info.plist` | ✅ Santé ×2, Face ID, position, caméra, toutes précises |
+| **Types collectés déclarés** | ⚠️ **5** : nom, courriel, adresse postale, téléphone, identifiant utilisateur. **La position précise n'y est pas** |
 
-### Mesures concrètes en place
+### ⚠️ Anomalie : la position précise n'est pas déclarée
 
-1. **Onboarding** : avertissement médical encadré + case "J'ai lu et compris" obligatoire avant de pouvoir continuer (`ProfileSetupView.disclaimerCard`).
-2. **Réglages** : section "Avertissement médical" toujours visible, mention de l'urgence (15/112).
-3. **App Store Connect** : déclaratif "Regulated medical device" → réponse `No`, justifiée par l'absence de certification CE/FDA/UKCA.
-4. **Politique de confidentialité** (à publier) : doit reprendre la mention "RettApp n'est pas un dispositif médical au sens du règlement UE 2017/745. Elle ne remplace pas le suivi par un professionnel de santé."
+`PlaceModels.swift` envoie `latitude` et `longitude` dans le `Payload` de l'avis, et
+`PlacePinPickerView` les relève avec `OneShotLocator`. Or `PrivacyInfo.xcprivacy` ne contient
+aucun type de position, alors que `.claude/rules/promesses-confidentialite.md` dit qu'elle y
+est déclarée. Sur ce point, **le manifeste est plus faible que la règle et que le code**.
+
+À faire ensemble, comme la règle l'exige : ajouter le type de position précise au manifeste
+(lié à l'identité, sans pistage, pour le fonctionnement de l'app), vérifier la déclaration
+de confidentialité d'App Store Connect, et relire la politique publiée sur le site. Je n'ai
+pas modifié le manifeste : c'est une déclaration faite à Apple.
+
+## 9. Menaces & mitigations
+
+Modèle STRIDE simplifié.
+
+| Menace | Vecteur | Mitigation en place | Écart |
+|---|---|---|---|
+| **S**poofing | Quelqu'un utilise l'iPhone déverrouillé | Face ID ou code pour l'espace adhérent | ❌ Aucun verrou sur le suivi médical |
+| **T**ampering | Jailbreak + modification du SQLite | Bac à sable iOS | ⚠️ Pas de somme de contrôle |
+| **R**epudiation | — | Horodatage | Faible enjeu |
+| **I**nformation disclosure | iPhone partagé, sauvegarde, CSV exporté, article piégé | Keychain verrouillé, session éphémère | ⚠️ CSV persistants, sauvegarde non exclue, pas de CSP |
+| **D**enial of service | Magasin SwiftData qui ne s'ouvre plus | — | ⚠️ La récupération **efface** les données |
+| **E**levation | — | Bac à sable | OK |
+
+Scénarios : iPhone volé avec code court (la classe de protection par défaut ne tient plus
+après le premier déverrouillage) ; téléphone partagé en famille ; CSV envoyé hors de
+l'écosystème Apple (voulu, à documenter) ; article de CMS compromis ; extraction du jeton
+d'application du binaire (protégé côté serveur, non vérifié ici).
+
+## 10. Findings & recommandations
+
+L'app est publiée (1.9) : les priorités ci-dessous ne sont plus « avant publication ».
+
+### 🔴 P0 — À traiter avant le prochain envoi
+
+1. **Déclarer la position précise** dans `PrivacyInfo.xcprivacy`, App Store Connect et la
+   politique de confidentialité (§8). Les trois ensemble.
+2. **Déployer le type `Tombstone` en production CloudKit** (`.claude/rules/sync-cloudkit.md`) :
+   sans cela, le partage entre parents casse chez les vraies familles, et nulle part ailleurs.
+   Non déployé au 11 novembre 2026 selon `CLAUDE.md` ; l'état de la console n'a pas été
+   revérifié.
+3. **Compiler.** Au 11 novembre 2026 (`CLAUDE.md`), tout `Features/Places`, la corbeille et
+   les pierres tombales n'avaient jamais été compilés.
+
+### 🟠 P1
+
+4. **Verrouillage biométrique optionnel du suivi médical**, aujourd'hui limité à l'espace adhérent.
+5. **Forcer la classe de protection** du magasin (`NSFileProtectionComplete`) ou documenter
+   pourquoi la classe par défaut suffit. Même question pour l'exclusion des sauvegardes.
+6. **Supprimer les CSV temporaires après le partage** (`completionWithItemsHandler`).
+7. **Content-Security-Policy** dans le HTML des articles et de l'espace adhérent :
+   `script-src 'none'` suffit aux articles, **à condition** de remplacer le script injecté
+   (hauteur, image, courriels) par autre chose, puisqu'il serait lui aussi bloqué.
+8. **Consentement parental** : décider avec le DPO s'il faut un écran dédié.
+9. **Confirmer `aps-environment`** sur une archive de distribution (§6).
+
+### 🟡 P2
+
+10. DPIA et registre art. 30 côté AFSR. Procédure de violation.
+11. Ne jamais introduire de SDK tiers sans repasser cet audit.
+12. Retirer `DonationAPIClient`, ou le garder en sachant qu'il est mort : tant qu'il est
+    dans la cible, il compte dans la surface à auditer.
+
+## 11. Statut « dispositif médical » (MDR EU)
+
+**Position retenue : non-dispositif médical** — une aide de suivi et de communication avec
+les soignants, sans revendication de diagnostic ni de traitement. Cette position date de
+l'audit 1.0 et **doit être revue**, parce que l'app a changé.
+
+### Ce qui a changé
+
+Depuis l'audit 1.0, l'app **calcule des corrélations** sur les données de suivi
+(`MedicalReportAnalysis`, pour le rapport au médecin) et **les traduit en phrases pour le
+parent** (`SeizureInsights`, dans le Bilan : « tendance … observée sur N jours, une tendance
+n'est pas une cause »). Le seuil de 14 jours et les nuances obligatoires montrent une
+prudence réelle.
+
+Or l'audit 1.0 plaçait parmi les lignes rouges « analyse statistique avec interprétation
+clinique ». Que ces phrases la franchissent ou non est **une question de qualification
+réglementaire que je ne peux pas trancher** ; le texte, le ton et le public (parent ou
+soignant) comptent autant que le calcul.
+
+### Lignes rouges
+
+L'app basculerait en dispositif médical si elle recommandait une dose, détectait ou prédisait
+une crise, ou affirmait diagnostiquer, réduire les crises ou améliorer le traitement.
+
+### Mesures en place
+
+1. Avertissement médical à cocher à la création du profil (`ProfileSetupView`), avec la
+   mention « n'est pas un dispositif médical » et l'urgence (15/112).
+2. Même mention sur l'écran de verrou de l'espace adhérent (`MemberLockView`).
+3. App Store Connect : la réponse « Regulated medical device » devrait être `No` ;
+   **non vérifié ici**, à contrôler dans la console.
 
 ### Recommandation
 
-Avant déploiement national à grande échelle, faire valider cette analyse par un avocat spécialisé en santé numérique (ou consulter directement l'**ANSM**). Coût estimé : 1-2 h de conseil.
+Faire valider par un juriste en santé numérique (ou consulter l'ANSM), **en lui montrant le
+Bilan tel qu'il s'affiche**, pas seulement la liste des fonctions. Référence Apple :
+https://developer.apple.com/help/app-store-connect/manage-app-information/declare-regulated-medical-device-status
 
-### Référence App Store Connect
+---
 
-Pour le déclaratif Apple : https://developer.apple.com/help/app-store-connect/manage-app-information/declare-regulated-medical-device-status — sélectionner **No** par pays/région.
+## Appendice — Checklist de revue par release
+
+- [ ] Aucun SDK tiers ajouté sans audit
+- [ ] Aucun secret embarqué (`apiKey`, `token`, `password`, `secret`)
+- [ ] Aucun journal contenant des données de santé (`print(`, `os_log`)
+- [ ] Le Privacy Manifest correspond aux données qui sortent **réellement** (§8)
+- [ ] La politique `afsr.fr/rettapp/confidentialite` décrit ce que l'app fait vraiment
+- [ ] Les entitlements actifs correspondent aux fonctions utilisées ; `aps-environment` vérifié sur l'archive
+- [ ] ATS reste strict
+- [ ] Tout nouveau type CloudKit est déployé en production avant l'envoi
+- [ ] Les évolutions de schéma SwiftData ne déclenchent pas la récupération qui efface le magasin
+
+*Audit à refaire à chaque ajout de dépendance, de permission, de donnée qui sort de
+l'appareil, ou de calcul présenté au parent.*
