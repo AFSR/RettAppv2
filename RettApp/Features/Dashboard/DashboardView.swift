@@ -17,8 +17,9 @@ struct DashboardView: View {
     /// → on initialise avec les plus fréquents au premier render.
     @State private var selectedSymptoms: Set<RettSymptom>?
     @State private var showSymptomPicker = false
-    /// Les graphiques autres que la fréquence sont repliés par défaut.
-    @State private var showAllCharts = false
+    /// Ordre et choix des graphiques, propres à cet appareil.
+    private let layout = BilanLayoutStore.shared
+    @State private var showLayoutEditor = false
     /// Mode d'affichage des graphiques de symptômes : fréquence ou intensité moyenne.
     @State private var symptomChartMode: SymptomChartMode = .frequency
 
@@ -106,29 +107,21 @@ struct DashboardView: View {
 
                 insightsSection
 
-                frequencyChart
-
                 // Décision 3 : le Bilan est pour le parent, réduit à
-                // l'essentiel. Les autres graphiques ne disparaissent pas —
-                // ils servent à préparer une consultation — mais ils ne sont
-                // plus la première chose qu'on voit.
-                DisclosureGroup(isExpanded: $showAllCharts) {
-                    VStack(spacing: 16) {
-                        intensityChart
-                        moodChart
-                        adherenceChart
-                        symptomsSection
-                    }
-                    .padding(.top, 8)
-                } label: {
-                    Label(
-                        showAllCharts ? "Masquer les autres graphiques" : "Voir les autres graphiques",
-                        systemImage: "chart.bar.doc.horizontal"
-                    )
-                    .font(AFSRFont.body(15))
-                    .foregroundStyle(.afsrPurpleAdaptive)
+                // l'essentiel. Par défaut seule la fréquence est affichée ;
+                // les autres graphiques servent à préparer une consultation
+                // et se choisissent, dans l'ordre voulu, ici.
+                ForEach(layout.visibleCharts) { chart in
+                    chartView(for: chart)
                 }
-                .tint(.afsrPurpleAdaptive)
+
+                Button {
+                    showLayoutEditor = true
+                } label: {
+                    Label("Personnaliser le Bilan", systemImage: "slider.horizontal.3")
+                        .font(AFSRFont.body(15))
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                }
                 .padding(.vertical, 4)
 
                 Spacer(minLength: 24)
@@ -138,8 +131,20 @@ struct DashboardView: View {
         .background(Color.afsrBackground.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showLayoutEditor) { BilanLayoutEditor(store: layout) }
         .onChange(of: viewModel.scale) { _, _ in crosshairDate = nil }
         .onChange(of: viewModel.referenceDate) { _, _ in crosshairDate = nil }
+    }
+
+    @ViewBuilder
+    private func chartView(for chart: BilanChart) -> some View {
+        switch chart {
+        case .frequency: frequencyChart
+        case .intensity: intensityChart
+        case .mood:      moodChart
+        case .adherence: adherenceChart
+        case .symptoms:  symptomsSection
+        }
     }
 
     private var title: String {
