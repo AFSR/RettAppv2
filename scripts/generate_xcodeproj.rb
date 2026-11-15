@@ -1,6 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 #
+# Copyright © 2026 Association Française du Syndrome de Rett (AFSR)
+# Licence Apache 2.0 — voir le fichier LICENSE à la racine du dépôt.
+#
 # Génère RettApp.xcodeproj à partir de la structure de fichiers.
 # Équivalent à `xcodegen generate` mais fonctionne sans macOS (utilise la gem xcodeproj).
 #

@@ -1,3 +1,6 @@
+// Copyright © 2026 Association Française du Syndrome de Rett (AFSR)
+// Licence Apache 2.0 — voir le fichier LICENSE à la racine du dépôt.
+
 import Foundation
 
 /// Schéma compact d'un cahier de suivi imprimé. Encodé en JSON dans un QR

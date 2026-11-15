@@ -1,6 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 #
+# Copyright © 2026 Association Française du Syndrome de Rett (AFSR)
+# Licence Apache 2.0 — voir le fichier LICENSE à la racine du dépôt.
+#
 # Convertit la Base de Données Publique des Médicaments (BDPM,
 # https://base-donnees-publique.medicaments.gouv.fr) en SQLite optimisée pour
 # l'autocomplétion dans RettApp.
