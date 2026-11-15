@@ -238,6 +238,7 @@ extension MedicationLog {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r["authorName"] = authorName as CKRecordValue
         r.writeLastModified(lastModifiedAt)
         return r
     }
@@ -282,6 +283,9 @@ extension MedicationLog {
         guard shouldApplyIncoming(local: existing, record: record) else { return }
 
         let lastModified = record.incomingLastModified ?? Date()
+        // Vide pour un enregistrement écrit par une version antérieure :
+        // l'app n'affiche alors aucun auteur plutôt que d'en inventer un.
+        let auteur = record["authorName"] as? String ?? ""
         if let existing {
             existing.medicationId = medicationId
             existing.medicationName = medicationName
@@ -293,6 +297,7 @@ extension MedicationLog {
             existing.isAdHoc = isAdHoc
             existing.adhocReason = adhocReason
             existing.childProfileId = childProfileId
+            existing.authorName = auteur
             existing.lastModifiedAt = lastModified
         } else {
             let new = MedicationLog(
@@ -302,6 +307,7 @@ extension MedicationLog {
                 childProfileId: childProfileId,
                 isAdHoc: isAdHoc, adhocReason: adhocReason
             )
+            new.authorName = auteur
             new.lastModifiedAt = lastModified
             context.insert(new)
         }
@@ -324,6 +330,7 @@ extension SeizureEvent {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r["authorName"] = authorName as CKRecordValue
         r.writeLastModified(lastModifiedAt)
         return r
     }
@@ -347,6 +354,9 @@ extension SeizureEvent {
         let trigger = SeizureTrigger(rawValue: triggerRaw) ?? .none
 
         let lastModified = record.incomingLastModified ?? Date()
+        // Vide pour un enregistrement écrit par une version antérieure :
+        // l'app n'affiche alors aucun auteur plutôt que d'en inventer un.
+        let auteur = record["authorName"] as? String ?? ""
         if let existing {
             existing.startTime = startTime
             existing.endTime = endTime
@@ -356,6 +366,7 @@ extension SeizureEvent {
             existing.triggerNotes = triggerNotes
             existing.notes = notes
             existing.childProfileId = childProfileId
+            existing.authorName = auteur
             existing.lastModifiedAt = lastModified
         } else {
             let new = SeizureEvent(
@@ -364,6 +375,7 @@ extension SeizureEvent {
                 triggerNotes: triggerNotes, notes: notes,
                 childProfileId: childProfileId
             )
+            new.authorName = auteur
             new.lastModifiedAt = lastModified
             context.insert(new)
         }
@@ -382,6 +394,7 @@ extension MoodEntry {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r["authorName"] = authorName as CKRecordValue
         r.writeLastModified(lastModifiedAt)
         return r
     }
@@ -401,17 +414,22 @@ extension MoodEntry {
         let level = MoodLevel(rawValue: levelRaw) ?? .neutral
 
         let lastModified = record.incomingLastModified ?? Date()
+        // Vide pour un enregistrement écrit par une version antérieure :
+        // l'app n'affiche alors aucun auteur plutôt que d'en inventer un.
+        let auteur = record["authorName"] as? String ?? ""
         if let existing {
             existing.timestamp = timestamp
             existing.level = level
             existing.notes = notes
             existing.childProfileId = childProfileId
+            existing.authorName = auteur
             existing.lastModifiedAt = lastModified
         } else {
             let new = MoodEntry(
                 id: id, timestamp: timestamp, level: level,
                 notes: notes, childProfileId: childProfileId
             )
+            new.authorName = auteur
             new.lastModifiedAt = lastModified
             context.insert(new)
         }
@@ -519,6 +537,7 @@ extension SymptomEvent {
         if let childProfileId {
             r["childProfileId"] = childProfileId.uuidString as CKRecordValue
         }
+        r["authorName"] = authorName as CKRecordValue
         r.writeLastModified(lastModifiedAt)
         return r
     }
@@ -539,6 +558,9 @@ extension SymptomEvent {
         let childProfileId = (record["childProfileId"] as? String).flatMap { UUID(uuidString: $0) }
         let symptomType = RettSymptom(rawValue: symptomTypeRaw) ?? .other
         let lastModified = record.incomingLastModified ?? Date()
+        // Vide pour un enregistrement écrit par une version antérieure :
+        // l'app n'affiche alors aucun auteur plutôt que d'en inventer un.
+        let auteur = record["authorName"] as? String ?? ""
 
         if let existing {
             existing.timestamp = timestamp
@@ -547,6 +569,7 @@ extension SymptomEvent {
             existing.durationMinutes = durationMinutes
             existing.notes = notes
             existing.childProfileId = childProfileId
+            existing.authorName = auteur
             existing.lastModifiedAt = lastModified
         } else {
             let new = SymptomEvent(
@@ -554,6 +577,7 @@ extension SymptomEvent {
                 intensity: intensity, durationMinutes: durationMinutes,
                 notes: notes, childProfileId: childProfileId
             )
+            new.authorName = auteur
             new.lastModifiedAt = lastModified
             context.insert(new)
         }

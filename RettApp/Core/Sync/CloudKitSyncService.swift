@@ -128,11 +128,8 @@ final class CloudKitSyncService {
     ///
     /// Il ne quitte l'appareil qu'avec le partage lui-même, c'est-à-dire vers
     /// l'iCloud personnel de la famille — jamais vers un serveur de l'AFSR.
-    var ownerFirstName: String = UserDefaults.standard
-        .string(forKey: CloudKitSyncService.ownerFirstNameKey) ?? "" {
-        didSet {
-            UserDefaults.standard.set(ownerFirstName, forKey: Self.ownerFirstNameKey)
-        }
+    var ownerFirstName: String = ParentIdentity.current {
+        didSet { ParentIdentity.current = ownerFirstName }
     }
 
     /// Le prénom nettoyé, ou `nil` s'il n'y en a pas.
@@ -1535,7 +1532,6 @@ final class CloudKitSyncService {
     /// la lisent le sont, puisqu'ils tournent hors du MainActor.
     private nonisolated static let resurrectedKey = "afsr.medlog.resurrectedOnce.v1"
 
-    private nonisolated static let ownerFirstNameKey = "afsr.sharing.ownerFirstName"
 
     /// IDs de prises cochées dont on a déjà refusé UNE suppression distante.
     /// Persistée pour survivre au relaunch — sinon chaque redémarrage

@@ -88,7 +88,7 @@ enum CombinedBackupService {
                     takenTime: l.takenTime, taken: l.taken, dose: l.dose,
                     doseUnitRaw: l.doseUnitRaw, childProfileId: l.childProfileId,
                     isAdHoc: l.isAdHoc, adhocReason: l.adhocReason,
-                    lastModifiedAt: l.lastModifiedAt
+                    lastModifiedAt: l.lastModifiedAt, authorName: l.authorName
                 )
             },
             seizures: seizures.map { s in
@@ -97,14 +97,14 @@ enum CombinedBackupService {
                     seizureTypeRaw: s.seizureTypeRaw, triggerRaw: s.triggerRaw,
                     triggerNotes: s.triggerNotes, notes: s.notes,
                     childProfileId: s.childProfileId,
-                    lastModifiedAt: s.lastModifiedAt
+                    lastModifiedAt: s.lastModifiedAt, authorName: s.authorName
                 )
             },
             moods: moods.map { m in
                 CombinedBackup.MoodBackup(
                     id: m.id, timestamp: m.timestamp, levelRaw: m.levelRaw,
                     notes: m.notes, childProfileId: m.childProfileId,
-                    lastModifiedAt: m.lastModifiedAt
+                    lastModifiedAt: m.lastModifiedAt, authorName: m.authorName
                 )
             },
             observations: observations.map { o in
@@ -128,7 +128,7 @@ enum CombinedBackupService {
                     id: s.id, timestamp: s.timestamp, symptomTypeRaw: s.symptomTypeRaw,
                     intensityRaw: s.intensityRaw, durationMinutes: s.durationMinutes,
                     notes: s.notes, childProfileId: s.childProfileId,
-                    lastModifiedAt: s.lastModifiedAt
+                    lastModifiedAt: s.lastModifiedAt, authorName: s.authorName
                 )
             },
             revisions: revisions.map { r in
@@ -421,6 +421,7 @@ enum CombinedBackupService {
             existing.childProfileId = l.childProfileId
             existing.isAdHoc = l.isAdHoc
             existing.adhocReason = l.adhocReason
+            existing.authorName = l.authorName ?? existing.authorName
             existing.lastModifiedAt = l.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = MedicationLog(
@@ -429,6 +430,7 @@ enum CombinedBackupService {
                 dose: l.dose, doseUnit: unit, childProfileId: l.childProfileId,
                 isAdHoc: l.isAdHoc, adhocReason: l.adhocReason
             )
+            if let auteur = l.authorName { new.authorName = auteur }
             if let ts = l.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
@@ -450,6 +452,7 @@ enum CombinedBackupService {
             existing.triggerNotes = s.triggerNotes
             existing.notes = s.notes
             existing.childProfileId = s.childProfileId
+            existing.authorName = s.authorName ?? existing.authorName
             existing.lastModifiedAt = s.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = SeizureEvent(
@@ -458,6 +461,7 @@ enum CombinedBackupService {
                 triggerNotes: s.triggerNotes, notes: s.notes,
                 childProfileId: s.childProfileId
             )
+            if let auteur = s.authorName { new.authorName = auteur }
             if let ts = s.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
@@ -474,12 +478,14 @@ enum CombinedBackupService {
             existing.level = level
             existing.notes = m.notes
             existing.childProfileId = m.childProfileId
+            existing.authorName = m.authorName ?? existing.authorName
             existing.lastModifiedAt = m.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = MoodEntry(
                 id: m.id, timestamp: m.timestamp, level: level,
                 notes: m.notes, childProfileId: m.childProfileId
             )
+            if let auteur = m.authorName { new.authorName = auteur }
             if let ts = m.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }
@@ -531,6 +537,7 @@ enum CombinedBackupService {
             existing.durationMinutes = s.durationMinutes
             existing.notes = s.notes
             existing.childProfileId = s.childProfileId
+            existing.authorName = s.authorName ?? existing.authorName
             existing.lastModifiedAt = s.lastModifiedAt ?? existing.lastModifiedAt
         } else {
             let new = SymptomEvent(
@@ -538,6 +545,7 @@ enum CombinedBackupService {
                 intensity: s.intensityRaw, durationMinutes: s.durationMinutes,
                 notes: s.notes, childProfileId: s.childProfileId
             )
+            if let auteur = s.authorName { new.authorName = auteur }
             if let ts = s.lastModifiedAt { new.lastModifiedAt = ts }
             context.insert(new)
         }

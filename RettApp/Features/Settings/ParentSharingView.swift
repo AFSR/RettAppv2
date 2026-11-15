@@ -294,24 +294,18 @@ struct ParentSharingView: View {
                     }
                 }
                 .disabled(isPreparingShare)
-                Button {
-                    prenomSaisi = sync.ownerFirstName
-                    inviterApres = false
-                    demandePrenom = true
-                } label: {
-                    Label(
-                        sync.ownerFirstName.isEmpty
-                            ? "Dire comment l'autre parent vous voit"
-                            : "L'autre parent vous voit comme « \(sync.ownerFirstName) »",
-                        systemImage: "person.text.rectangle"
-                    )
-                }
+                boutonPrenom
                 Button(role: .destructive) {
                     presentStopConfirm = true
                 } label: {
                     Label("Arrêter le partage", systemImage: "xmark.circle")
                 }
             case .participant:
+                // Le prénom valait jusqu'ici au propriétaire seul. Il concerne
+                // les deux : c'est lui qui signe chaque entrée du journal, et
+                // sans lui celles de l'invité arrivaient anonymes chez l'autre
+                // parent.
+                boutonPrenom
                 Button(role: .destructive) {
                     presentStopConfirm = true
                 } label: {
@@ -450,6 +444,23 @@ struct ParentSharingView: View {
     /// l'invitation doit se faire en présentiel pour garantir l'intégrité du
     /// destinataire (Messages/Mail seraient acceptables techniquement mais
     /// ouvriraient une porte d'attaque sociale qu'on préfère fermer côté UX).
+    /// Le prénom sous lequel l'autre parent vous voit, et qui signe vos
+    /// entrées dans le journal partagé. Proposé aux deux rôles.
+    private var boutonPrenom: some View {
+        Button {
+            prenomSaisi = sync.ownerFirstName
+            inviterApres = false
+            demandePrenom = true
+        } label: {
+            Label(
+                sync.ownerFirstName.isEmpty
+                    ? "Dire comment l'autre parent vous voit"
+                    : "L'autre parent vous voit comme « \(sync.ownerFirstName) »",
+                systemImage: "person.text.rectangle"
+            )
+        }
+    }
+
     /// Demande le prénom s'il manque, puis invite. Sans lui, l'autre parent
     /// verrait « Vous avez accepté l'invitation d'un autre parent » et
     /// « L'autre parent a ajouté 2 crises » — exact, et parfaitement inutile

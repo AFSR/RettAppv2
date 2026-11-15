@@ -40,7 +40,7 @@ extension TrashStore {
                 seizureTypeRaw: s.seizureTypeRaw, triggerRaw: s.triggerRaw,
                 triggerNotes: s.triggerNotes, notes: s.notes,
                 childProfileId: s.childProfileId,
-                lastModifiedAt: s.lastModifiedAt
+                lastModifiedAt: s.lastModifiedAt, authorName: s.authorName
             )
         ]
 
@@ -98,7 +98,7 @@ extension TrashStore {
                 taken: l.taken, dose: l.dose, doseUnitRaw: l.doseUnitRaw,
                 childProfileId: l.childProfileId,
                 isAdHoc: l.isAdHoc, adhocReason: l.adhocReason,
-                lastModifiedAt: l.lastModifiedAt
+                lastModifiedAt: l.lastModifiedAt, authorName: l.authorName
             )
         ]
 
@@ -119,7 +119,7 @@ extension TrashStore {
             CombinedBackup.MoodBackup(
                 id: m.id, timestamp: m.timestamp, levelRaw: m.levelRaw,
                 notes: m.notes, childProfileId: m.childProfileId,
-                lastModifiedAt: m.lastModifiedAt
+                lastModifiedAt: m.lastModifiedAt, authorName: m.authorName
             )
         ]
 
@@ -142,7 +142,7 @@ extension TrashStore {
                 symptomTypeRaw: s.symptomTypeRaw, intensityRaw: s.intensityRaw,
                 durationMinutes: s.durationMinutes, notes: s.notes,
                 childProfileId: s.childProfileId,
-                lastModifiedAt: s.lastModifiedAt
+                lastModifiedAt: s.lastModifiedAt, authorName: s.authorName
             )
         ]
 
