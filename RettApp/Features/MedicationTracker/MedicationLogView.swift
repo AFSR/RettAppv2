@@ -389,7 +389,29 @@ struct MedicationPlanView: View {
     private func save(_ r: MedicationEditor.SaveResult, editing: Medication?) async {
         let hours = r.intakes.map { HourMinute(hour: $0.hour, minute: $0.minute) }
         let target: Medication
-        if let editing {
+        let now = Date()
+        if let editing, r.replacesExisting {
+            // Changement de traitement : l'ancien plan est arrêté tel qu'il
+            // était (ses champs ne sont pas touchés), le nouveau commence à
+            // la même seconde. Les deux révisions portent la même date, donc
+            // l'historique ne montre ni trou ni chevauchement.
+            editing.isActive = false
+            MedicationRevision.capture(of: editing, at: now, in: modelContext)
+            let med = Medication(
+                name: r.name,
+                doseAmount: r.defaultDose,
+                doseUnit: r.unit,
+                scheduledHours: hours,
+                kind: r.kind,
+                isActive: true,
+                notifyEnabled: r.notifyEnabled,
+                createdAt: now,
+                intakes: r.intakes
+            )
+            med.childProfile = editing.childProfile ?? profile
+            modelContext.insert(med)
+            target = med
+        } else if let editing {
             editing.name = r.name
             editing.doseAmount = r.defaultDose
             editing.doseUnit = r.unit
@@ -418,7 +440,7 @@ struct MedicationPlanView: View {
         // Versioning : on capture l'état post-modification dans une révision
         // horodatée. Cette révision sert ensuite à reconstituer le plan tel
         // qu'il était à une date donnée (cf. MedicationRevision.latest).
-        MedicationRevision.capture(of: target, in: modelContext)
+        MedicationRevision.capture(of: target, at: now, in: modelContext)
 
         // Re-génère les logs du jour pour le médicament modifié : les logs
         // déjà pris sont préservés (l'historique reste fidèle), mais les
@@ -488,6 +510,7 @@ struct MedicationEditor: View {
     @State private var active: Bool = true
     @State private var notifyEnabled: Bool = true
     @State private var showDeleteConfirm: Bool = false
+    @State private var showReplaceChoice: Bool = false
     @FocusState private var defaultDoseFocused: Bool
     /// Flag pour ne charger `medication.intakes` qu'une seule fois quand
     /// l'éditeur apparaît. `.onAppear` re-fire en iOS 17 après chaque pop
@@ -505,6 +528,9 @@ struct MedicationEditor: View {
         let kind: MedicationKind
         let active: Bool
         let notifyEnabled: Bool
+        /// Vrai quand la famille a choisi d'arrêter le plan en cours et d'en
+        /// créer un nouveau plutôt que de le modifier sur place.
+        var replacesExisting: Bool = false
     }
 
     var body: some View {
@@ -616,7 +642,10 @@ struct MedicationEditor: View {
                 } header: {
                     Text("Prises")
                 } footer: {
-                    Text("Chaque prise a sa propre heure, sa dose, ses jours actifs et son rappel. Créez deux prises pour différencier semaine et week-end, par exemple.")
+                    Text("Chaque prise a sa propre heure, sa dose, ses jours actifs et son rappel. Créez deux prises pour différencier semaine et week-end, par exemple."
+                         + (medication != nil
+                            ? "\n\nPour changer la dose ou les horaires, l'application vous proposera d'arrêter ce plan et d'en créer un nouveau, chacun daté : c'est ce qui permet ensuite de comparer les crises et les symptômes avant et après."
+                            : ""))
                 }
             }
 
@@ -669,18 +698,11 @@ struct MedicationEditor: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Enregistrer") {
                     defaultDoseFocused = false
-                    let amount = Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) ?? 0
-                    let finalIntakes = kind == .regular ? intakes : []
-                    onSave(SaveResult(
-                        name: name.trimmingCharacters(in: .whitespaces),
-                        defaultDose: amount,
-                        unit: unit,
-                        intakes: finalIntakes,
-                        kind: kind,
-                        active: active,
-                        notifyEnabled: notifyEnabled
-                    ))
-                    dismiss()
+                    if medication != nil, !planChanges.isEmpty, planChangeRequiresNewPlan {
+                        showReplaceChoice = true
+                    } else {
+                        commit(replacing: false)
+                    }
                 }
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty
                           || Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) == nil
@@ -700,6 +722,18 @@ struct MedicationEditor: View {
             hasLoaded = true
         }
         .confirmationDialog(
+            "Vous changez le traitement",
+            isPresented: $showReplaceChoice,
+            titleVisibility: .visible
+        ) {
+            Button("Arrêter l'ancien et créer le nouveau") { commit(replacing: true) }
+            Button("Modifier l'existant quand même") { commit(replacing: false) }
+            Button("Annuler", role: .cancel) { }
+        } message: {
+            Text(planChanges.joined(separator: "\n")
+                 + "\n\nArrêter l'ancien plan et en créer un nouveau garde chacun daté : vous pourrez comparer les crises et les symptômes avant et après. Modifier l'existant efface cette trace.")
+        }
+        .confirmationDialog(
             "Supprimer ce médicament ?",
             isPresented: $showDeleteConfirm,
             titleVisibility: .visible
@@ -712,6 +746,41 @@ struct MedicationEditor: View {
         } message: {
             Text("Cette action est irréversible. Le médicament et son historique de prises seront effacés.")
         }
+    }
+
+    // MARK: Changement de traitement
+
+    private var enteredAmount: Double {
+        Double(defaultDoseText.replacingOccurrences(of: ",", with: ".")) ?? 0
+    }
+
+    private var newValues: MedicationPlanChange.Values {
+        .init(doseAmount: enteredAmount, unit: unit, kind: kind, isActive: active,
+              intakes: kind == .regular ? intakes : [])
+    }
+
+    private var planChanges: [String] {
+        guard let medication else { return [] }
+        return MedicationPlanChange.changes(from: .init(medication), to: newValues)
+    }
+
+    private var planChangeRequiresNewPlan: Bool {
+        guard let medication else { return false }
+        return MedicationPlanChange.requiresNewPlan(from: .init(medication), to: newValues)
+    }
+
+    private func commit(replacing: Bool) {
+        onSave(SaveResult(
+            name: name.trimmingCharacters(in: .whitespaces),
+            defaultDose: enteredAmount,
+            unit: unit,
+            intakes: kind == .regular ? intakes : [],
+            kind: kind,
+            active: active,
+            notifyEnabled: notifyEnabled,
+            replacesExisting: replacing
+        ))
+        dismiss()
     }
 
     @ViewBuilder

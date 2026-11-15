@@ -17,8 +17,10 @@ struct DashboardView: View {
     /// → on initialise avec les plus fréquents au premier render.
     @State private var selectedSymptoms: Set<RettSymptom>?
     @State private var showSymptomPicker = false
-    /// Les graphiques autres que la fréquence sont repliés par défaut.
-    @State private var showAllCharts = false
+    /// Ordre et choix des graphiques, propres à cet appareil.
+    private let layout = BilanLayoutStore.shared
+    @State private var showLayoutEditor = false
+    @State private var showFactorsHelp = false
     /// Mode d'affichage des graphiques de symptômes : fréquence ou intensité moyenne.
     @State private var symptomChartMode: SymptomChartMode = .frequency
 
@@ -106,29 +108,19 @@ struct DashboardView: View {
 
                 insightsSection
 
-                frequencyChart
-
-                // Décision 3 : le Bilan est pour le parent, réduit à
-                // l'essentiel. Les autres graphiques ne disparaissent pas —
-                // ils servent à préparer une consultation — mais ils ne sont
-                // plus la première chose qu'on voit.
-                DisclosureGroup(isExpanded: $showAllCharts) {
-                    VStack(spacing: 16) {
-                        intensityChart
-                        moodChart
-                        adherenceChart
-                        symptomsSection
-                    }
-                    .padding(.top, 8)
-                } label: {
-                    Label(
-                        showAllCharts ? "Masquer les autres graphiques" : "Voir les autres graphiques",
-                        systemImage: "chart.bar.doc.horizontal"
-                    )
-                    .font(AFSRFont.body(15))
-                    .foregroundStyle(.afsrPurpleAdaptive)
+                // Tous les graphiques sont affichés par défaut ; chacun peut
+                // être masqué ou déplacé depuis « Personnaliser le Bilan ».
+                ForEach(layout.visibleCharts) { chart in
+                    chartView(for: chart)
                 }
-                .tint(.afsrPurpleAdaptive)
+
+                Button {
+                    showLayoutEditor = true
+                } label: {
+                    Label("Personnaliser le Bilan", systemImage: "slider.horizontal.3")
+                        .font(AFSRFont.body(15))
+                        .foregroundStyle(.afsrPurpleAdaptive)
+                }
                 .padding(.vertical, 4)
 
                 Spacer(minLength: 24)
@@ -138,8 +130,31 @@ struct DashboardView: View {
         .background(Color.afsrBackground.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showLayoutEditor) { BilanLayoutEditor(store: layout) }
+        .sheet(isPresented: $showFactorsHelp) {
+            NavigationStack {
+                FactorsHelpView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("OK") { showFactorsHelp = false }
+                        }
+                    }
+            }
+        }
         .onChange(of: viewModel.scale) { _, _ in crosshairDate = nil }
         .onChange(of: viewModel.referenceDate) { _, _ in crosshairDate = nil }
+    }
+
+    @ViewBuilder
+    private func chartView(for chart: BilanChart) -> some View {
+        switch chart {
+        case .frequency: frequencyChart
+        case .intensity: intensityChart
+        case .mood:      moodChart
+        case .adherence: adherenceChart
+        case .symptoms:  symptomsSection
+        case .factors:   factorsSection
+        }
     }
 
     private var title: String {
@@ -519,6 +534,64 @@ struct DashboardView: View {
                     }
                 }
                 .chartOverlay(content: crosshairCapture)
+            }
+        }
+    }
+
+    // MARK: - Facteurs associés
+
+    /// Regarde les 90 derniers jours jusqu'à la fin de la fenêtre, quelle que
+    /// soit l'échelle choisie : voir `JournalFactors.lookbackDays`.
+    private var factorDays: [JournalFactors.Day] {
+        let end = min(viewModel.windowBounds().end, Date().addingTimeInterval(86_400))
+        return JournalFactors.days(
+            seizures: seizures, symptoms: symptoms, observations: observations,
+            moods: moods, logs: logs, endingBefore: end
+        )
+    }
+
+    private var factorsSection: some View {
+        let days = factorDays
+        let findings = JournalFactors.findings(in: days)
+        let journalDays = JournalFactors.daysWithJournal(in: days)
+        return SectionCard(title: "Facteurs associés", systemImage: "link", accent: .afsrPurpleAdaptive) {
+            VStack(alignment: .leading, spacing: 12) {
+                if findings.isEmpty {
+                    Text(journalDays < JournalFactors.minimumDays
+                         ? "Pas encore assez de données : \(journalDays) jour\(journalDays > 1 ? "s" : "") de journal sur les \(JournalFactors.lookbackDays) derniers. Il en faut au moins \(JournalFactors.minimumDays)."
+                         : "Aucun lien net entre le journal et les crises ou les symptômes sur les \(JournalFactors.lookbackDays) derniers jours.")
+                        .font(AFSRFont.body(15))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(findings) { f in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: f.factor.systemImage)
+                                .foregroundStyle(.afsrPurpleAdaptive)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(f.sentence)
+                                    .font(AFSRFont.body(15))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(f.caveat)
+                                    .font(AFSRFont.caption())
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                Text("Calculé sur cet iPhone, sur les \(JournalFactors.lookbackDays) derniers jours. Un lien n'est pas une cause : à voir avec l'équipe soignante.")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    showFactorsHelp = true
+                } label: {
+                    Label("Comment lire ces résultats ?", systemImage: "questionmark.circle")
+                        .font(AFSRFont.caption())
+                }
+                .foregroundStyle(.afsrPurpleAdaptive)
             }
         }
     }
