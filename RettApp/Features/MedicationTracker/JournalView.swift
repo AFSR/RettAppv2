@@ -673,6 +673,23 @@ private enum JournalFeedItem: Identifiable {
         }
     }
 
+    /// Le prénom de l'autre parent, quand c'est lui qui a noté l'entrée.
+    ///
+    /// `nil` pour mes propres entrées — étiqueter chaque ligne de son propre
+    /// prénom n'apprendrait rien et alourdirait le fil. `nil` aussi quand
+    /// personne n'a renseigné de prénom, et pour tout ce qui a été saisi avant
+    /// novembre 2026 : mieux vaut ne rien dire qu'inventer un auteur.
+    var auteurAutre: String? {
+        let auteur: String
+        switch self {
+        case .medication(let l): auteur = l.authorName
+        case .seizure(let s): auteur = s.authorName
+        case .mood(let m): auteur = m.authorName
+        case .symptom(let s): auteur = s.authorName
+        }
+        return ParentIdentity.estUnAutre(auteur) ? auteur : nil
+    }
+
     /// Ce que la confirmation nomme. « Supprimer cette entrée ? » ne dit pas
     /// assez : sur un fil qui mêle quatre natures d'enregistrement, on ne sait
     /// pas ce qu'on s'apprête à perdre.
@@ -694,16 +711,27 @@ private struct JournalFeedRow: View {
     let onSeizureTap: () -> Void
 
     var body: some View {
-        contenu
-            // Un menu contextuel, et non un balayage : le fil est un
-            // `LazyVStack` et non une `List`, où `swipeActions` n'existe pas.
-            // L'appui long est aussi plus difficile à déclencher par accident
-            // qu'un balayage, ce qui convient à une suppression.
-            .contextMenu {
-                Button("Supprimer", systemImage: "trash", role: .destructive) {
-                    onDelete(item)
-                }
+        VStack(alignment: .leading, spacing: 3) {
+            contenu
+            // Sous la ligne, et seulement quand l'entrée vient de l'autre
+            // parent : le fil mêle ce que chacun note, et rien ne le disait.
+            // Aligné sur le texte de la ligne, après la pastille d'icône.
+            if let auteur = item.auteurAutre {
+                Label("Noté par \(auteur)", systemImage: "person.fill")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 46)
             }
+        }
+        // Un menu contextuel, et non un balayage : le fil est un
+        // `LazyVStack` et non une `List`, où `swipeActions` n'existe pas.
+        // L'appui long est aussi plus difficile à déclencher par accident
+        // qu'un balayage, ce qui convient à une suppression.
+        .contextMenu {
+            Button("Supprimer", systemImage: "trash", role: .destructive) {
+                onDelete(item)
+            }
+        }
     }
 
     @ViewBuilder

@@ -40,6 +40,19 @@ final class MoodEntry {
     var notes: String
     var childProfileId: UUID?
     /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+
+    /// Le prénom du parent qui a noté cette entrée.
+    ///
+    /// Vide quand personne ne l'a renseigné, et pour tout ce qui a été saisi
+    /// avant novembre 2026 : l'app n'affiche alors rien plutôt que d'inventer
+    /// un auteur. C'est aussi le cas quand on suit seul — l'auteur n'a de sens
+    /// qu'à deux.
+    ///
+    /// Un prénom recopié à la saisie, et non une référence vers un compte :
+    /// l'entrée doit rester lisible si le partage s'arrête, et rien ici ne
+    /// doit dépendre de CloudKit.
+    var authorName: String = ""
+
     var lastModifiedAt: Date = Date()
 
     var level: MoodLevel {
@@ -52,13 +65,15 @@ final class MoodEntry {
         timestamp: Date = Date(),
         level: MoodLevel,
         notes: String = "",
-        childProfileId: UUID? = nil
+        childProfileId: UUID? = nil,
+        authorName: String = ParentIdentity.current
     ) {
         self.id = id
         self.timestamp = timestamp
         self.levelRaw = level.rawValue
         self.notes = notes
         self.childProfileId = childProfileId
+        self.authorName = authorName
     }
 }
 

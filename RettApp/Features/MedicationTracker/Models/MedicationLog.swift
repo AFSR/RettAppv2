@@ -22,6 +22,19 @@ final class MedicationLog {
     /// Raison libre pour les prises ponctuelles (« fièvre », « post-crise », etc.).
     var adhocReason: String = ""
     /// Tie-breaker last-writer-wins pour la synchro CloudKit (cf. SyncTimestamped).
+
+    /// Le prénom du parent qui a noté cette entrée.
+    ///
+    /// Vide quand personne ne l'a renseigné, et pour tout ce qui a été saisi
+    /// avant novembre 2026 : l'app n'affiche alors rien plutôt que d'inventer
+    /// un auteur. C'est aussi le cas quand on suit seul — l'auteur n'a de sens
+    /// qu'à deux.
+    ///
+    /// Un prénom recopié à la saisie, et non une référence vers un compte :
+    /// l'entrée doit rester lisible si le partage s'arrête, et rien ici ne
+    /// doit dépendre de CloudKit.
+    var authorName: String = ""
+
     var lastModifiedAt: Date = Date()
 
     var doseUnit: DoseUnit {
@@ -41,7 +54,8 @@ final class MedicationLog {
         childProfileId: UUID? = nil,
         exportedToHealthKit: Bool = false,
         isAdHoc: Bool = false,
-        adhocReason: String = ""
+        adhocReason: String = "",
+        authorName: String = ParentIdentity.current
     ) {
         self.id = id
         self.medicationId = medicationId
@@ -52,6 +66,7 @@ final class MedicationLog {
         self.dose = dose
         self.doseUnitRaw = doseUnit.rawValue
         self.childProfileId = childProfileId
+        self.authorName = authorName
         self.exportedToHealthKit = exportedToHealthKit
         self.isAdHoc = isAdHoc
         self.adhocReason = adhocReason

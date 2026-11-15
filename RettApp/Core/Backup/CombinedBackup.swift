@@ -77,6 +77,12 @@ struct CombinedBackup: Codable {
         let isAdHoc: Bool
         let adhocReason: String
         var lastModifiedAt: Date? = nil
+        /// Optionnel, et pas une chaîne vide par défaut : le décodeur
+        /// synthétisé de Swift échoue sur une clé absente et ne retombe pas
+        /// sur la valeur par défaut d'une propriété. Non optionnel, il rendrait
+        /// illisibles toutes les sauvegardes — et toutes les corbeilles —
+        /// écrites avant novembre 2026.
+        var authorName: String? = nil
     }
 
     struct SeizureBackup: Codable {
@@ -89,6 +95,12 @@ struct CombinedBackup: Codable {
         let notes: String
         let childProfileId: UUID?
         var lastModifiedAt: Date? = nil
+        /// Optionnel, et pas une chaîne vide par défaut : le décodeur
+        /// synthétisé de Swift échoue sur une clé absente et ne retombe pas
+        /// sur la valeur par défaut d'une propriété. Non optionnel, il rendrait
+        /// illisibles toutes les sauvegardes — et toutes les corbeilles —
+        /// écrites avant novembre 2026.
+        var authorName: String? = nil
     }
 
     struct MoodBackup: Codable {
@@ -98,6 +110,12 @@ struct CombinedBackup: Codable {
         let notes: String
         let childProfileId: UUID?
         var lastModifiedAt: Date? = nil
+        /// Optionnel, et pas une chaîne vide par défaut : le décodeur
+        /// synthétisé de Swift échoue sur une clé absente et ne retombe pas
+        /// sur la valeur par défaut d'une propriété. Non optionnel, il rendrait
+        /// illisibles toutes les sauvegardes — et toutes les corbeilles —
+        /// écrites avant novembre 2026.
+        var authorName: String? = nil
     }
 
     struct ObservationBackup: Codable {
@@ -132,6 +150,12 @@ struct CombinedBackup: Codable {
         let notes: String
         let childProfileId: UUID?
         var lastModifiedAt: Date? = nil
+        /// Optionnel, et pas une chaîne vide par défaut : le décodeur
+        /// synthétisé de Swift échoue sur une clé absente et ne retombe pas
+        /// sur la valeur par défaut d'une propriété. Non optionnel, il rendrait
+        /// illisibles toutes les sauvegardes — et toutes les corbeilles —
+        /// écrites avant novembre 2026.
+        var authorName: String? = nil
     }
 
     struct RevisionBackup: Codable {
