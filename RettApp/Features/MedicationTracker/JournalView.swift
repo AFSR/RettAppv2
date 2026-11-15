@@ -423,6 +423,18 @@ private struct JournalContent: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, 4)
+
+                    // Le partage se voyait seulement dans Réglages → Partage,
+                    // à deux touches. Les deux parents regardent ce fil tous
+                    // les jours : l'état se lit ICI, et dans les mêmes termes
+                    // de chaque côté — l'acceptation est réciproque, son
+                    // affichage doit l'être aussi.
+                    if let partage = mentionDePartage {
+                        Label(partage, systemImage: "person.2.fill")
+                            .font(AFSRFont.caption())
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
+                    }
                     LazyVStack(spacing: 10) {
                         ForEach(combinedFeed) { item in
                             JournalFeedRow(
@@ -464,6 +476,44 @@ private struct JournalContent: View {
         } message: { _ in
             Text("L'entrée part en corbeille et reste récupérable trente jours, dans Réglages → Données. Chez l'autre parent, elle disparaît et ne revient pas.")
         }
+    }
+
+    /// Ce que le fil annonce du partage, ou `nil` quand il n'y a rien à dire.
+    ///
+    /// Affiché seulement quand le partage est ACTIF — une invitation envoyée
+    /// mais pas encore acceptée n'a rien à faire ici, et un parent qui suit
+    /// seul n'a pas à lire une ligne sur un partage qui n'existe pas.
+    ///
+    /// Le propriétaire ne peut pas connaître le prénom de l'autre par
+    /// CloudKit : `discoverUserIdentity` n'est plus servie depuis iOS 17, et
+    /// le champ du partage ne porte que SON propre prénom. On le tire donc des
+    /// entrées que l'autre a écrites, qui sont déjà sous les yeux. Tant qu'il
+    /// n'a rien noté, on le dit sans le nommer plutôt que d'inventer.
+    private var mentionDePartage: String? {
+        switch sync.role {
+        case .none:
+            return nil
+        case .participant:
+            if let nom = sync.ownerDisplayNameFromShare, !nom.isEmpty {
+                return "Partagé avec \(nom)"
+            }
+            return "Partagé avec l'autre parent"
+        case .owner:
+            let accepte = sync.participants.contains { !$0.isOwner && $0.acceptanceStatus == .accepted }
+            guard accepte else { return nil }
+            if let nom = prenomDeLAutreParent {
+                return "Partagé avec \(nom)"
+            }
+            return "Partagé avec l'autre parent"
+        }
+    }
+
+    /// Le prénom lu sur l'entrée la plus récente que je n'ai pas écrite.
+    private var prenomDeLAutreParent: String? {
+        combinedFeed
+            .sorted { $0.time > $1.time }
+            .compactMap(\.auteurAutre)
+            .first
     }
 
     /// Sorti du `body` : l'interpolation à l'intérieur d'un modificateur a fait
@@ -634,6 +684,15 @@ private struct JournalContent: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
+
+            // Ici aussi, et pas seulement sous le fil : un parent qui vient
+            // d'accepter une invitation et regarde une journée vide est
+            // précisément celui qui se demande s'il est relié à l'autre.
+            if let partage = mentionDePartage {
+                Label(partage, systemImage: "person.2.fill")
+                    .font(AFSRFont.caption())
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.top, 28)
     }
