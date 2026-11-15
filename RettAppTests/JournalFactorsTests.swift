@@ -70,4 +70,45 @@ final class JournalFactorsTests: XCTestCase {
     func test_pValue_decroitAvecLeNombreDeJours() {
         XCTAssertLessThan(JournalFactors.pValue(r: 0.5, n: 60), JournalFactors.pValue(r: 0.5, n: 15))
     }
+
+    // MARK: - Plan médicamenteux
+
+    private let keppra = JournalFactors.MedicationRef(id: UUID(), name: "Keppra")
+
+    /// 30 jours : la dose passe de 250 à 500 au 16e jour.
+    private func daysWithDoseChange(seizures: (Int) -> Int) -> [JournalFactors.Day] {
+        (0..<30).map { i in
+            var d = JournalFactors.Day(start: Date(timeIntervalSince1970: Double(i) * 86_400))
+            d.factors[.medicationDose(keppra)] = i < 15 ? 250 : 500
+            d.seizureCount = seizures(i)
+            return d
+        }
+    }
+
+    func test_changementDeDose_estRelieAuxCrises_etRenvoieAuMedecin() {
+        // Crises : 3 ou 4 avant la hausse, 0 ou 1 après, en alternance.
+        let data = daysWithDoseChange { i in i < 15 ? 3 + i % 2 : i % 2 }
+        let f = JournalFactors.findings(in: data)
+        XCTAssertEqual(f.first?.factor, .medicationDose(keppra))
+        XCTAssertTrue(f.first?.sentence.contains("la dose quotidienne de Keppra est plus bas, il y a plus de crises") == true,
+                      f.first?.sentence ?? "aucun constat")
+        XCTAssertTrue(f.first?.caveat.contains("avis du médecin") == true,
+                      "un constat sur un traitement doit renvoyer au médecin")
+    }
+
+    func test_doseConstante_neDitRien() {
+        let data = (0..<30).map { i -> JournalFactors.Day in
+            var d = JournalFactors.Day(start: Date(timeIntervalSince1970: Double(i) * 86_400))
+            d.factors[.medicationDose(keppra)] = 250
+            d.seizureCount = i % 3
+            return d
+        }
+        XCTAssertTrue(JournalFactors.findings(in: data).isEmpty,
+                      "sans variation de dose, il n'y a rien à corréler")
+    }
+
+    func test_deuxNomsPourLeMemeMedicament_nFontQu_uneSerie() {
+        let renomme = JournalFactors.MedicationRef(id: keppra.id, name: "Lévétiracétam")
+        XCTAssertEqual(JournalFactors.Factor.medicationDose(keppra), .medicationDose(renomme))
+    }
 }

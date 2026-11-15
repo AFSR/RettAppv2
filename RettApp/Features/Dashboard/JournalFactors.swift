@@ -25,10 +25,52 @@ enum JournalFactors {
         var symptomCounts: [RettSymptom: Int] = [:]
     }
 
-    /// Les champs du journal qu'on sait croiser.
-    enum Factor: String, CaseIterable {
+    /// Un médicament du plan, identifié par son `id` seul : le nom peut être
+    /// corrigé en cours de route (faute de frappe, marque → générique) sans
+    /// que ses jours se scindent en deux séries.
+    struct MedicationRef: Hashable {
+        let id: UUID
+        let name: String
+        static func == (a: Self, b: Self) -> Bool { a.id == b.id }
+        func hash(into h: inout Hasher) { h.combine(id) }
+    }
+
+    /// Ce qu'on sait croiser : les champs du journal et le plan médicamenteux.
+    ///
+    /// Seuls les médicaments **réguliers** y figurent. Un médicament à la
+    /// demande se prend *à cause* d'une crise ou d'un symptôme : le croiser
+    /// ferait conclure que le Rivotril « provoque » les crises, ce qui
+    /// renverse la causalité.
+    enum Factor: Hashable {
         case sleepQuality, sleepHours, meals, hydration
         case stoolCount, urine, mood, adherence
+        /// Dose quotidienne prévue au plan, d'après les prises planifiées du
+        /// jour : c'est ce qui change quand on modifie le dosage.
+        case medicationDose(MedicationRef)
+        /// Part des prises planifiées du jour réellement faites, pour ce médicament.
+        case medicationTaken(MedicationRef)
+
+        var id: String {
+            switch self {
+            case .sleepQuality: return "sleepQuality"
+            case .sleepHours:   return "sleepHours"
+            case .meals:        return "meals"
+            case .hydration:    return "hydration"
+            case .stoolCount:   return "stoolCount"
+            case .urine:        return "urine"
+            case .mood:         return "mood"
+            case .adherence:    return "adherence"
+            case .medicationDose(let m):  return "dose|\(m.id)"
+            case .medicationTaken(let m): return "taken|\(m.id)"
+            }
+        }
+
+        var isMedication: Bool {
+            switch self {
+            case .medicationDose, .medicationTaken: return true
+            default: return false
+            }
+        }
 
         /// Sujet de la phrase « les jours où … est plus élevé / plus bas » :
         /// pas d'adjectif à accorder, donc un seul gabarit pour tous.
@@ -42,6 +84,8 @@ enum JournalFactors {
             case .urine:        return "la quantité d'urines"
             case .mood:         return "l'humeur"
             case .adherence:    return "l'observance des médicaments"
+            case .medicationDose(let m):  return "la dose quotidienne de \(m.name)"
+            case .medicationTaken(let m): return "la part des prises de \(m.name) faites"
             }
         }
 
@@ -52,7 +96,7 @@ enum JournalFactors {
             case .hydration:  return "drop.fill"
             case .stoolCount, .urine: return "toilet.fill"
             case .mood:       return "face.smiling"
-            case .adherence:  return "pill.fill"
+            case .adherence, .medicationDose, .medicationTaken: return "pill.fill"
             }
         }
     }
@@ -88,7 +132,7 @@ enum JournalFactors {
         let n: Int
         let pValue: Double
 
-        var id: String { "\(factor.rawValue)|\(outcome)|\(lag.rawValue)" }
+        var id: String { "\(factor.id)|\(outcome)|\(lag.rawValue)" }
         /// Facteur haut ↔ résultat plus fréquent.
         var increases: Bool { r > 0 }
 
@@ -102,8 +146,14 @@ enum JournalFactors {
         }
 
         var caveat: String {
-            "Lien \(MedicalReportAnalysis.CorrelationStrength.classify(r).label), observé sur \(n) jours. "
-            + "Ce n'est pas une cause."
+            let base = "Lien \(MedicalReportAnalysis.CorrelationStrength.classify(r).label), observé sur \(n) jours. "
+                + "Ce n'est pas une cause."
+            // Un traitement change rarement seul (croissance, saison, autre
+            // médicament) : on le dit, et on renvoie au médecin plutôt que
+            // de laisser lire une consigne dans un coefficient.
+            guard factor.isMedication else { return base }
+            return base + " Un changement de traitement coïncide souvent avec d'autres changements. "
+                + "Ne modifiez jamais un traitement sans l'avis du médecin."
         }
     }
 
@@ -134,8 +184,12 @@ enum JournalFactors {
         let outcomes: [Outcome] = [.seizures, .seizureDuration]
             + seen.sorted { $0.rawValue < $1.rawValue }.map(Outcome.symptom)
 
+        // Les facteurs sont ceux réellement présents : un médicament absent
+        // de la période n'a pas de série à croiser.
+        let factors = Set(days.flatMap { $0.factors.keys }).sorted { $0.id < $1.id }
+
         var found: [Finding] = []
-        for factor in Factor.allCases {
+        for factor in factors {
             for outcome in outcomes {
                 for lag in [Lag.sameDay, .previousDay] {
                     if let f = finding(factor, outcome, lag, days) { found.append(f) }
@@ -147,7 +201,7 @@ enum JournalFactors {
         // fort, sinon on répéterait la même chose le jour même puis la veille.
         var best: [String: Finding] = [:]
         for f in found {
-            let key = "\(f.factor.rawValue)|\(f.outcome)"
+            let key = "\(f.factor.id)|\(f.outcome)"
             if let old = best[key], abs(old.r) >= abs(f.r) { continue }
             best[key] = f
         }

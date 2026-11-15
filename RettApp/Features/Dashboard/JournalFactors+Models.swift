@@ -43,6 +43,13 @@ extension JournalFactors {
         var observationByDay: [Date: DailyObservation] = [:]
         for o in observations { observationByDay[key(o.dayStart)] = o }
 
+        // Nom le plus récent de chaque médicament, pour une seule étiquette
+        // même si le nom a été corrigé pendant la période.
+        var names: [UUID: String] = [:]
+        for l in logs.sorted(by: { $0.scheduledTime < $1.scheduledTime }) where !l.isAdHoc {
+            names[l.medicationId] = l.medicationName
+        }
+
         var result: [Day] = []
         var cursor = first
         while cursor < endDay {
@@ -66,6 +73,16 @@ extension JournalFactors {
             }
             if let l = logsByDay[cursor], !l.isEmpty {
                 day.factors[.adherence] = Double(l.filter(\.taken).count) / Double(l.count)
+
+                // Plan médicamenteux, médicament par médicament. La dose vient
+                // des prises planifiées (et non des prises faites) : ainsi
+                // une prise oubliée ne se déguise pas en baisse de dosage,
+                // elle est portée par `.medicationTaken`.
+                for (medId, group) in Dictionary(grouping: l, by: \.medicationId) {
+                    let ref = MedicationRef(id: medId, name: names[medId] ?? group[0].medicationName)
+                    day.factors[.medicationDose(ref)] = group.reduce(0) { $0 + $1.dose }
+                    day.factors[.medicationTaken(ref)] = Double(group.filter(\.taken).count) / Double(group.count)
+                }
             }
 
             result.append(day)
