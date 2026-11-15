@@ -26,6 +26,13 @@
     la déclaration de confidentialité d'App Store Connect — un relecteur qui
     compare les deux doit y trouver le même contenu.
 
+    La position précise y figure aussi. L'épingle posée sur un lieu part avec
+    l'avis ou le lieu proposé (latitude et longitude du `Payload` de
+    `PlaceModels.swift`), vers afsr.fr. Elle est relevée une seule fois, à la
+    demande, par `OneShotLocator`, et l'app ne suit jamais les déplacements —
+    mais ce qui sort de l'appareil se déclare, et la politique de
+    confidentialité du site doit le dire dans les mêmes termes.
+
     Rien n'est lié à du pistage : « Tracking » est faux partout, et la liste
     des domaines de pistage est vide. Aucune bibliothèque tierce n'est
     embarquée, donc aucun manifeste à agréger.
@@ -119,6 +126,21 @@
                  quitte pas l'appareil — mais il identifie une personne. -->
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- Les coordonnées de l'épingle d'un lieu, envoyées avec l'avis
+                 ou la proposition. Liées à l'adhérent qui les dépose, comme
+                 le reste. Aucun relevé en continu, aucun historique. -->
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePreciseLocation</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
             <key>NSPrivacyCollectedDataTypeTracking</key>

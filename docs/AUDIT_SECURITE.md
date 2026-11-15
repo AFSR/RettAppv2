@@ -199,19 +199,24 @@ périmètre de l'AFSR : elles sont déclarées au manifeste (§8) et relèvent d
 | Suivi (ATT) | ✅ Aucun (`NSPrivacyTracking = false`) |
 | API à motif requis | ✅ `UserDefaults` (`CA92.1`), horodatage de fichiers (`C617.1`) |
 | Clés d'usage `Info.plist` | ✅ Santé ×2, Face ID, position, caméra, toutes précises |
-| **Types collectés déclarés** | ⚠️ **5** : nom, courriel, adresse postale, téléphone, identifiant utilisateur. **La position précise n'y est pas** |
+| Types collectés déclarés | ✅ **6** au manifeste : nom, courriel, adresse postale, téléphone, identifiant utilisateur, **position précise** (ajoutée le 2026-11-15) |
+| Déclaration App Store Connect, politique du site | ⚠️ Doivent dire la même chose que le manifeste ; **non vérifié ici** |
 
-### ⚠️ Anomalie : la position précise n'est pas déclarée
+### Position précise : manifeste corrigé, le reste à aligner
 
 `PlaceModels.swift` envoie `latitude` et `longitude` dans le `Payload` de l'avis, et
-`PlacePinPickerView` les relève avec `OneShotLocator`. Or `PrivacyInfo.xcprivacy` ne contient
-aucun type de position, alors que `.claude/rules/promesses-confidentialite.md` dit qu'elle y
-est déclarée. Sur ce point, **le manifeste est plus faible que la règle et que le code**.
+`PlacePinPickerView` les relève avec `OneShotLocator`, une seule fois, à la demande.
+Le manifeste ne déclarait pas ce type alors que `.claude/rules/promesses-confidentialite.md`
+disait le contraire. **Il le déclare depuis le 2026-11-15** : position précise, liée à
+l'identité, sans pistage, pour le fonctionnement de l'app.
 
-À faire ensemble, comme la règle l'exige : ajouter le type de position précise au manifeste
-(lié à l'identité, sans pistage, pour le fonctionnement de l'app), vérifier la déclaration
-de confidentialité d'App Store Connect, et relire la politique publiée sur le site. Je n'ai
-pas modifié le manifeste : c'est une déclaration faite à Apple.
+La règle demande trois corrections ensemble ; seule la première est faite ici :
+
+- [x] `Info.plist` : la clé d'usage de la position existait déjà et est précise ;
+- [x] `PrivacyInfo.xcprivacy` : type ajouté ;
+- [ ] la déclaration de confidentialité d'**App Store Connect** (non vérifiable d'ici) ;
+- [ ] la **politique de confidentialité** du site, dans les trois langues, et le test
+  `LegalPagesTest` qui la garde (dépôt `AFSR/website`, non consulté pour cet audit).
 
 ## 9. Menaces & mitigations
 
@@ -237,8 +242,9 @@ L'app est publiée (1.9) : les priorités ci-dessous ne sont plus « avant publi
 
 ### 🔴 P0 — À traiter avant le prochain envoi
 
-1. **Déclarer la position précise** dans `PrivacyInfo.xcprivacy`, App Store Connect et la
-   politique de confidentialité (§8). Les trois ensemble.
+1. **Aligner App Store Connect et la politique du site** sur la position précise, désormais
+   déclarée au manifeste (§8). Le manifeste seul ne suffit pas : les trois doivent dire
+   la même chose.
 2. **Déployer le type `Tombstone` en production CloudKit** (`.claude/rules/sync-cloudkit.md`) :
    sans cela, le partage entre parents casse chez les vraies familles, et nulle part ailleurs.
    Non déployé au 11 novembre 2026 selon `CLAUDE.md` ; l'état de la console n'a pas été
